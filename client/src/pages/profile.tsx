@@ -50,7 +50,21 @@ export default function Profile() {
     try {
       const response = await api.users.depositCheckout(amount);
       if (response.url) {
-        window.location.href = response.url;
+        const width = 500;
+        const height = 700;
+        const left = window.screenX + (window.outerWidth - width) / 2;
+        const top = window.screenY + (window.outerHeight - height) / 2;
+        const popup = window.open(
+          response.url,
+          'stripe_checkout',
+          `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
+        );
+        if (!popup) {
+          window.location.href = response.url;
+        } else {
+          setDepositDialogOpen(false);
+          setIsProcessing(false);
+        }
       }
     } catch (error: any) {
       toast({ description: error.message || "Failed to start checkout", variant: "destructive" });
