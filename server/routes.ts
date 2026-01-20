@@ -197,10 +197,14 @@ export async function registerRoutes(
 
   app.post("/api/pools", requireAuth, async (req, res, next) => {
     try {
-      const data = insertPoolSchema.parse({
+      // Convert deadline string to Date before validation
+      const requestBody = {
         ...req.body,
         creatorId: req.session.userId,
-      });
+        deadline: req.body.deadline ? new Date(req.body.deadline) : undefined,
+      };
+      
+      const data = insertPoolSchema.parse(requestBody);
 
       const pool = await storage.createPool(data);
       
