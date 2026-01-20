@@ -5,6 +5,7 @@ import session from "express-session";
 import { registerSchema, loginSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { z } from "zod";
+import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
 declare module "express-session" {
   interface SessionData {
@@ -426,6 +427,60 @@ export async function registerRoutes(
     try {
       const isFollowing = await storage.isFollowing(req.session.userId!, req.params.id);
       res.json({ isFollowing });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Stripe routes
+  app.get("/api/stripe/config", async (req, res, next) => {
+    try {
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Create checkout session for pool contribution
+  app.post("/api/pools/:poolId/checkout", requireAuth, async (req, res, next) => {
+    try {
+      const { amount } = req.body;
+      const poolId = req.params.poolId;
+      const userId = req.session.userId!;
+
+      const pool = await storage.getPool(poolId);
+      if (!pool) {
+        return res.status(404).json({ message: "Pool not found" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Contribution to ${pool.title}`,
+              description: pool.description || undefined,
+            },
+            unit_amount: Math.round(parseFloat(amount) * 100),
+          },
+          quantity: 1,
+        }],
+        mode: 'payment',
+        success_url: `${baseUrl}/pool/${poolId}?payment=success`,
+        cancel_url: `${baseUrl}/pool/${poolId}?payment=cancelled`,
+        metadata: {
+          poolId,
+          userId,
+          amount,
+        },
+      });
+
+      res.json({ url: session.url });
     } catch (error) {
       next(error);
     }

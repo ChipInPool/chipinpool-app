@@ -45,3 +45,4 @@ waitForPort = 5000
 
 [agent]
 mockupState = "FULLSTACK"
+integrations = ["stripe:2.0.0"]
