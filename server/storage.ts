@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { 
-  users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites,
+  users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites, walletDeposits,
   type User, type InsertUser, type Pool, type InsertPool, type Contribution, type InsertContribution,
   type Comment, type InsertComment, type Notification, type InsertNotification,
   type VirtualCard, type InsertVirtualCard, type Transaction, type InsertTransaction,
@@ -322,6 +322,28 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(users, eq(follows.followerId, users.id))
       .where(eq(follows.followingId, userId));
     return result.map(r => r.user);
+  }
+
+  async createWalletDeposit(userId: string, amount: string, sessionId: string): Promise<boolean> {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx.select().from(walletDeposits).where(eq(walletDeposits.stripeSessionId, sessionId));
+      if (existing) {
+        console.log(`Wallet deposit already exists for session ${sessionId}`);
+        return false;
+      }
+
+      await tx.insert(walletDeposits).values({
+        userId,
+        amount,
+        stripeSessionId: sessionId,
+      });
+
+      await tx.update(users).set({ 
+        balance: sql`${users.balance} + ${amount}`
+      }).where(eq(users.id, userId));
+
+      return true;
+    });
   }
 }
 

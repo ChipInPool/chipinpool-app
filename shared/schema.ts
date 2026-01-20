@@ -130,6 +130,14 @@ export const invites = pgTable("invites", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const walletDeposits = pgTable("wallet_deposits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  stripeSessionId: varchar("stripe_session_id").notNull().unique(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, poolsCreated: true, totalContributed: true, balance: true, rating: true });
 export const insertPoolSchema = createInsertSchema(pools).omit({ id: true, createdAt: true, updatedAt: true, currentAmount: true, status: true });
