@@ -9,6 +9,7 @@ import { formatDistanceToNow } from "date-fns";
 import { CircularProgressbarWithChildren, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
 import { PaymentMethodSelector } from "@/components/payment-method-selector";
+import { CommentsSection } from "@/components/comments-section";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -117,7 +118,10 @@ export default function PoolDetails() {
                                   <AvatarFallback>{c.user.name[0]}</AvatarFallback>
                                </Avatar>
                                <div>
-                                  <p className="font-medium">{c.user.name}</p>
+                                  <p className="font-medium flex items-center gap-1">
+                                    {c.user.name}
+                                    {c.user.badges?.map(b => <span key={b.id} className="text-xs" title={b.name}>{b.icon}</span>)}
+                                  </p>
                                   <p className="text-xs text-muted-foreground">{c.date}</p>
                                </div>
                             </div>
@@ -126,6 +130,9 @@ export default function PoolDetails() {
                       ))}
                    </div>
                 </div>
+
+                {/* Comments Section */}
+                <CommentsSection comments={pool.comments} poolId={pool.id} />
             </div>
 
             {/* Right Column: Action Card */}

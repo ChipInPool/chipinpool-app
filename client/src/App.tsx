@@ -12,6 +12,8 @@ import ApiDocs from "@/pages/api-docs";
 import Explore from "@/pages/explore";
 import HowItWorks from "@/pages/how-it-works";
 
+import Profile from "@/pages/profile";
+
 function Router() {
   return (
     <Switch>
@@ -20,6 +22,7 @@ function Router() {
       <Route path="/explore" component={Explore} />
       <Route path="/how-it-works" component={HowItWorks} />
       <Route path="/api-docs" component={ApiDocs} />
+      <Route path="/profile" component={Profile} />
       <Route path="/pool/:id" component={PoolDetails} />
       <Route path="/pool/:id/spend" component={SpendPool} />
       <Route component={NotFound} />
@@ -27,14 +30,18 @@ function Router() {
   );
 }
 
+import { ThemeProvider } from "@/components/theme-provider";
+
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

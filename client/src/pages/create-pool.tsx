@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Gift, Plane, ShoppingBag, Calendar, ImagePlus } from "lucide-react";
+import { ArrowLeft, Gift, Plane, ShoppingBag, Calendar, ImagePlus, RefreshCw } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ export default function CreatePool() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +56,7 @@ export default function CreatePool() {
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                    <Label>Category</Label>
-                   <Select required>
+                   <Select required onValueChange={(val) => setIsRecurring(val === 'recurring')}>
                       <SelectTrigger className="h-12 bg-white/5 border-white/10">
                          <SelectValue placeholder="Select category" />
                       </SelectTrigger>
@@ -63,6 +64,7 @@ export default function CreatePool() {
                          <SelectItem value="gift"><div className="flex items-center gap-2"><Gift className="w-4 h-4" /> Gift</div></SelectItem>
                          <SelectItem value="trip"><div className="flex items-center gap-2"><Plane className="w-4 h-4" /> Trip</div></SelectItem>
                          <SelectItem value="purchase"><div className="flex items-center gap-2"><ShoppingBag className="w-4 h-4" /> Purchase</div></SelectItem>
+                         <SelectItem value="recurring"><div className="flex items-center gap-2"><RefreshCw className="w-4 h-4 text-primary" /> Recurring / Bill</div></SelectItem>
                       </SelectContent>
                    </Select>
                 </div>
@@ -71,6 +73,43 @@ export default function CreatePool() {
                    <Input id="amount" type="number" placeholder="0.00" className="h-12 bg-white/5 border-white/10 font-mono" required />
                 </div>
              </div>
+
+             {/* Recurring Options */}
+             {isRecurring && (
+                <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 animate-in fade-in slide-in-from-top-2">
+                   <h3 className="font-semibold text-sm mb-3 text-primary flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4" /> Recurring Settings
+                   </h3>
+                   <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                         <Label>Frequency</Label>
+                         <Select defaultValue="monthly">
+                            <SelectTrigger className="bg-background border-white/10">
+                               <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                               <SelectItem value="weekly">Weekly</SelectItem>
+                               <SelectItem value="monthly">Monthly</SelectItem>
+                               <SelectItem value="quarterly">Quarterly</SelectItem>
+                            </SelectContent>
+                         </Select>
+                      </div>
+                      <div className="space-y-2">
+                         <Label>Repeat Until</Label>
+                         <Select defaultValue="cancel">
+                            <SelectTrigger className="bg-background border-white/10">
+                               <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                               <SelectItem value="cancel">I cancel it</SelectItem>
+                               <SelectItem value="date">Specific Date</SelectItem>
+                               <SelectItem value="amount">Target Reached</SelectItem>
+                            </SelectContent>
+                         </Select>
+                      </div>
+                   </div>
+                </div>
+             )}
 
              <div className="space-y-2">
                 <Label htmlFor="description">Description (Optional)</Label>
