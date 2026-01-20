@@ -55,8 +55,9 @@ export default function Login() {
     setIsLoading(true);
     try {
       await register(registerForm.name, registerForm.email, registerForm.password);
-      toast({ description: "Account created successfully!" });
-      setLocation("/");
+      toast({ description: "Account created! Please verify your identity to unlock all features." });
+      // Redirect new users to security page for identity verification
+      setLocation("/security");
     } catch (error: any) {
       toast({ description: error.message || "Registration failed", variant: "destructive" });
     } finally {

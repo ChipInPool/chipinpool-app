@@ -1188,8 +1188,11 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Plaid not configured. Bank linking unavailable." });
       }
 
+      // Use development environment (change to sandbox for testing)
+      const plaidEnv = process.env.PLAID_ENV === 'sandbox' ? PlaidEnvironments.sandbox : PlaidEnvironments.development;
+      
       const configuration = new Configuration({
-        basePath: PlaidEnvironments.sandbox,
+        basePath: plaidEnv,
         baseOptions: {
           headers: {
             'PLAID-CLIENT-ID': plaidClientId,
@@ -1205,14 +1208,21 @@ export async function registerRoutes(
       const linkTokenResponse = await plaidClient.linkTokenCreate({
         user: { client_user_id: user.id },
         client_name: 'ChipInPay',
-        products: [Products.Auth, Products.Transfer],
+        products: [Products.Auth],
         country_codes: [CountryCode.Us],
         language: 'en',
       });
 
       res.json({ linkToken: linkTokenResponse.data.link_token });
     } catch (error: any) {
-      console.error('[Plaid] Link token error:', error.message);
+      console.error('[Plaid] Link token error:', error.response?.data || error.message);
+      const plaidError = error.response?.data;
+      if (plaidError?.error_code) {
+        return res.status(400).json({ 
+          message: plaidError.error_message || 'Plaid error',
+          code: plaidError.error_code 
+        });
+      }
       next(error);
     }
   });
@@ -1234,8 +1244,10 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Plaid not configured" });
       }
 
+      const plaidEnv = process.env.PLAID_ENV === 'sandbox' ? PlaidEnvironments.sandbox : PlaidEnvironments.development;
+      
       const configuration = new Configuration({
-        basePath: PlaidEnvironments.sandbox,
+        basePath: plaidEnv,
         baseOptions: {
           headers: {
             'PLAID-CLIENT-ID': plaidClientId,
