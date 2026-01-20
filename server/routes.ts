@@ -206,6 +206,38 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/pools/:id", requireAuth, async (req, res, next) => {
+    try {
+      const pool = await storage.getPool(req.params.id);
+      if (!pool) {
+        return res.status(404).json({ message: "Pool not found" });
+      }
+
+      if (pool.creatorId !== req.session.userId) {
+        return res.status(403).json({ message: "Only the pool creator can edit this pool" });
+      }
+
+      const updateSchema = z.object({
+        title: z.string().optional(),
+        description: z.string().optional(),
+        targetAmount: z.string().optional(),
+        deadline: z.string().optional(),
+      });
+
+      const data = updateSchema.parse(req.body);
+      const updatedPool = await storage.updatePool(pool.id, {
+        title: data.title,
+        description: data.description,
+        targetAmount: data.targetAmount,
+        deadline: data.deadline ? new Date(data.deadline) : undefined,
+      });
+
+      res.json({ pool: updatedPool });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post("/api/pools/:id/contribute", requireAuth, async (req, res, next) => {
     try {
       const { amount } = z.object({ amount: z.string() }).parse(req.body);
@@ -323,6 +355,58 @@ export async function registerRoutes(
     try {
       await storage.markAllNotificationsAsRead(req.session.userId!);
       res.json({ message: "All notifications marked as read" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // User deposit/withdraw routes
+  app.post("/api/user/deposit", requireAuth, async (req, res, next) => {
+    try {
+      const { amount } = z.object({ amount: z.string() }).parse(req.body);
+      const depositAmount = parseFloat(amount);
+      
+      if (isNaN(depositAmount) || depositAmount <= 0) {
+        return res.status(400).json({ message: "Invalid amount" });
+      }
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const newBalance = (parseFloat(user.balance) + depositAmount).toFixed(2);
+      await storage.updateUserBalance(user.id, newBalance);
+
+      res.json({ message: "Deposit successful", balance: newBalance });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/user/withdraw", requireAuth, async (req, res, next) => {
+    try {
+      const { amount } = z.object({ amount: z.string() }).parse(req.body);
+      const withdrawAmount = parseFloat(amount);
+      
+      if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
+        return res.status(400).json({ message: "Invalid amount" });
+      }
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const currentBalance = parseFloat(user.balance);
+      if (currentBalance < withdrawAmount) {
+        return res.status(400).json({ message: "Insufficient balance" });
+      }
+
+      const newBalance = (currentBalance - withdrawAmount).toFixed(2);
+      await storage.updateUserBalance(user.id, newBalance);
+
+      res.json({ message: "Withdrawal successful", balance: newBalance });
     } catch (error) {
       next(error);
     }

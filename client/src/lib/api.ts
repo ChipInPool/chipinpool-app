@@ -41,6 +41,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    update: (id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: string }) =>
+      fetchApi(`/api/pools/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
     contribute: (id: string, amount: string) =>
       fetchApi(`/api/pools/${id}/contribute`, {
         method: "POST",
@@ -85,6 +90,10 @@ export const api = {
       fetchApi(`/api/users/${userId}/follow`, { method: "POST" }),
     unfollow: (userId: string) =>
       fetchApi(`/api/users/${userId}/unfollow`, { method: "POST" }),
+    deposit: (amount: string) =>
+      fetchApi("/api/user/deposit", { method: "POST", body: JSON.stringify({ amount }) }),
+    withdraw: (amount: string) =>
+      fetchApi("/api/user/withdraw", { method: "POST", body: JSON.stringify({ amount }) }),
   },
 };
 

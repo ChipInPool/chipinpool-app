@@ -1,21 +1,67 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PoolCard } from "@/components/pool-card";
-import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target } from "lucide-react";
+import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
 import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 export default function Profile() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  
+  const [depositDialogOpen, setDepositDialogOpen] = useState(false);
+  const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleDeposit = async () => {
+    if (!amount || parseFloat(amount) <= 0) {
+      toast({ description: "Please enter a valid amount", variant: "destructive" });
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      await api.users.deposit(amount);
+      toast({ description: `Successfully deposited $${amount}` });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user });
+      setDepositDialogOpen(false);
+      setAmount("");
+    } catch (error: any) {
+      toast({ description: error.message || "Deposit failed", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!amount || parseFloat(amount) <= 0) {
+      toast({ description: "Please enter a valid amount", variant: "destructive" });
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      await api.users.withdraw(amount);
+      toast({ description: `Successfully withdrew $${amount}` });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user });
+      setWithdrawDialogOpen(false);
+      setAmount("");
+    } catch (error: any) {
+      toast({ description: error.message || "Withdrawal failed", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const { data: poolsData, isLoading: poolsLoading } = useQuery({
     queryKey: queryKeys.pools,
@@ -124,6 +170,37 @@ export default function Profile() {
               </div>
             </div>
 
+            <div className="p-6 rounded-2xl bg-card border border-white/5" data-testid="wallet-section">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold flex items-center gap-2">
+                  <Wallet className="w-4 h-4 text-green-500" /> Wallet
+                </h3>
+              </div>
+              <div className="text-center mb-4">
+                <div className="text-3xl font-bold font-display text-green-500" data-testid="text-balance">
+                  ${parseFloat(user.balance || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wider">Available Balance</div>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  className="flex-1" 
+                  onClick={() => setDepositDialogOpen(true)}
+                  data-testid="button-add-funds"
+                >
+                  <Plus className="w-4 h-4 mr-2" /> Add Funds
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex-1" 
+                  onClick={() => setWithdrawDialogOpen(true)}
+                  data-testid="button-withdraw"
+                >
+                  <Minus className="w-4 h-4 mr-2" /> Withdraw
+                </Button>
+              </div>
+            </div>
+
             <div className="p-6 rounded-2xl bg-card border border-white/5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold flex items-center gap-2">
@@ -221,6 +298,66 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      <Dialog open={depositDialogOpen} onOpenChange={setDepositDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Funds</DialogTitle>
+            <DialogDescription>
+              Enter the amount you want to deposit to your wallet.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              type="number"
+              placeholder="Enter amount"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              min="0"
+              step="0.01"
+              data-testid="input-deposit-amount"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDepositDialogOpen(false); setAmount(""); }}>
+              Cancel
+            </Button>
+            <Button onClick={handleDeposit} disabled={isProcessing} data-testid="button-confirm-deposit">
+              {isProcessing ? "Processing..." : "Deposit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={withdrawDialogOpen} onOpenChange={setWithdrawDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Withdraw Funds</DialogTitle>
+            <DialogDescription>
+              Enter the amount you want to withdraw from your wallet.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              type="number"
+              placeholder="Enter amount"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              min="0"
+              step="0.01"
+              data-testid="input-withdraw-amount"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setWithdrawDialogOpen(false); setAmount(""); }}>
+              Cancel
+            </Button>
+            <Button onClick={handleWithdraw} disabled={isProcessing} data-testid="button-confirm-withdraw">
+              {isProcessing ? "Processing..." : "Withdraw"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
