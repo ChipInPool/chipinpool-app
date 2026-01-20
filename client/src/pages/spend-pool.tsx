@@ -2,11 +2,20 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { MOCK_POOLS } from "@/lib/mock-data";
 import { VirtualCard } from "@/components/virtual-card";
-import { ArrowLeft, Copy, Eye, EyeOff, ShoppingBag, ExternalLink, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Copy, Eye, EyeOff, ShoppingBag, ExternalLink, ShieldCheck, Plus, Store } from "lucide-react";
 import { Link, useRoute } from "wouter";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
+
+interface Transaction {
+  id: string;
+  merchant: string;
+  amount: number;
+  date: string;
+  status: 'pending' | 'completed';
+  icon?: string;
+}
 
 export default function SpendPool() {
   const [, params] = useRoute("/pool/:id/spend");
@@ -14,12 +23,37 @@ export default function SpendPool() {
   const pool = MOCK_POOLS.find(p => p.id === params?.id);
   const [showCardDetails, setShowCardDetails] = useState(false);
   const [activeTab, setActiveTab] = useState<'virtual' | 'transfer'>('virtual');
+  
+  // Transaction state
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [currentBalance, setCurrentBalance] = useState(pool?.currentAmount || 0);
+  const [isSimulating, setIsSimulating] = useState(false);
 
   if (!pool) return <Layout><div className="text-center py-20">Pool not found</div></Layout>;
 
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast({ description: `${label} copied to clipboard` });
+  };
+
+  const simulateTransaction = (merchant: string, amount: number) => {
+    setIsSimulating(true);
+    setTimeout(() => {
+        const newTx: Transaction = {
+            id: `tx_${Math.random().toString(36).substr(2, 9)}`,
+            merchant,
+            amount,
+            date: 'Just now',
+            status: 'completed'
+        };
+        setTransactions([newTx, ...transactions]);
+        setCurrentBalance(prev => Math.max(0, prev - amount));
+        setIsSimulating(false);
+        toast({
+            title: `Payment Successful: ${merchant}`,
+            description: `You spent $${amount.toFixed(2)}. Remaining: $${(currentBalance - amount).toFixed(2)}`
+        });
+    }, 1500);
   };
 
   return (
@@ -31,9 +65,15 @@ export default function SpendPool() {
            </a>
         </Link>
 
-        <div className="mb-8">
-           <h1 className="text-3xl font-display font-bold mb-2">Spend Pool Funds</h1>
-           <p className="text-muted-foreground">Use the collected funds securely online or transfer to a merchant.</p>
+        <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+           <div>
+              <h1 className="text-3xl font-display font-bold mb-2">Spend Pool Funds</h1>
+              <p className="text-muted-foreground">Use the collected funds securely online or transfer to a merchant.</p>
+           </div>
+           <div className="text-right">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Available to Spend</p>
+              <p className="text-3xl font-mono font-bold text-primary">${currentBalance.toFixed(2)}</p>
+           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
@@ -59,7 +99,7 @@ export default function SpendPool() {
 
                       <div className="mb-8">
                          <VirtualCard 
-                            balance={pool.currentAmount} 
+                            balance={currentBalance} 
                             poolName={pool.title}
                             cardNumber={showCardDetails ? "4922 8301 2944 8592" : "•••• •••• •••• 8592"}
                             cvc={showCardDetails ? "492" : "•••"}
@@ -130,15 +170,34 @@ export default function SpendPool() {
                           <p className="text-sm text-muted-foreground">
                              Use the virtual card details to pay on any website that accepts Visa. Perfect for booking flights or buying gifts.
                           </p>
-                          <div className="space-y-2">
-                             <h4 className="text-xs font-semibold uppercase text-muted-foreground">Supported Merchants</h4>
-                             <div className="flex gap-2">
-                                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center p-2"><img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" className="w-full" /></div>
-                                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center p-2"><img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Airbnb_Logo_B%C3%A9lo.svg" className="w-full" /></div>
-                                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center p-2"><img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" className="w-full" /></div>
-                                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-muted-foreground">+500</div>
+                          
+                          <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5">
+                             <div className="flex items-center justify-between mb-3">
+                                <span className="text-xs font-bold uppercase text-muted-foreground">Simulate Purchase</span>
+                                {isSimulating && <span className="text-xs text-primary animate-pulse">Processing...</span>}
+                             </div>
+                             <div className="space-y-2">
+                                <Button 
+                                    variant="outline" 
+                                    className="w-full justify-between border-white/10 hover:bg-white/5"
+                                    onClick={() => simulateTransaction('Amazon.com', 124.50)}
+                                    disabled={isSimulating || currentBalance < 124.50}
+                                >
+                                    <span className="flex items-center"><Store className="w-4 h-4 mr-2" /> Amazon</span>
+                                    <span>$124.50</span>
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    className="w-full justify-between border-white/10 hover:bg-white/5"
+                                    onClick={() => simulateTransaction('Airbnb Inc.', 450.00)}
+                                    disabled={isSimulating || currentBalance < 450}
+                                >
+                                    <span className="flex items-center"><Store className="w-4 h-4 mr-2" /> Airbnb</span>
+                                    <span>$450.00</span>
+                                </Button>
                              </div>
                           </div>
+                          
                           <Button className="w-full mt-2 group" variant="secondary">
                              Open Merchant Site <ExternalLink className="w-3 h-3 ml-2 group-hover:translate-x-1 transition-transform" />
                           </Button>
@@ -162,13 +221,32 @@ export default function SpendPool() {
                  </div>
               </div>
 
-              {/* Transaction History Placeholder */}
+              {/* Transaction History */}
               <div className="rounded-2xl bg-card border border-white/10 p-6">
                  <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider text-muted-foreground">Recent Activity</h3>
-                 <div className="text-center py-8 text-sm text-muted-foreground">
-                    <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    No transactions yet.
-                 </div>
+                 {transactions.length > 0 ? (
+                     <div className="space-y-3">
+                        {transactions.map(tx => (
+                            <div key={tx.id} className="flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
+                                        <ShoppingBag className="w-4 h-4 text-primary" />
+                                    </div>
+                                    <div>
+                                        <p className="font-medium text-sm">{tx.merchant}</p>
+                                        <p className="text-xs text-muted-foreground">{tx.date}</p>
+                                    </div>
+                                </div>
+                                <span className="font-mono text-sm">-${tx.amount.toFixed(2)}</span>
+                            </div>
+                        ))}
+                     </div>
+                 ) : (
+                    <div className="text-center py-8 text-sm text-muted-foreground">
+                        <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        No transactions yet.
+                    </div>
+                 )}
               </div>
            </div>
         </div>

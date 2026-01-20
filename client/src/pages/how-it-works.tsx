@@ -1,0 +1,71 @@
+import { Layout } from "@/components/layout";
+import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
+import { ArrowRight, UserPlus, CreditCard, Share2, Gift } from "lucide-react";
+
+export default function HowItWorks() {
+  const steps = [
+    {
+      icon: <UserPlus className="w-8 h-8 text-primary" />,
+      title: "1. Create a Pool",
+      description: "Set a goal, add details, and choose a category. It only takes a minute to get started."
+    },
+    {
+      icon: <Share2 className="w-8 h-8 text-accent" />,
+      title: "2. Invite Friends",
+      description: "Share your unique pool link via SMS, WhatsApp, or social media. Friends can chip in without an account."
+    },
+    {
+      icon: <CreditCard className="w-8 h-8 text-purple-400" />,
+      title: "3. Collect Funds",
+      description: "Watch contributions roll in. We hold the funds securely until you reach your target."
+    },
+    {
+      icon: <Gift className="w-8 h-8 text-yellow-400" />,
+      title: "4. Spend & Enjoy",
+      description: "Use your Virtual Visa Card instantly online or transfer funds to your bank account."
+    }
+  ];
+
+  return (
+    <Layout>
+      <div className="max-w-4xl mx-auto py-12">
+         <div className="text-center mb-16">
+            <h1 className="text-4xl md:text-5xl font-display font-bold mb-6">How ChipIn Works</h1>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+               Pooling money shouldn't be a hassle. We've streamlined the process so you can focus on the experience, not the math.
+            </p>
+         </div>
+
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-20">
+            {steps.map((step, i) => (
+               <div key={i} className="p-8 rounded-3xl bg-card border border-white/5 relative overflow-hidden group hover:border-primary/20 transition-colors">
+                  <div className="absolute top-0 right-0 p-8 opacity-5 text-9xl font-bold font-display pointer-events-none">
+                     {i + 1}
+                  </div>
+                  <div className="relative z-10">
+                     <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        {step.icon}
+                     </div>
+                     <h3 className="text-2xl font-bold mb-3">{step.title}</h3>
+                     <p className="text-muted-foreground leading-relaxed">{step.description}</p>
+                  </div>
+               </div>
+            ))}
+         </div>
+
+         <div className="rounded-3xl bg-linear-to-br from-primary/20 to-accent/20 p-1">
+            <div className="bg-[#0B0E14] rounded-[22px] p-12 text-center">
+               <h2 className="text-3xl font-display font-bold mb-4">Ready to start?</h2>
+               <p className="text-muted-foreground mb-8">Join thousands of users pooling for trips, gifts, and more.</p>
+               <Link href="/create">
+                  <Button size="lg" className="h-14 px-8 text-lg font-bold shadow-xl shadow-primary/20 hover:scale-105 transition-transform">
+                     Start Your First Pool <ArrowRight className="w-5 h-5 ml-2" />
+                  </Button>
+               </Link>
+            </div>
+         </div>
+      </div>
+    </Layout>
+  );
+}

@@ -8,12 +8,18 @@ import Home from "@/pages/home";
 import CreatePool from "@/pages/create-pool";
 import PoolDetails from "@/pages/pool-details";
 import SpendPool from "@/pages/spend-pool";
+import ApiDocs from "@/pages/api-docs";
+import Explore from "@/pages/explore";
+import HowItWorks from "@/pages/how-it-works";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/create" component={CreatePool} />
+      <Route path="/explore" component={Explore} />
+      <Route path="/how-it-works" component={HowItWorks} />
+      <Route path="/api-docs" component={ApiDocs} />
       <Route path="/pool/:id" component={PoolDetails} />
       <Route path="/pool/:id/spend" component={SpendPool} />
       <Route component={NotFound} />

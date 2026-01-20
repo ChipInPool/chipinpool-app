@@ -36,6 +36,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 Explore
               </a>
             </Link>
+            <Link href="/how-it-works">
+              <a className={`text-sm font-medium hover:text-primary transition-colors ${location === '/how-it-works' ? 'text-primary' : 'text-muted-foreground'}`}>
+                How it works
+              </a>
+            </Link>
+            <Link href="/api-docs">
+              <a className={`text-sm font-medium hover:text-primary transition-colors ${location === '/api-docs' ? 'text-primary' : 'text-muted-foreground'}`}>
+                Developers
+              </a>
+            </Link>
           </div>
 
           <div className="hidden md:flex items-center gap-4">
@@ -85,6 +95,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     </Link>
                     <Link href="/explore">
                       <a className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Explore Pools</a>
+                    </Link>
+                    <Link href="/how-it-works">
+                      <a className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>How It Works</a>
+                    </Link>
+                    <Link href="/api-docs">
+                      <a className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>For Developers</a>
                     </Link>
                   </div>
                 </div>
