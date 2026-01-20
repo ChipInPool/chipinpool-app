@@ -484,6 +484,38 @@ export async function registerRoutes(
   });
 
   // User profile routes
+  app.get("/api/users/:id/profile", requireAuth, async (req, res, next) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const [badges, createdPools, followers, following] = await Promise.all([
+        storage.getUserBadges(user.id),
+        storage.getPoolsByCreator(user.id),
+        storage.getFollowers(user.id),
+        storage.getFollowing(user.id),
+      ]);
+
+      const isFollowing = req.session.userId ? await storage.isFollowing(req.session.userId, user.id) : false;
+
+      const { password, ...userWithoutPassword } = user;
+      res.json({
+        user: {
+          ...userWithoutPassword,
+          badges,
+          followerCount: followers.length,
+          followingCount: following.length,
+        },
+        pools: createdPools,
+        isFollowing,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get("/api/users/:id/pools", requireAuth, async (req, res, next) => {
     try {
       const [createdPools, contributedPools] = await Promise.all([
@@ -506,10 +538,48 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/users/:id/unfollow", requireAuth, async (req, res, next) => {
+  app.delete("/api/users/:id/follow", requireAuth, async (req, res, next) => {
     try {
       await storage.unfollowUser(req.session.userId!, req.params.id);
       res.json({ message: "User unfollowed" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/users/:id/following", async (req, res, next) => {
+    try {
+      const followingIds = await storage.getFollowing(req.params.id);
+      const followingUsers = await Promise.all(
+        followingIds.map(async (id) => {
+          const user = await storage.getUser(id);
+          if (user) {
+            const { password, ...userWithoutPassword } = user;
+            return userWithoutPassword;
+          }
+          return null;
+        })
+      );
+      res.json({ following: followingUsers.filter(Boolean) });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/users/:id/followers", async (req, res, next) => {
+    try {
+      const followerIds = await storage.getFollowers(req.params.id);
+      const followerUsers = await Promise.all(
+        followerIds.map(async (id) => {
+          const user = await storage.getUser(id);
+          if (user) {
+            const { password, ...userWithoutPassword } = user;
+            return userWithoutPassword;
+          }
+          return null;
+        })
+      );
+      res.json({ followers: followerUsers.filter(Boolean) });
     } catch (error) {
       next(error);
     }

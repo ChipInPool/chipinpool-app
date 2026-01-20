@@ -85,11 +85,14 @@ export const api = {
       }),
   },
   users: {
+    getProfile: (userId: string) => fetchApi(`/api/users/${userId}/profile`),
     getPools: (userId: string) => fetchApi(`/api/users/${userId}/pools`),
     follow: (userId: string) =>
       fetchApi(`/api/users/${userId}/follow`, { method: "POST" }),
     unfollow: (userId: string) =>
-      fetchApi(`/api/users/${userId}/unfollow`, { method: "POST" }),
+      fetchApi(`/api/users/${userId}/follow`, { method: "DELETE" }),
+    getFollowing: (userId: string) => fetchApi(`/api/users/${userId}/following`),
+    getFollowers: (userId: string) => fetchApi(`/api/users/${userId}/followers`),
     deposit: (amount: string) =>
       fetchApi("/api/user/deposit", { method: "POST", body: JSON.stringify({ amount }) }),
     withdraw: (amount: string) =>
@@ -99,11 +102,14 @@ export const api = {
 
 export const queryKeys = {
   user: ["user"] as const,
+  userProfile: (userId: string) => ["userProfile", userId] as const,
   pools: ["pools"] as const,
   pool: (id: string) => ["pool", id] as const,
   notifications: ["notifications"] as const,
   virtualCard: (poolId: string) => ["virtualCard", poolId] as const,
   cardTransactions: (cardId: string) => ["cardTransactions", cardId] as const,
+  following: (userId: string) => ["following", userId] as const,
+  followers: (userId: string) => ["followers", userId] as const,
 };
 
 export const userQueryOptions = queryOptions({

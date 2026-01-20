@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
+import { Link } from "wouter";
 
 interface CommentsSectionProps {
   comments: any[];
@@ -86,14 +87,22 @@ export function CommentsSection({ comments: initialComments, poolId }: CommentsS
         ) : (
           initialComments.map((comment: any) => (
             <div key={comment.id} className="flex gap-4 animate-in fade-in slide-in-from-top-2">
-              <Avatar className="w-10 h-10 mt-1">
-                <AvatarImage src={comment.user?.avatar} />
-                <AvatarFallback>{comment.user?.name?.[0] || '?'}</AvatarFallback>
-              </Avatar>
+              <Link href={comment.userId === user?.id ? '/profile' : `/user/${comment.userId}`} data-testid={`link-comment-user-${comment.userId}`}>
+                <Avatar className="w-10 h-10 mt-1 cursor-pointer hover:opacity-80 transition-opacity">
+                  <AvatarImage src={comment.user?.avatar} />
+                  <AvatarFallback>{comment.user?.name?.[0] || '?'}</AvatarFallback>
+                </Avatar>
+              </Link>
               <div className="flex-1 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm">{comment.user?.name || 'Anonymous'}</span>
+                    <Link 
+                      href={comment.userId === user?.id ? '/profile' : `/user/${comment.userId}`} 
+                      className="font-semibold text-sm hover:text-primary transition-colors"
+                      data-testid={`link-comment-username-${comment.userId}`}
+                    >
+                      {comment.user?.name || 'Anonymous'}
+                    </Link>
                     {comment.user?.badges?.map((b: any) => (
                       <span key={b.id} title={b.name} className="text-xs cursor-help">{b.icon}</span>
                     ))}

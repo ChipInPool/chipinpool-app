@@ -77,13 +77,18 @@ export function PoolCard({ pool }: PoolCardProps) {
           </CardContent>
           
           <CardFooter className="px-5 py-3 border-t border-white/5 bg-white/[0.02] flex justify-between items-center">
-            <div className="flex items-center gap-2">
+            <Link 
+              href={pool.creatorId === user?.id ? '/profile' : `/user/${pool.creatorId}`} 
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+              data-testid={`link-creator-${pool.creatorId}`}
+            >
               <Avatar className="w-5 h-5">
                 <AvatarImage src={creator.avatar} />
                 <AvatarFallback>{creator.name?.[0] || '?'}</AvatarFallback>
               </Avatar>
-              <span className="text-xs text-muted-foreground">by {pool.creatorId === user?.id ? 'You' : creator.name}</span>
-            </div>
+              <span className="text-xs text-muted-foreground hover:text-foreground transition-colors">by {pool.creatorId === user?.id ? 'You' : creator.name}</span>
+            </Link>
             {isCompleted ? (
               <CheckCircle2 className="w-5 h-5 text-primary" />
             ) : (

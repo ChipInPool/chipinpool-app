@@ -241,13 +241,17 @@ export default function PoolDetails() {
                   </div>
                 </div>
                 <h1 className="text-3xl md:text-5xl font-display font-bold text-white mb-2">{pool.title}</h1>
-                <div className="flex items-center gap-3 text-white/80">
+                <Link 
+                  href={isCreator ? '/profile' : `/user/${pool.creatorId}`}
+                  className="flex items-center gap-3 text-white/80 hover:text-white transition-colors w-fit"
+                  data-testid={`link-pool-creator-${pool.creatorId}`}
+                >
                   <Avatar className="w-6 h-6 border border-white/20">
                     <AvatarImage src={creator.avatar} />
                     <AvatarFallback>{creator.name?.[0]}</AvatarFallback>
                   </Avatar>
                   <span className="text-sm">Created by <span className="font-semibold text-white">{creator.name}</span></span>
-                </div>
+                </Link>
               </div>
             </div>
 
@@ -266,19 +270,23 @@ export default function PoolDetails() {
                 ) : (
                   contributors.map((c: any, i: number) => (
                     <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
-                      <div className="flex items-center gap-3">
+                      <Link 
+                        href={c.user?.id === user?.id ? '/profile' : `/user/${c.user?.id}`}
+                        className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+                        data-testid={`link-contributor-${c.user?.id}`}
+                      >
                         <Avatar>
                           <AvatarImage src={c.user?.avatar} />
                           <AvatarFallback>{c.user?.name?.[0] || '?'}</AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-medium flex items-center gap-1">
+                          <p className="font-medium flex items-center gap-1 hover:text-primary transition-colors">
                             {c.user?.name || 'Anonymous'}
                             {c.user?.badges?.map((b: any) => <span key={b.id} className="text-xs" title={b.name}>{b.icon}</span>)}
                           </p>
                           <p className="text-xs text-muted-foreground">{new Date(c.date).toLocaleDateString()}</p>
                         </div>
-                      </div>
+                      </Link>
                       <span className="font-mono font-medium text-green-400">+${parseFloat(c.amount).toLocaleString()}</span>
                     </div>
                   ))

@@ -3,7 +3,7 @@ import { Layout } from "@/components/layout";
 import { PoolCard } from "@/components/pool-card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, TrendingUp } from "lucide-react";
+import { Search, Filter, TrendingUp, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -13,13 +13,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function Explore() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const [filterMode, setFilterMode] = useState<"all" | "following">("all");
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const [, setLocation] = useLocation();
 
   const { data: poolsData, isLoading: poolsLoading } = useQuery({
     queryKey: queryKeys.pools,
     queryFn: api.pools.list,
     enabled: isAuthenticated,
+  });
+
+  const { data: followingData } = useQuery({
+    queryKey: queryKeys.following(user?.id || ""),
+    queryFn: () => api.users.getFollowing(user?.id || ""),
+    enabled: isAuthenticated && !!user?.id && filterMode === "following",
   });
 
   useEffect(() => {
@@ -33,12 +40,14 @@ export default function Explore() {
   }
 
   const pools = poolsData?.pools || [];
+  const followingIds = followingData?.following?.map((u: any) => u.id) || [];
   
   const filteredPools = pools.filter((pool: any) => {
     const matchesSearch = pool.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
       pool.category.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === "All" || pool.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesFollowing = filterMode === "all" || followingIds.includes(pool.creatorId);
+    return matchesSearch && matchesCategory && matchesFollowing;
   });
 
   const categories = ['All', 'Trip', 'Gift', 'Purchase', 'Event', 'Recurring', 'Other'];
@@ -50,6 +59,33 @@ export default function Explore() {
         <p className="text-muted-foreground text-lg max-w-2xl">
           Discover public pools, join community causes, or get inspired by what others are chipping in for.
         </p>
+      </div>
+
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => setFilterMode("all")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+            filterMode === "all"
+              ? "bg-primary text-primary-foreground"
+              : "bg-white/5 hover:bg-white/10 border border-white/10"
+          }`}
+          data-testid="button-filter-all"
+        >
+          <TrendingUp className="w-4 h-4" />
+          All Pools
+        </button>
+        <button
+          onClick={() => setFilterMode("following")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+            filterMode === "following"
+              ? "bg-primary text-primary-foreground"
+              : "bg-white/5 hover:bg-white/10 border border-white/10"
+          }`}
+          data-testid="button-filter-following"
+        >
+          <Users className="w-4 h-4" />
+          From People I Follow
+        </button>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-8">
@@ -84,8 +120,14 @@ export default function Explore() {
       <div className="space-y-12">
         <section>
           <div className="flex items-center gap-2 mb-6">
-            <TrendingUp className="w-5 h-5 text-primary" />
-            <h2 className="text-xl font-bold">All Pools</h2>
+            {filterMode === "all" ? (
+              <TrendingUp className="w-5 h-5 text-primary" />
+            ) : (
+              <Users className="w-5 h-5 text-primary" />
+            )}
+            <h2 className="text-xl font-bold">
+              {filterMode === "all" ? "All Pools" : "Pools from People You Follow"}
+            </h2>
           </div>
           
           {poolsLoading ? (

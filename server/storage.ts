@@ -58,6 +58,8 @@ export interface IStorage {
   // Follow operations
   followUser(followerId: string, followingId: string): Promise<void>;
   unfollowUser(followerId: string, followingId: string): Promise<void>;
+  getFollowing(userId: string): Promise<string[]>;
+  getFollowers(userId: string): Promise<string[]>;
   isFollowing(followerId: string, followingId: string): Promise<boolean>;
 }
 
@@ -261,6 +263,20 @@ export class DatabaseStorage implements IStorage {
         eq(follows.followingId, followingId)
       )
     );
+  }
+
+  async getFollowing(userId: string): Promise<string[]> {
+    const result = await db.select({ followingId: follows.followingId })
+      .from(follows)
+      .where(eq(follows.followerId, userId));
+    return result.map(r => r.followingId);
+  }
+
+  async getFollowers(userId: string): Promise<string[]> {
+    const result = await db.select({ followerId: follows.followerId })
+      .from(follows)
+      .where(eq(follows.followingId, userId));
+    return result.map(r => r.followerId);
   }
 
   async isFollowing(followerId: string, followingId: string): Promise<boolean> {
