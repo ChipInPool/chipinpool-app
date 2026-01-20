@@ -1063,7 +1063,10 @@ export async function registerRoutes(
   app.post("/api/pools/:id/recurring", requireAuth, async (req, res, next) => {
     try {
       const { amount, frequency } = z.object({
-        amount: z.string(),
+        amount: z.string().refine((val) => {
+          const num = parseFloat(val);
+          return !isNaN(num) && num > 0;
+        }, { message: "Amount must be a positive number" }),
         frequency: z.enum(['weekly', 'monthly', 'quarterly']),
       }).parse(req.body);
 
@@ -1080,6 +1083,16 @@ export async function registerRoutes(
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
 
+      // Validate sufficient balance for first contribution
+      const contributionAmount = parseFloat(amount);
+      const userBalance = parseFloat(user.balance);
+
+      if (userBalance < contributionAmount) {
+        return res.status(400).json({ 
+          message: "Insufficient balance for the first contribution. Please add funds to your wallet." 
+        });
+      }
+
       // Calculate next payment date based on frequency
       const now = new Date();
       let nextPaymentDate = new Date(now);
@@ -1091,8 +1104,12 @@ export async function registerRoutes(
         nextPaymentDate.setMonth(now.getMonth() + 3);
       }
 
-      // For demo purposes, create local recurring contribution
-      // In production, this would create a Stripe Subscription
+      // Process first contribution immediately
+      await storage.updateUserBalance(userId, (userBalance - contributionAmount).toFixed(2));
+      await storage.createContribution({ poolId: pool.id, userId, amount });
+      await storage.updatePoolAmount(pool.id, (parseFloat(pool.currentAmount) + contributionAmount).toFixed(2));
+
+      // Create recurring contribution record after successful first payment
       const recurringContribution = await storage.createRecurringContribution({
         poolId: pool.id,
         userId,
@@ -1100,17 +1117,6 @@ export async function registerRoutes(
         frequency,
         nextPaymentDate,
       });
-
-      // Process first contribution immediately
-      const contributionAmount = parseFloat(amount);
-      const userBalance = parseFloat(user.balance);
-
-      if (userBalance >= contributionAmount) {
-        // Deduct from wallet
-        await storage.updateUserBalance(userId, (userBalance - contributionAmount).toFixed(2));
-        await storage.createContribution({ poolId: pool.id, userId, amount });
-        await storage.updatePoolAmount(pool.id, (parseFloat(pool.currentAmount) + contributionAmount).toFixed(2));
-      }
 
       res.json({ 
         recurringContribution,
@@ -1149,6 +1155,14 @@ export async function registerRoutes(
   // Cancel a recurring contribution
   app.delete("/api/recurring-contributions/:id", requireAuth, async (req, res, next) => {
     try {
+      // Get the recurring contribution to verify ownership
+      const userContributions = await storage.getRecurringContributionsByUser(req.session.userId!);
+      const contribution = userContributions.find(c => c.id === req.params.id);
+      
+      if (!contribution) {
+        return res.status(404).json({ message: "Recurring contribution not found or you don't have permission to cancel it" });
+      }
+
       await storage.cancelRecurringContribution(req.params.id);
       res.json({ message: "Recurring contribution cancelled" });
     } catch (error) {
