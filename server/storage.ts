@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
-  users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites, walletDeposits, verificationCodes, bankAccounts,
+  users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites, walletDeposits, verificationCodes, bankAccounts, recurringContributions,
   type User, type InsertUser, type Pool, type InsertPool, type Contribution, type InsertContribution,
   type Comment, type InsertComment, type Notification, type InsertNotification,
   type VirtualCard, type InsertVirtualCard, type Transaction, type InsertTransaction,
-  type Invite, type InsertInvite
+  type Invite, type InsertInvite, type RecurringContribution, type InsertRecurringContribution
 } from "@shared/schema";
 import { eq, desc, and, sql, gt } from "drizzle-orm";
 
@@ -69,6 +69,13 @@ export interface IStorage {
   updateInviteStatus(id: string, status: 'pending' | 'accepted' | 'declined'): Promise<void>;
   getUserByPhone(phone: string): Promise<User | undefined>;
   getFollowersWithDetails(userId: string): Promise<User[]>;
+  
+  // Recurring contribution operations
+  createRecurringContribution(data: InsertRecurringContribution): Promise<RecurringContribution>;
+  getRecurringContributionsByPool(poolId: string): Promise<RecurringContribution[]>;
+  getRecurringContributionsByUser(userId: string): Promise<RecurringContribution[]>;
+  updateRecurringContributionStatus(id: string, status: string): Promise<void>;
+  cancelRecurringContribution(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -371,6 +378,27 @@ export class DatabaseStorage implements IStorage {
 
   async markVerificationCodeUsed(id: string): Promise<void> {
     await db.update(verificationCodes).set({ used: true }).where(eq(verificationCodes.id, id));
+  }
+
+  async createRecurringContribution(data: InsertRecurringContribution): Promise<RecurringContribution> {
+    const [result] = await db.insert(recurringContributions).values(data).returning();
+    return result;
+  }
+
+  async getRecurringContributionsByPool(poolId: string): Promise<RecurringContribution[]> {
+    return await db.select().from(recurringContributions).where(eq(recurringContributions.poolId, poolId));
+  }
+
+  async getRecurringContributionsByUser(userId: string): Promise<RecurringContribution[]> {
+    return await db.select().from(recurringContributions).where(eq(recurringContributions.userId, userId));
+  }
+
+  async updateRecurringContributionStatus(id: string, status: string): Promise<void> {
+    await db.update(recurringContributions).set({ status }).where(eq(recurringContributions.id, id));
+  }
+
+  async cancelRecurringContribution(id: string): Promise<void> {
+    await db.update(recurringContributions).set({ status: 'cancelled' }).where(eq(recurringContributions.id, id));
   }
 }
 

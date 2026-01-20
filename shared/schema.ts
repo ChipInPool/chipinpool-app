@@ -125,6 +125,19 @@ export const transactions = pgTable("transactions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const recurringContributions = pgTable("recurring_contributions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  poolId: varchar("pool_id").references(() => pools.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  frequency: frequencyEnum("frequency").notNull(),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  stripePriceId: text("stripe_price_id"),
+  status: text("status").notNull().default('active'),
+  nextPaymentDate: timestamp("next_payment_date").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const follows = pgTable("follows", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   followerId: varchar("follower_id").references(() => users.id).notNull(),
@@ -201,6 +214,7 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 export const insertVirtualCardSchema = createInsertSchema(virtualCards).omit({ id: true, createdAt: true, isActive: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true, status: true });
 export const insertInviteSchema = createInsertSchema(invites).omit({ id: true, createdAt: true, status: true });
+export const insertRecurringContributionSchema = createInsertSchema(recurringContributions).omit({ id: true, createdAt: true, status: true });
 
 // Login/Register Schemas
 export const loginSchema = z.object({
@@ -231,3 +245,5 @@ export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Invite = typeof invites.$inferSelect;
 export type InsertInvite = z.infer<typeof insertInviteSchema>;
+export type RecurringContribution = typeof recurringContributions.$inferSelect;
+export type InsertRecurringContribution = z.infer<typeof insertRecurringContributionSchema>;

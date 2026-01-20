@@ -1057,6 +1057,105 @@ export async function registerRoutes(
     }
   });
 
+  // ========== RECURRING CONTRIBUTIONS ROUTES ==========
+
+  // Create a recurring contribution (subscription)
+  app.post("/api/pools/:id/recurring", requireAuth, async (req, res, next) => {
+    try {
+      const { amount, frequency } = z.object({
+        amount: z.string(),
+        frequency: z.enum(['weekly', 'monthly', 'quarterly']),
+      }).parse(req.body);
+
+      const pool = await storage.getPool(req.params.id);
+      if (!pool) {
+        return res.status(404).json({ message: "Pool not found" });
+      }
+
+      if (!pool.isRecurring) {
+        return res.status(400).json({ message: "This pool does not accept recurring contributions" });
+      }
+
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Calculate next payment date based on frequency
+      const now = new Date();
+      let nextPaymentDate = new Date(now);
+      if (frequency === 'weekly') {
+        nextPaymentDate.setDate(now.getDate() + 7);
+      } else if (frequency === 'monthly') {
+        nextPaymentDate.setMonth(now.getMonth() + 1);
+      } else if (frequency === 'quarterly') {
+        nextPaymentDate.setMonth(now.getMonth() + 3);
+      }
+
+      // For demo purposes, create local recurring contribution
+      // In production, this would create a Stripe Subscription
+      const recurringContribution = await storage.createRecurringContribution({
+        poolId: pool.id,
+        userId,
+        amount,
+        frequency,
+        nextPaymentDate,
+      });
+
+      // Process first contribution immediately
+      const contributionAmount = parseFloat(amount);
+      const userBalance = parseFloat(user.balance);
+
+      if (userBalance >= contributionAmount) {
+        // Deduct from wallet
+        await storage.updateUserBalance(userId, (userBalance - contributionAmount).toFixed(2));
+        await storage.createContribution({ poolId: pool.id, userId, amount });
+        await storage.updatePoolAmount(pool.id, (parseFloat(pool.currentAmount) + contributionAmount).toFixed(2));
+      }
+
+      res.json({ 
+        recurringContribution,
+        message: `Recurring ${frequency} contribution of $${amount} set up successfully`,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get recurring contributions for a pool
+  app.get("/api/pools/:id/recurring", requireAuth, async (req, res, next) => {
+    try {
+      const pool = await storage.getPool(req.params.id);
+      if (!pool) {
+        return res.status(404).json({ message: "Pool not found" });
+      }
+
+      const contributions = await storage.getRecurringContributionsByPool(pool.id);
+      res.json({ contributions });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get user's recurring contributions
+  app.get("/api/user/recurring-contributions", requireAuth, async (req, res, next) => {
+    try {
+      const contributions = await storage.getRecurringContributionsByUser(req.session.userId!);
+      res.json({ contributions });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Cancel a recurring contribution
+  app.delete("/api/recurring-contributions/:id", requireAuth, async (req, res, next) => {
+    try {
+      await storage.cancelRecurringContribution(req.params.id);
+      res.json({ message: "Recurring contribution cancelled" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // ========== PLAID BANK LINKING ROUTES ==========
 
   // Create Plaid link token

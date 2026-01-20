@@ -106,6 +106,13 @@ export const api = {
     withdraw: (amount: string) =>
       fetchApi("/api/user/withdraw", { method: "POST", body: JSON.stringify({ amount }) }),
   },
+  recurring: {
+    create: (poolId: string, amount: string, frequency: 'weekly' | 'monthly' | 'quarterly') =>
+      fetchApi(`/api/pools/${poolId}/recurring`, { method: "POST", body: JSON.stringify({ amount, frequency }) }),
+    getByPool: (poolId: string) => fetchApi(`/api/pools/${poolId}/recurring`),
+    getUserRecurring: () => fetchApi("/api/user/recurring-contributions"),
+    cancel: (id: string) => fetchApi(`/api/recurring-contributions/${id}`, { method: "DELETE" }),
+  },
   plaid: {
     getLinkToken: () => fetchApi("/api/plaid/link-token", { method: "POST" }),
     exchangeToken: (publicToken: string, accountId: string) =>
