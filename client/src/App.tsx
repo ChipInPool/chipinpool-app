@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/lib/auth-context";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
+import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import CreatePool from "@/pages/create-pool";
 import PoolDetails from "@/pages/pool-details";
@@ -21,6 +22,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/welcome" component={Landing} />
       <Route path="/login" component={Login} />
       <Route path="/create" component={CreatePool} />
       <Route path="/explore" component={Explore} />

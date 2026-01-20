@@ -90,10 +90,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Skeleton className="h-8 w-24" />
             ) : isAuthenticated && user ? (
               <>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5">
-                  <Wallet className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-mono font-medium">${parseFloat(user.balance).toLocaleString()}</span>
-                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 hover:border-primary/30 transition-all cursor-pointer" data-testid="button-wallet">
+                      <Wallet className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-mono font-medium">${parseFloat(user.balance).toLocaleString()}</span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-card border-white/10 w-48">
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link href="/profile?action=deposit" className="flex items-center gap-2">
+                        <Plus className="w-4 h-4 text-green-400" />
+                        <span>Deposit Funds</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link href="/profile?action=withdraw" className="flex items-center gap-2">
+                        <Wallet className="w-4 h-4 text-orange-400" />
+                        <span>Withdraw Funds</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 <Popover>
                   <PopoverTrigger asChild>
