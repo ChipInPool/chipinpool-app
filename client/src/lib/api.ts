@@ -46,6 +46,14 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ amount }),
       }),
+    checkout: (id: string, amount: string) =>
+      fetchApi(`/api/pools/${id}/checkout`, {
+        method: "POST",
+        body: JSON.stringify({ amount }),
+      }),
+  },
+  stripe: {
+    getConfig: () => fetchApi("/api/stripe/config"),
   },
   comments: {
     create: (poolId: string, text: string) =>

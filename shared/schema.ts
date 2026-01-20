@@ -58,8 +58,10 @@ export const pools = pgTable("pools", {
 export const contributions = pgTable("contributions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   poolId: varchar("pool_id").references(() => pools.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  stripeSessionId: varchar("stripe_session_id").unique(),
+  guestEmail: text("guest_email"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

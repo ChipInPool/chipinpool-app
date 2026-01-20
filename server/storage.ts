@@ -27,6 +27,8 @@ export interface IStorage {
   // Contribution operations
   getContributionsByPool(poolId: string): Promise<Contribution[]>;
   createContribution(contribution: InsertContribution): Promise<Contribution>;
+  getContributionByStripeSession(sessionId: string): Promise<Contribution | undefined>;
+  createStripeContribution(poolId: string, amount: string, sessionId: string, userId?: string | null, guestEmail?: string | null): Promise<Contribution | null>;
   
   // Comment operations
   getCommentsByPool(poolId: string): Promise<Comment[]>;
@@ -130,6 +132,40 @@ export class DatabaseStorage implements IStorage {
   async createContribution(insertContribution: InsertContribution): Promise<Contribution> {
     const [contribution] = await db.insert(contributions).values(insertContribution).returning();
     return contribution;
+  }
+
+  async getContributionByStripeSession(sessionId: string): Promise<Contribution | undefined> {
+    const [contribution] = await db.select().from(contributions).where(eq(contributions.stripeSessionId, sessionId));
+    return contribution;
+  }
+
+  async createStripeContribution(poolId: string, amount: string, sessionId: string, userId?: string | null, guestEmail?: string | null): Promise<Contribution | null> {
+    // Use transaction for atomic idempotence check + contribution + pool update
+    return await db.transaction(async (tx) => {
+      // Idempotence check inside transaction
+      const [existing] = await tx.select().from(contributions).where(eq(contributions.stripeSessionId, sessionId));
+      if (existing) {
+        console.log(`Contribution already exists for session ${sessionId}`);
+        return null;
+      }
+
+      // Create contribution
+      const [contribution] = await tx.insert(contributions).values({
+        poolId,
+        userId: userId || null,
+        amount,
+        stripeSessionId: sessionId,
+        guestEmail: guestEmail || null,
+      }).returning();
+
+      // Atomic increment of pool balance using SQL expression
+      await tx.update(pools).set({ 
+        currentAmount: sql`${pools.currentAmount} + ${amount}`,
+        updatedAt: new Date()
+      }).where(eq(pools.id, poolId));
+
+      return contribution;
+    });
   }
 
   async getCommentsByPool(poolId: string): Promise<Comment[]> {

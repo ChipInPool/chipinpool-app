@@ -136,6 +136,14 @@ export async function registerRoutes(
       // Get contributors with user info
       const contributorsData = await Promise.all(
         contributions.map(async (c) => {
+          if (!c.userId) {
+            // Guest contribution
+            return {
+              user: { name: c.guestEmail || 'Anonymous Guest', avatar: null, badges: [] },
+              amount: c.amount,
+              date: c.createdAt.toISOString(),
+            };
+          }
           const user = await storage.getUser(c.userId);
           const badges = await storage.getUserBadges(c.userId);
           return {
@@ -442,7 +450,7 @@ export async function registerRoutes(
     }
   });
 
-  // Create checkout session for pool contribution
+  // Create checkout session for pool contribution (authenticated users)
   app.post("/api/pools/:poolId/checkout", requireAuth, async (req, res, next) => {
     try {
       const { amount } = req.body;
@@ -481,6 +489,119 @@ export async function registerRoutes(
       });
 
       res.json({ url: session.url });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ============================================
+  // Developer API - Third Party Checkout Integration
+  // ============================================
+
+  // Public endpoint for 3rd party checkout (no auth required)
+  app.post("/api/v1/checkout", async (req, res, next) => {
+    try {
+      const { poolId, amount, customerEmail, successUrl, cancelUrl } = req.body;
+
+      // Validate required fields
+      if (!poolId || !amount) {
+        return res.status(400).json({ error: "poolId and amount are required" });
+      }
+
+      // Validate amount is a positive number
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0 || parsedAmount > 10000) {
+        return res.status(400).json({ error: "Amount must be between $0.01 and $10,000" });
+      }
+
+      const pool = await storage.getPool(poolId);
+      if (!pool) {
+        return res.status(404).json({ error: "Pool not found" });
+      }
+
+      // Check pool is active
+      if (pool.status !== 'active') {
+        return res.status(400).json({ error: "Pool is not accepting contributions" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        customer_email: customerEmail,
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Contribution to ${pool.title}`,
+              description: pool.description || undefined,
+              images: pool.image ? [pool.image] : undefined,
+            },
+            unit_amount: Math.round(parseFloat(amount) * 100),
+          },
+          quantity: 1,
+        }],
+        mode: 'payment',
+        success_url: successUrl || `${baseUrl}/pool/${poolId}?payment=success`,
+        cancel_url: cancelUrl || `${baseUrl}/pool/${poolId}?payment=cancelled`,
+        metadata: {
+          poolId,
+          amount,
+          source: 'api',
+        },
+      });
+
+      res.json({ 
+        checkoutUrl: session.url,
+        sessionId: session.id,
+        expiresAt: new Date(session.expires_at * 1000).toISOString()
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get pool info for 3rd party integrations (public)
+  app.get("/api/v1/pools/:poolId", async (req, res, next) => {
+    try {
+      const pool = await storage.getPool(req.params.poolId);
+      if (!pool) {
+        return res.status(404).json({ error: "Pool not found" });
+      }
+
+      // Return limited public info
+      res.json({
+        id: pool.id,
+        title: pool.title,
+        description: pool.description,
+        targetAmount: pool.targetAmount,
+        currentAmount: pool.currentAmount,
+        category: pool.category,
+        image: pool.image,
+        deadline: pool.deadline,
+        status: pool.status,
+        percentComplete: Math.min(100, Math.round((parseFloat(pool.currentAmount) / parseFloat(pool.targetAmount)) * 100)),
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Check payment status for 3rd party (public)
+  app.get("/api/v1/checkout/:sessionId", async (req, res, next) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
+
+      res.json({
+        sessionId: session.id,
+        status: session.status,
+        paymentStatus: session.payment_status,
+        amountTotal: session.amount_total ? session.amount_total / 100 : 0,
+        currency: session.currency,
+        poolId: session.metadata?.poolId,
+      });
     } catch (error) {
       next(error);
     }

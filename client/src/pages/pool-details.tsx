@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2 } from "lucide-react";
+import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck } from "lucide-react";
 import { Link, useRoute, useLocation } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { CircularProgressbarWithChildren, buildStyles } from 'react-circular-progressbar';
@@ -30,6 +30,7 @@ export default function PoolDetails() {
   const [isChippingIn, setIsChippingIn] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [paymentStep, setPaymentStep] = useState<'amount' | 'method'>('amount');
+  const [paymentMethod, setPaymentMethod] = useState<'balance' | 'stripe'>('stripe');
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const { data: poolData, isLoading: poolLoading } = useQuery({
@@ -101,10 +102,28 @@ export default function PoolDetails() {
   const comments = pool.comments || [];
   const creator = pool.creator || { name: 'Unknown', avatar: null };
 
-  const handleChipIn = () => {
+  const handleChipIn = async () => {
     setIsChippingIn(true);
-    contributeMutation.mutate(chipInAmount);
-    setIsChippingIn(false);
+    try {
+      if (paymentMethod === 'stripe') {
+        // Redirect to Stripe checkout
+        const response = await api.pools.checkout(params?.id || '', chipInAmount);
+        if (response.url) {
+          window.location.href = response.url;
+        }
+      } else {
+        // Use account balance
+        contributeMutation.mutate(chipInAmount);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Payment Error",
+        description: error.message || "Could not process payment",
+        variant: "destructive",
+      });
+    } finally {
+      setIsChippingIn(false);
+    }
   };
 
   const confettiConfig = {
@@ -267,10 +286,52 @@ export default function PoolDetails() {
                     ) : (
                       <div className="py-4 animate-in fade-in slide-in-from-right-4">
                         <div className="mb-4 flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Payment Method</span>
+                          <span className="text-sm text-muted-foreground">Amount</span>
                           <span className="font-bold text-lg">${chipInAmount}</span>
                         </div>
-                        <PaymentMethodSelector onMethodChange={() => {}} />
+                        <div className="space-y-3">
+                          <p className="text-sm text-muted-foreground mb-3">Choose payment method:</p>
+                          <button
+                            onClick={() => setPaymentMethod('stripe')}
+                            className={`w-full p-4 rounded-xl border transition-all flex items-center gap-4 ${
+                              paymentMethod === 'stripe' 
+                                ? 'border-primary bg-primary/10' 
+                                : 'border-white/10 hover:border-white/20'
+                            }`}
+                          >
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                              paymentMethod === 'stripe' ? 'bg-primary text-primary-foreground' : 'bg-white/10'
+                            }`}>
+                              <CreditCard className="w-5 h-5" />
+                            </div>
+                            <div className="text-left flex-1">
+                              <p className="font-medium">Pay with Card</p>
+                              <p className="text-xs text-muted-foreground">Secure checkout via Stripe</p>
+                            </div>
+                            {paymentMethod === 'stripe' && <ShieldCheck className="w-5 h-5 text-primary" />}
+                          </button>
+                          <button
+                            onClick={() => setPaymentMethod('balance')}
+                            className={`w-full p-4 rounded-xl border transition-all flex items-center gap-4 ${
+                              paymentMethod === 'balance' 
+                                ? 'border-primary bg-primary/10' 
+                                : 'border-white/10 hover:border-white/20'
+                            }`}
+                          >
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                              paymentMethod === 'balance' ? 'bg-primary text-primary-foreground' : 'bg-white/10'
+                            }`}>
+                              <Wallet className="w-5 h-5" />
+                            </div>
+                            <div className="text-left flex-1">
+                              <p className="font-medium">Use Balance</p>
+                              <p className="text-xs text-muted-foreground">
+                                Available: ${user ? parseFloat(user.balance).toLocaleString() : '0'}
+                              </p>
+                            </div>
+                            {paymentMethod === 'balance' && <ShieldCheck className="w-5 h-5 text-primary" />}
+                          </button>
+                        </div>
                       </div>
                     )}
 
@@ -331,8 +392,3 @@ export default function PoolDetails() {
   );
 }
 
-function ShieldCheck({className}: {className?: string}) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
-  )
-}
