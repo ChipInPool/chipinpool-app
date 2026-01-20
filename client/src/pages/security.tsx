@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Shield, Mail, Phone, Key, Smartphone, UserCheck, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Shield, Mail, Phone, Key, Smartphone, UserCheck, CheckCircle, XCircle, Loader2, Building } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 export default function Security() {
@@ -31,6 +31,12 @@ export default function Security() {
   const { data: securityStatus, isLoading: statusLoading } = useQuery({
     queryKey: ["securityStatus"],
     queryFn: api.security.getStatus,
+    enabled: isAuthenticated,
+  });
+
+  const { data: plaidStatus } = useQuery({
+    queryKey: ["plaidStatus"],
+    queryFn: api.plaid.getStatus,
     enabled: isAuthenticated,
   });
 
@@ -411,6 +417,39 @@ export default function Security() {
                   {startKYCMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   {status.kycStatus === 'pending' ? 'Verification in Progress' : 'Start Verification'}
                 </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/[0.02] border-white/5">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Building className="w-5 h-5 text-cyan-400" />
+                  <CardTitle>Bank Account</CardTitle>
+                </div>
+                {plaidStatus?.hasBankLinked ? (
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                    <CheckCircle className="w-3 h-3 mr-1" /> Linked
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="border-orange-500/30 text-orange-400">
+                    <XCircle className="w-3 h-3 mr-1" /> Not Linked
+                  </Badge>
+                )}
+              </div>
+              <CardDescription>Link a bank account to withdraw funds to your bank</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!plaidStatus?.hasBankLinked && (
+                <p className="text-sm text-muted-foreground">
+                  Bank linking requires Plaid API keys to be configured. Contact support to enable this feature.
+                </p>
+              )}
+              {plaidStatus?.hasBankLinked && (
+                <p className="text-sm text-green-400">
+                  Your bank account is linked. You can withdraw funds from your wallet.
+                </p>
               )}
             </CardContent>
           </Card>

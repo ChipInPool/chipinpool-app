@@ -106,6 +106,14 @@ export const api = {
     withdraw: (amount: string) =>
       fetchApi("/api/user/withdraw", { method: "POST", body: JSON.stringify({ amount }) }),
   },
+  plaid: {
+    getLinkToken: () => fetchApi("/api/plaid/link-token", { method: "POST" }),
+    exchangeToken: (publicToken: string, accountId: string) =>
+      fetchApi("/api/plaid/exchange-token", { method: "POST", body: JSON.stringify({ publicToken, accountId }) }),
+    getStatus: () => fetchApi("/api/plaid/status"),
+    withdraw: (amount: string) =>
+      fetchApi("/api/plaid/withdraw", { method: "POST", body: JSON.stringify({ amount }) }),
+  },
   security: {
     getStatus: () => fetchApi("/api/security/status"),
     sendEmailVerification: () => 
