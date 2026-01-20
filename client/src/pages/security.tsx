@@ -40,6 +40,44 @@ export default function Security() {
     enabled: isAuthenticated,
   });
 
+  const linkBankMutation = useMutation({
+    mutationFn: async () => {
+      const { linkToken } = await api.plaid.getLinkToken();
+      // Open Plaid Link in a new window for sandbox testing
+      const plaidUrl = `https://cdn.plaid.com/link/v2/stable/link.html?isWebview=true&token=${linkToken}`;
+      const popup = window.open(plaidUrl, 'plaid-link', 'width=400,height=600');
+      
+      // For demo purposes, simulate successful bank linking after a delay
+      // In production, you would use Plaid Link SDK properly
+      return new Promise((resolve, reject) => {
+        const checkClosed = setInterval(() => {
+          if (popup?.closed) {
+            clearInterval(checkClosed);
+            // Refresh status after popup closes
+            queryClient.invalidateQueries({ queryKey: ["plaidStatus"] });
+            resolve({ success: true });
+          }
+        }, 1000);
+        
+        // Timeout after 5 minutes
+        setTimeout(() => {
+          clearInterval(checkClosed);
+          reject(new Error("Bank linking timed out"));
+        }, 300000);
+      });
+    },
+    onSuccess: () => {
+      toast({ description: "Bank account linking initiated. Follow the instructions in the popup." });
+    },
+    onError: (error: any) => {
+      toast({ description: error.message || "Failed to link bank account", variant: "destructive" });
+    },
+  });
+
+  const handleLinkBank = () => {
+    linkBankMutation.mutate();
+  };
+
   const sendEmailMutation = useMutation({
     mutationFn: api.security.sendEmailVerification,
     onSuccess: () => {
@@ -442,9 +480,15 @@ export default function Security() {
             </CardHeader>
             <CardContent>
               {!plaidStatus?.hasBankLinked && (
-                <p className="text-sm text-muted-foreground">
-                  Bank linking requires Plaid API keys to be configured. Contact support to enable this feature.
-                </p>
+                <Button 
+                  onClick={handleLinkBank}
+                  disabled={linkBankMutation.isPending}
+                  className="bg-gradient-to-r from-cyan-500 to-blue-500"
+                  data-testid="button-link-bank"
+                >
+                  {linkBankMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Link Bank Account
+                </Button>
               )}
               {plaidStatus?.hasBankLinked && (
                 <p className="text-sm text-green-400">
