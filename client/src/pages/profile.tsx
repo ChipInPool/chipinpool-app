@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PoolCard } from "@/components/pool-card";
-import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus, Clock, Users, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
+import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus, Clock, Users, UserPlus, ChevronDown, ChevronUp, Building, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Profile() {
   const { toast } = useToast();
@@ -73,14 +74,18 @@ export default function Profile() {
   };
 
   const handleWithdraw = async () => {
+    if (!plaidStatus?.hasBankLinked) {
+      toast({ description: "Please link a bank account first in Security settings", variant: "destructive" });
+      return;
+    }
     if (!amount || parseFloat(amount) <= 0) {
       toast({ description: "Please enter a valid amount", variant: "destructive" });
       return;
     }
     setIsProcessing(true);
     try {
-      await api.users.withdraw(amount);
-      toast({ description: `Successfully withdrew $${amount}` });
+      const response = await api.plaid.withdraw(amount);
+      toast({ description: response.message || `Withdrawal of $${amount} initiated` });
       queryClient.invalidateQueries({ queryKey: queryKeys.user });
       setWithdrawDialogOpen(false);
       setAmount("");
@@ -107,6 +112,12 @@ export default function Profile() {
     queryKey: queryKeys.following(user?.id || ""),
     queryFn: () => api.users.getFollowing(user?.id || ""),
     enabled: isAuthenticated && !!user?.id,
+  });
+
+  const { data: plaidStatus } = useQuery({
+    queryKey: ["plaidStatus"],
+    queryFn: api.plaid.getStatus,
+    enabled: isAuthenticated,
   });
 
   useEffect(() => {
@@ -448,37 +459,7 @@ export default function Profile() {
           <DialogHeader>
             <DialogTitle>Add Funds</DialogTitle>
             <DialogDescription>
-              Enter the amount you want to deposit to your wallet.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Input
-              type="number"
-              placeholder="Enter amount"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              min="0"
-              step="0.01"
-              data-testid="input-deposit-amount"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setDepositDialogOpen(false); setAmount(""); }}>
-              Cancel
-            </Button>
-            <Button onClick={handleDeposit} disabled={isProcessing} data-testid="button-confirm-deposit">
-              {isProcessing ? "Processing..." : "Deposit"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={withdrawDialogOpen} onOpenChange={setWithdrawDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Withdraw Funds</DialogTitle>
-            <DialogDescription>
-              Enter the amount you want to withdraw from your wallet.
+              Securely add funds to your wallet using Stripe.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
@@ -489,20 +470,79 @@ export default function Profile() {
               onChange={(e) => setAmount(e.target.value)}
               min="0"
               step="0.01"
-              data-testid="input-withdraw-amount"
+              data-testid="input-deposit-amount"
             />
             <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
-              <Clock className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>Real withdrawals will be processed within 3-5 business days.</span>
+              <svg className="w-4 h-4 mt-0.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.594-7.305h.003z"/>
+              </svg>
+              <span>You'll be redirected to Stripe's secure checkout to complete your deposit.</span>
             </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDepositDialogOpen(false); setAmount(""); }}>
+              Cancel
+            </Button>
+            <Button onClick={handleDeposit} disabled={isProcessing} data-testid="button-confirm-deposit">
+              {isProcessing ? "Processing..." : "Continue to Stripe"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={withdrawDialogOpen} onOpenChange={setWithdrawDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Withdraw Funds</DialogTitle>
+            <DialogDescription>
+              Withdraw funds to your linked bank account via Plaid.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {!plaidStatus?.hasBankLinked ? (
+              <Alert className="border-orange-500/30 bg-orange-500/10">
+                <Building className="w-4 h-4 text-orange-500" />
+                <AlertDescription className="text-orange-200">
+                  You need to link a bank account before withdrawing. Go to{" "}
+                  <Link href="/security" className="underline font-medium">Security Settings</Link>{" "}
+                  to link your bank.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-sm text-green-400">
+                  <Building className="w-4 h-4 shrink-0" />
+                  <span>Bank account linked via Plaid</span>
+                </div>
+                <Input
+                  type="number"
+                  placeholder="Enter amount"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  min="0"
+                  step="0.01"
+                  data-testid="input-withdraw-amount"
+                />
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+                  <Clock className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>Withdrawals are processed within 1-3 business days.</span>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setWithdrawDialogOpen(false); setAmount(""); }}>
               Cancel
             </Button>
-            <Button onClick={handleWithdraw} disabled={isProcessing} data-testid="button-confirm-withdraw">
-              {isProcessing ? "Processing..." : "Withdraw"}
-            </Button>
+            {plaidStatus?.hasBankLinked ? (
+              <Button onClick={handleWithdraw} disabled={isProcessing} data-testid="button-confirm-withdraw">
+                {isProcessing ? "Processing..." : "Withdraw to Bank"}
+              </Button>
+            ) : (
+              <Button onClick={() => { setWithdrawDialogOpen(false); setLocation("/security"); }} data-testid="button-link-bank-redirect">
+                Link Bank Account
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
