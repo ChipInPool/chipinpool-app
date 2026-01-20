@@ -8,6 +8,14 @@ import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { sendPoolInviteEmail } from "./resendClient";
 import { sendPoolInviteSMS } from "./clicksendClient";
+import { 
+  generateOTP, 
+  generate2FASecret, 
+  generate2FAQRCode, 
+  verify2FAToken,
+  hashTransactionPin,
+  verifyTransactionPin
+} from "./verificationService";
 
 declare module "express-session" {
   interface SessionData {
@@ -936,6 +944,267 @@ export async function registerRoutes(
         amountTotal: session.amount_total ? session.amount_total / 100 : 0,
         currency: session.currency,
         poolId: session.metadata?.poolId,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ========== SECURITY ROUTES ==========
+
+  // Send email verification code
+  app.post("/api/security/email/send", requireAuth, async (req, res, next) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      if (user.emailVerified) return res.status(400).json({ error: "Email already verified" });
+
+      const code = generateOTP();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      await storage.createVerificationCode({ userId: user.id, type: 'email', code, expiresAt });
+
+      // Send via Resend
+      try {
+        const { Resend } = await import('resend');
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        await resend.emails.send({
+          from: 'ChipInPay <onboarding@resend.dev>',
+          to: user.email,
+          subject: 'Verify your email - ChipInPay',
+          html: `<h1>Your verification code: <strong>${code}</strong></h1><p>Expires in 15 minutes.</p>`,
+        });
+      } catch (e) {
+        console.log(`[DEV] Email verification code for ${user.email}: ${code}`);
+      }
+
+      res.json({ message: "Verification code sent to your email" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Verify email code
+  app.post("/api/security/email/verify", requireAuth, async (req, res, next) => {
+    try {
+      const { code } = z.object({ code: z.string().length(6) }).parse(req.body);
+      const userId = req.session.userId!;
+
+      const verificationCode = await storage.getValidVerificationCode(userId, 'email', code);
+      if (!verificationCode) {
+        return res.status(400).json({ error: "Invalid or expired code" });
+      }
+
+      await storage.markVerificationCodeUsed(verificationCode.id);
+      await storage.updateUser(userId, { emailVerified: true });
+
+      res.json({ message: "Email verified successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Send phone verification code
+  app.post("/api/security/phone/send", requireAuth, async (req, res, next) => {
+    try {
+      const { phone } = z.object({ phone: z.string().min(10) }).parse(req.body);
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      await storage.updateUser(userId, { phone });
+
+      const code = generateOTP();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      await storage.createVerificationCode({ userId, type: 'phone', code, expiresAt });
+
+      // Send via ClickSend
+      const username = process.env.CLICKSEND_USERNAME;
+      const apiKey = process.env.CLICKSEND_API_KEY;
+      if (username && apiKey) {
+        let phoneNumber = phone.replace(/\D/g, '');
+        if (!phoneNumber.startsWith('1') && phoneNumber.length === 10) phoneNumber = '1' + phoneNumber;
+        if (!phoneNumber.startsWith('+')) phoneNumber = '+' + phoneNumber;
+
+        await fetch('https://rest.clicksend.com/v3/sms/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Basic ' + Buffer.from(`${username}:${apiKey}`).toString('base64'),
+          },
+          body: JSON.stringify({ messages: [{ source: 'chipin', body: `Your ChipInPay code: ${code}`, to: phoneNumber }] }),
+        });
+      } else {
+        console.log(`[DEV] Phone verification code for ${phone}: ${code}`);
+      }
+
+      res.json({ message: "Verification code sent to your phone" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Verify phone code
+  app.post("/api/security/phone/verify", requireAuth, async (req, res, next) => {
+    try {
+      const { code } = z.object({ code: z.string().length(6) }).parse(req.body);
+      const userId = req.session.userId!;
+
+      const verificationCode = await storage.getValidVerificationCode(userId, 'phone', code);
+      if (!verificationCode) {
+        return res.status(400).json({ error: "Invalid or expired code" });
+      }
+
+      await storage.markVerificationCodeUsed(verificationCode.id);
+      await storage.updateUser(userId, { phoneVerified: true });
+
+      res.json({ message: "Phone verified successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Set transaction PIN
+  app.post("/api/security/pin/set", requireAuth, async (req, res, next) => {
+    try {
+      const { pin } = z.object({ pin: z.string().length(4).regex(/^\d+$/) }).parse(req.body);
+      const userId = req.session.userId!;
+
+      const hashedPin = await hashTransactionPin(pin);
+      await storage.updateUser(userId, { transactionPin: hashedPin });
+
+      res.json({ message: "Transaction PIN set successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Verify transaction PIN
+  app.post("/api/security/pin/verify", requireAuth, async (req, res, next) => {
+    try {
+      const { pin } = z.object({ pin: z.string().length(4) }).parse(req.body);
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user || !user.transactionPin) {
+        return res.status(400).json({ error: "No PIN set" });
+      }
+
+      const isValid = await verifyTransactionPin(pin, user.transactionPin);
+      if (!isValid) {
+        return res.status(400).json({ error: "Invalid PIN" });
+      }
+
+      res.json({ valid: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Enable 2FA - get QR code
+  app.post("/api/security/2fa/setup", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      if (user.twoFactorEnabled) return res.status(400).json({ error: "2FA already enabled" });
+
+      const { secret, otpauthUrl } = generate2FASecret(user.email);
+      const qrCode = await generate2FAQRCode(otpauthUrl);
+
+      await storage.updateUser(userId, { twoFactorSecret: secret });
+
+      res.json({ qrCode, secret });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Confirm 2FA with code
+  app.post("/api/security/2fa/enable", requireAuth, async (req, res, next) => {
+    try {
+      const { code } = z.object({ code: z.string().length(6) }).parse(req.body);
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user || !user.twoFactorSecret) {
+        return res.status(400).json({ error: "2FA not set up" });
+      }
+
+      const isValid = verify2FAToken(user.twoFactorSecret, code);
+      if (!isValid) {
+        return res.status(400).json({ error: "Invalid code" });
+      }
+
+      await storage.updateUser(userId, { twoFactorEnabled: true });
+      res.json({ message: "2FA enabled successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Disable 2FA
+  app.post("/api/security/2fa/disable", requireAuth, async (req, res, next) => {
+    try {
+      const { code } = z.object({ code: z.string().length(6) }).parse(req.body);
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
+        return res.status(400).json({ error: "2FA not enabled" });
+      }
+
+      const isValid = verify2FAToken(user.twoFactorSecret, code);
+      if (!isValid) {
+        return res.status(400).json({ error: "Invalid code" });
+      }
+
+      await storage.updateUser(userId, { twoFactorEnabled: false, twoFactorSecret: null });
+      res.json({ message: "2FA disabled successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Initiate KYC with Stripe Identity
+  app.post("/api/security/kyc/start", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      if (user.kycStatus === 'verified') return res.status(400).json({ error: "Already verified" });
+
+      const stripe = await getUncachableStripeClient();
+      
+      const verificationSession = await stripe.identity.verificationSessions.create({
+        type: 'document',
+        metadata: { userId },
+        options: {
+          document: {
+            require_matching_selfie: true,
+          },
+        },
+      });
+
+      await storage.updateUser(userId, { kycStatus: 'pending' });
+
+      res.json({ 
+        clientSecret: verificationSession.client_secret,
+        url: verificationSession.url,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get security status
+  app.get("/api/security/status", requireAuth, async (req, res, next) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      res.json({
+        emailVerified: user.emailVerified,
+        phoneVerified: user.phoneVerified,
+        hasTransactionPin: !!user.transactionPin,
+        twoFactorEnabled: user.twoFactorEnabled,
+        kycStatus: user.kycStatus,
       });
     } catch (error) {
       next(error);

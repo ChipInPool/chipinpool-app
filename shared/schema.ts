@@ -9,6 +9,7 @@ export const frequencyEnum = pgEnum('frequency', ['weekly', 'monthly', 'quarterl
 export const notificationTypeEnum = pgEnum('notification_type', ['contribution', 'comment', 'goal_reached', 'friend_request', 'pool_invite']);
 export const inviteStatusEnum = pgEnum('invite_status', ['pending', 'accepted', 'declined']);
 export const inviteMethodEnum = pgEnum('invite_method', ['email', 'sms', 'push', 'link']);
+export const kycStatusEnum = pgEnum('kyc_status', ['not_started', 'pending', 'verified', 'failed']);
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -26,6 +27,17 @@ export const users = pgTable("users", {
   poolsCreated: integer("pools_created").notNull().default(0),
   totalContributed: decimal("total_contributed", { precision: 10, scale: 2 }).notNull().default('0'),
   rating: decimal("rating", { precision: 3, scale: 2 }).default('5.0'),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  phoneVerified: boolean("phone_verified").notNull().default(false),
+  transactionPin: text("transaction_pin"),
+  twoFactorSecret: text("two_factor_secret"),
+  twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
+  kycStatus: kycStatusEnum("kyc_status").notNull().default('not_started'),
+  kycVerifiedAt: timestamp("kyc_verified_at"),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeCardholderId: text("stripe_cardholder_id"),
+  plaidAccessToken: text("plaid_access_token"),
+  plaidAccountId: text("plaid_account_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -99,6 +111,8 @@ export const virtualCards = pgTable("virtual_cards", {
   cvc: text("cvc").notNull(),
   balance: decimal("balance", { precision: 10, scale: 2 }).notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  stripeCardId: text("stripe_card_id"),
+  lastFour: text("last_four"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -138,8 +152,48 @@ export const walletDeposits = pgTable("wallet_deposits", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const verificationCodes = pgTable("verification_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  type: text("type").notNull(),
+  code: text("code").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const bankAccounts = pgTable("bank_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  plaidAccountId: text("plaid_account_id").notNull(),
+  institutionName: text("institution_name").notNull(),
+  accountName: text("account_name").notNull(),
+  accountMask: text("account_mask").notNull(),
+  accountType: text("account_type").notNull(),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Insert Schemas
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, poolsCreated: true, totalContributed: true, balance: true, rating: true });
+export const insertUserSchema = createInsertSchema(users).omit({ 
+  id: true, 
+  createdAt: true, 
+  poolsCreated: true, 
+  totalContributed: true, 
+  balance: true, 
+  rating: true,
+  emailVerified: true,
+  phoneVerified: true,
+  transactionPin: true,
+  twoFactorSecret: true,
+  twoFactorEnabled: true,
+  kycStatus: true,
+  kycVerifiedAt: true,
+  stripeCustomerId: true,
+  stripeCardholderId: true,
+  plaidAccessToken: true,
+  plaidAccountId: true,
+});
 export const insertPoolSchema = createInsertSchema(pools).omit({ id: true, createdAt: true, updatedAt: true, currentAmount: true, status: true });
 export const insertContributionSchema = createInsertSchema(contributions).omit({ id: true, createdAt: true });
 export const insertCommentSchema = createInsertSchema(comments).omit({ id: true, createdAt: true, likes: true });

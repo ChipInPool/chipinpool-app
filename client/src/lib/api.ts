@@ -106,6 +106,29 @@ export const api = {
     withdraw: (amount: string) =>
       fetchApi("/api/user/withdraw", { method: "POST", body: JSON.stringify({ amount }) }),
   },
+  security: {
+    getStatus: () => fetchApi("/api/security/status"),
+    sendEmailVerification: () => 
+      fetchApi("/api/security/email/send", { method: "POST" }),
+    verifyEmail: (code: string) =>
+      fetchApi("/api/security/email/verify", { method: "POST", body: JSON.stringify({ code }) }),
+    sendPhoneVerification: (phone: string) =>
+      fetchApi("/api/security/phone/send", { method: "POST", body: JSON.stringify({ phone }) }),
+    verifyPhone: (code: string) =>
+      fetchApi("/api/security/phone/verify", { method: "POST", body: JSON.stringify({ code }) }),
+    setPin: (pin: string) =>
+      fetchApi("/api/security/pin/set", { method: "POST", body: JSON.stringify({ pin }) }),
+    verifyPin: (pin: string) =>
+      fetchApi("/api/security/pin/verify", { method: "POST", body: JSON.stringify({ pin }) }),
+    setup2FA: () =>
+      fetchApi("/api/security/2fa/setup", { method: "POST" }),
+    enable2FA: (code: string) =>
+      fetchApi("/api/security/2fa/enable", { method: "POST", body: JSON.stringify({ code }) }),
+    disable2FA: (code: string) =>
+      fetchApi("/api/security/2fa/disable", { method: "POST", body: JSON.stringify({ code }) }),
+    startKYC: () =>
+      fetchApi("/api/security/kyc/start", { method: "POST" }),
+  },
 };
 
 export const queryKeys = {

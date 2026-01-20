@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAuth } from "@/lib/auth-context";
 import { api, queryKeys } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Wallet, Menu, Bell, Moon, Sun, LogOut } from "lucide-react";
+import { Plus, Wallet, Menu, Bell, Moon, Sun, LogOut, Shield } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -176,6 +176,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <DropdownMenuContent align="end" className="bg-card border-white/10">
                     <DropdownMenuItem asChild>
                       <Link href="/profile">My Profile</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/security" className="flex items-center">
+                        <Shield className="w-4 h-4 mr-2" />
+                        Security
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleLogout} className="text-red-400">
                       <LogOut className="w-4 h-4 mr-2" />

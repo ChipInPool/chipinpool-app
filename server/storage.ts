@@ -1,12 +1,12 @@
 import { db } from "./db";
 import { 
-  users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites, walletDeposits,
+  users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites, walletDeposits, verificationCodes, bankAccounts,
   type User, type InsertUser, type Pool, type InsertPool, type Contribution, type InsertContribution,
   type Comment, type InsertComment, type Notification, type InsertNotification,
   type VirtualCard, type InsertVirtualCard, type Transaction, type InsertTransaction,
   type Invite, type InsertInvite
 } from "@shared/schema";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, gt } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -344,6 +344,33 @@ export class DatabaseStorage implements IStorage {
 
       return true;
     });
+  }
+
+  async updateUser(id: string, data: Partial<User>): Promise<User | undefined> {
+    const [user] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return user;
+  }
+
+  async createVerificationCode(data: { userId: string; type: string; code: string; expiresAt: Date }): Promise<void> {
+    await db.insert(verificationCodes).values(data);
+  }
+
+  async getValidVerificationCode(userId: string, type: string, code: string): Promise<{ id: string } | undefined> {
+    const now = new Date();
+    const [result] = await db.select({ id: verificationCodes.id })
+      .from(verificationCodes)
+      .where(and(
+        eq(verificationCodes.userId, userId),
+        eq(verificationCodes.type, type),
+        eq(verificationCodes.code, code),
+        eq(verificationCodes.used, false),
+        gt(verificationCodes.expiresAt, now)
+      ));
+    return result;
+  }
+
+  async markVerificationCodeUsed(id: string): Promise<void> {
+    await db.update(verificationCodes).set({ used: true }).where(eq(verificationCodes.id, id));
   }
 }
 
