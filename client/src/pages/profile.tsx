@@ -455,92 +455,221 @@ export default function Profile() {
       </div>
 
       <Dialog open={depositDialogOpen} onOpenChange={setDepositDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Funds</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                <Plus className="w-5 h-5 text-green-500" />
+              </div>
+              Add Funds
+            </DialogTitle>
             <DialogDescription>
-              Securely add funds to your wallet using Stripe.
+              Securely deposit money to your ChipIn wallet
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-4">
-            <Input
-              type="number"
-              placeholder="Enter amount"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              min="0"
-              step="0.01"
-              data-testid="input-deposit-amount"
-            />
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
-              <svg className="w-4 h-4 mt-0.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.594-7.305h.003z"/>
-              </svg>
-              <span>You'll be redirected to Stripe's secure checkout to complete your deposit.</span>
+          
+          <div className="py-4 space-y-5">
+            <div className="text-center p-4 rounded-xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Current Balance</p>
+              <p className="text-2xl font-bold text-green-500">
+                ${parseFloat(user?.balance || '0').toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Amount to deposit</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">$</span>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  min="0"
+                  step="0.01"
+                  className="pl-8 text-lg h-12"
+                  data-testid="input-deposit-amount"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              {[25, 50, 100, 250].map((preset) => (
+                <Button
+                  key={preset}
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setAmount(preset.toString())}
+                  data-testid={`button-preset-${preset}`}
+                >
+                  ${preset}
+                </Button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+              <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4 text-purple-400" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.594-7.305h.003z"/>
+                </svg>
+              </div>
+              <div className="text-sm">
+                <p className="font-medium text-purple-300">Powered by Stripe</p>
+                <p className="text-muted-foreground text-xs">Secure payment processing</p>
+              </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setDepositDialogOpen(false); setAmount(""); }}>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => { setDepositDialogOpen(false); setAmount(""); }}>
               Cancel
             </Button>
-            <Button onClick={handleDeposit} disabled={isProcessing} data-testid="button-confirm-deposit">
-              {isProcessing ? "Processing..." : "Continue to Stripe"}
+            <Button 
+              onClick={handleDeposit} 
+              disabled={isProcessing || !amount || parseFloat(amount) <= 0}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="button-confirm-deposit"
+            >
+              {isProcessing ? "Processing..." : `Deposit $${amount || '0'}`}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={withdrawDialogOpen} onOpenChange={setWithdrawDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Withdraw Funds</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <Minus className="w-5 h-5 text-blue-500" />
+              </div>
+              Withdraw Funds
+            </DialogTitle>
             <DialogDescription>
-              Withdraw funds to your linked bank account via Plaid.
+              Transfer money from your wallet to your bank
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-4">
+          
+          <div className="py-4 space-y-5">
+            <div className="text-center p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Available Balance</p>
+              <p className="text-2xl font-bold text-blue-400">
+                ${parseFloat(user?.balance || '0').toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+
             {!plaidStatus?.hasBankLinked ? (
-              <Alert className="border-orange-500/30 bg-orange-500/10">
-                <Building className="w-4 h-4 text-orange-500" />
-                <AlertDescription className="text-orange-200">
-                  You need to link a bank account before withdrawing. Go to{" "}
-                  <Link href="/security" className="underline font-medium">Security Settings</Link>{" "}
-                  to link your bank.
-                </AlertDescription>
-              </Alert>
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 text-center">
+                  <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-3">
+                    <Building className="w-6 h-6 text-orange-400" />
+                  </div>
+                  <h4 className="font-medium text-orange-300 mb-1">No Bank Account Linked</h4>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Link your bank account to withdraw funds securely via Plaid.
+                  </p>
+                  <Button 
+                    onClick={() => { setWithdrawDialogOpen(false); setLocation("/security"); }}
+                    className="bg-orange-600 hover:bg-orange-700"
+                    data-testid="button-link-bank-redirect"
+                  >
+                    <Building className="w-4 h-4 mr-2" />
+                    Link Bank Account
+                  </Button>
+                </div>
+              </div>
             ) : (
               <>
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-sm text-green-400">
-                  <Building className="w-4 h-4 shrink-0" />
-                  <span>Bank account linked via Plaid</span>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
+                    <Building className="w-4 h-4 text-green-400" />
+                  </div>
+                  <div className="text-sm">
+                    <p className="font-medium text-green-300">Bank Account Connected</p>
+                    <p className="text-muted-foreground text-xs">Linked via Plaid</p>
+                  </div>
                 </div>
-                <Input
-                  type="number"
-                  placeholder="Enter amount"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  min="0"
-                  step="0.01"
-                  data-testid="input-withdraw-amount"
-                />
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Amount to withdraw</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">$</span>
+                    <Input
+                      type="number"
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      min="0"
+                      max={parseFloat(user?.balance || '0')}
+                      step="0.01"
+                      className="pl-8 text-lg h-12"
+                      data-testid="input-withdraw-amount"
+                    />
+                  </div>
+                  {parseFloat(amount || '0') > parseFloat(user?.balance || '0') && (
+                    <p className="text-xs text-red-400 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Amount exceeds available balance
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setAmount((parseFloat(user?.balance || '0') * 0.25).toFixed(2))}
+                  >
+                    25%
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setAmount((parseFloat(user?.balance || '0') * 0.5).toFixed(2))}
+                  >
+                    50%
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setAmount((parseFloat(user?.balance || '0') * 0.75).toFixed(2))}
+                  >
+                    75%
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setAmount(user?.balance || '0')}
+                  >
+                    Max
+                  </Button>
+                </div>
+
                 <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
                   <Clock className="w-4 h-4 mt-0.5 shrink-0" />
-                  <span>Withdrawals are processed within 1-3 business days.</span>
+                  <span>Funds typically arrive within 1-3 business days.</span>
                 </div>
               </>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setWithdrawDialogOpen(false); setAmount(""); }}>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => { setWithdrawDialogOpen(false); setAmount(""); }}>
               Cancel
             </Button>
-            {plaidStatus?.hasBankLinked ? (
-              <Button onClick={handleWithdraw} disabled={isProcessing} data-testid="button-confirm-withdraw">
-                {isProcessing ? "Processing..." : "Withdraw to Bank"}
-              </Button>
-            ) : (
-              <Button onClick={() => { setWithdrawDialogOpen(false); setLocation("/security"); }} data-testid="button-link-bank-redirect">
-                Link Bank Account
+            {plaidStatus?.hasBankLinked && (
+              <Button 
+                onClick={handleWithdraw} 
+                disabled={isProcessing || !amount || parseFloat(amount) <= 0 || parseFloat(amount) > parseFloat(user?.balance || '0')}
+                className="bg-blue-600 hover:bg-blue-700"
+                data-testid="button-confirm-withdraw"
+              >
+                {isProcessing ? "Processing..." : `Withdraw $${amount || '0'}`}
               </Button>
             )}
           </DialogFooter>
