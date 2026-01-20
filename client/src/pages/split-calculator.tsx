@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Calculator, Plus, Trash2, Users, DollarSign, Percent, Copy, Check } from "lucide-react";
-import { Link } from "wouter";
+import { ArrowLeft, Calculator, Plus, Trash2, Users, DollarSign, Percent, Copy, Check, Wallet } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
 interface Person {
@@ -14,6 +14,7 @@ interface Person {
 
 export default function SplitCalculator() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [totalAmount, setTotalAmount] = useState("");
   const [people, setPeople] = useState<Person[]>([
     { id: "1", name: "", amount: 0 },
@@ -256,6 +257,23 @@ export default function SplitCalculator() {
                 <span>${equalSplit.toFixed(2)}</span>
               </div>
             </div>
+
+            {total > 0 && (
+              <Button
+                className="w-full mt-4"
+                onClick={() => {
+                  const params = new URLSearchParams({
+                    title: `Split: $${totalWithTip.toFixed(2)}`,
+                    amount: totalWithTip.toFixed(2),
+                    participants: people.length.toString(),
+                  });
+                  setLocation(`/create?${params.toString()}`);
+                }}
+                data-testid="button-create-pool"
+              >
+                <Wallet className="w-4 h-4 mr-2" /> Create Pool from Split
+              </Button>
+            )}
           </div>
         </div>
       </div>

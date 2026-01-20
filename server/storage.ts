@@ -7,7 +7,7 @@ import {
   type Invite, type InsertInvite, type RecurringContribution, type InsertRecurringContribution,
   type ApiAccessRequest, type InsertApiAccessRequest
 } from "@shared/schema";
-import { eq, desc, and, sql, gt } from "drizzle-orm";
+import { eq, desc, and, sql, gt, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -425,7 +425,7 @@ export class DatabaseStorage implements IStorage {
 
     const cards = await db.select()
       .from(virtualCards)
-      .where(sql`${virtualCards.poolId} = ANY(${poolIds})`);
+      .where(inArray(virtualCards.poolId, poolIds));
 
     if (cards.length === 0) return [];
 
@@ -434,7 +434,7 @@ export class DatabaseStorage implements IStorage {
 
     const allTransactions = await db.select()
       .from(transactions)
-      .where(sql`${transactions.virtualCardId} = ANY(${cardIds})`)
+      .where(inArray(transactions.virtualCardId, cardIds))
       .orderBy(desc(transactions.createdAt));
 
     return allTransactions.map(t => ({

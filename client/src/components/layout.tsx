@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAuth } from "@/lib/auth-context";
 import { api, queryKeys } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Wallet, Menu, Bell, Moon, Sun, LogOut, Shield } from "lucide-react";
+import { Plus, Wallet, Menu, Bell, Moon, Sun, LogOut, Shield, Settings } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -77,8 +77,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Link href="/explore" className={`text-sm font-medium hover:text-primary transition-colors ${location === '/explore' ? 'text-primary' : 'text-muted-foreground'}`}>
               Explore
             </Link>
-            <Link href="/how-it-works" className={`text-sm font-medium hover:text-primary transition-colors ${location === '/how-it-works' ? 'text-primary' : 'text-muted-foreground'}`}>
-              How it works
+            <Link href="/recurring" className={`text-sm font-medium hover:text-primary transition-colors ${location === '/recurring' ? 'text-primary' : 'text-muted-foreground'}`}>
+              Recurring
+            </Link>
+            <Link href="/split-calculator" className={`text-sm font-medium hover:text-primary transition-colors ${location === '/split-calculator' ? 'text-primary' : 'text-muted-foreground'}`}>
+              Split
             </Link>
             <Link href="/api-docs" className={`text-sm font-medium hover:text-primary transition-colors ${location === '/api-docs' ? 'text-primary' : 'text-muted-foreground'}`}>
               Developers
@@ -183,6 +186,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         Security
                       </Link>
                     </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/settings" className="flex items-center">
+                        <Settings className="w-4 h-4 mr-2" />
+                        Settings
+                      </Link>
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleLogout} className="text-red-400">
                       <LogOut className="w-4 h-4 mr-2" />
                       Logout
@@ -230,8 +239,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <div className="flex flex-col gap-2">
                     <Link href="/" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Dashboard</Link>
                     <Link href="/explore" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Explore Pools</Link>
+                    <Link href="/recurring" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Recurring</Link>
+                    <Link href="/split-calculator" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Split Calculator</Link>
                     <Link href="/profile" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>My Profile</Link>
-                    <Link href="/how-it-works" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>How It Works</Link>
+                    <Link href="/settings" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Settings</Link>
                     <Link href="/api-docs" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>For Developers</Link>
                     {isAuthenticated && (
                       <button onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors text-left text-red-400">

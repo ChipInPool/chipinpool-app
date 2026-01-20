@@ -102,6 +102,9 @@ export default function CreatePool() {
               { icon: GraduationCap, label: "Graduation", category: "gift", amount: "150", desc: "Celebrate a graduate" },
               { icon: Heart, label: "Wedding Gift", category: "gift", amount: "300", desc: "Gift for the newlyweds" },
               { icon: Coffee, label: "Office Fund", category: "recurring", amount: "50", desc: "Monthly office snacks/coffee" },
+              { icon: RefreshCw, label: "Rent Split", category: "recurring", amount: "1000", desc: "Monthly rent contributions" },
+              { icon: RefreshCw, label: "Utilities", category: "recurring", amount: "150", desc: "Monthly utility bills" },
+              { icon: RefreshCw, label: "Subscription", category: "recurring", amount: "30", desc: "Shared streaming/service" },
             ].map((template) => (
               <button
                 key={template.label}

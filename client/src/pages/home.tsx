@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { PoolCard } from "@/components/pool-card";
-import { ArrowRight, Plus, Wallet, TrendingUp, Users, CreditCard, Bell, Clock, DollarSign } from "lucide-react";
+import { ArrowRight, Plus, Wallet, TrendingUp, Users, CreditCard, Bell, Clock, DollarSign, Activity, Expand } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery } from "@tanstack/react-query";
@@ -10,7 +10,7 @@ import { api, queryKeys } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 
 export default function Home() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
@@ -28,8 +28,16 @@ export default function Home() {
     enabled: isAuthenticated,
   });
 
+  const { data: activityData } = useQuery({
+    queryKey: ["activityFeed"],
+    queryFn: () => fetch("/api/activity-feed", { credentials: "include" }).then(r => r.json()),
+    enabled: isAuthenticated,
+    staleTime: 60 * 1000,
+  });
+
   const pools = poolsData?.pools || [];
   const notifications = notificationsData?.notifications || [];
+  const activities = activityData?.activities || [];
 
   const myPools = pools.filter((p: any) => p.creatorId === user?.id);
   const contributedPools = pools.filter((p: any) => p.creatorId !== user?.id);
@@ -186,44 +194,94 @@ export default function Home() {
           )}
         </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-display font-bold flex items-center gap-2">
-              <Bell className="w-5 h-5" /> Activity
-            </h2>
-          </div>
-          <Card className="bg-white/[0.02] border-white/5">
-            <CardContent className="p-0">
-              {recentNotifications.length === 0 ? (
-                <div className="p-6 text-center text-muted-foreground text-sm">
-                  No recent activity
-                </div>
-              ) : (
-                <div className="divide-y divide-white/5">
-                  {recentNotifications.map((notification: any) => (
-                    <Link key={notification.id} href={notification.link || '#'}>
-                      <div className={`p-4 hover:bg-white/5 transition-colors cursor-pointer ${!notification.read ? 'bg-primary/5' : ''}`}>
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 rounded-full bg-white/5">
-                            <Clock className="w-3 h-3 text-muted-foreground" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{notification.title}</p>
-                            <p className="text-xs text-muted-foreground line-clamp-2">{notification.message}</p>
-                            <p className="text-[10px] text-muted-foreground mt-1">
-                              {format(new Date(notification.createdAt), 'MMM d, h:mm a')}
-                            </p>
+        <div className="space-y-6">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-display font-bold flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" /> Friend Activity
+              </h2>
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary" asChild>
+                <Link href="/activity"><Expand className="w-4 h-4 mr-1" /> Expand</Link>
+              </Button>
+            </div>
+            <Card className="bg-white/[0.02] border-white/5">
+              <CardContent className="p-0">
+                {activities.length === 0 ? (
+                  <div className="p-6 text-center text-muted-foreground text-sm">
+                    <Activity className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p>No activity from friends yet</p>
+                    <p className="text-xs mt-1">Follow people to see their contributions here</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-white/5">
+                    {activities.slice(0, 4).map((activity: any) => (
+                      <Link key={activity.id} href={`/pool/${activity.poolId}`}>
+                        <div className="p-4 hover:bg-white/5 transition-colors cursor-pointer">
+                          <div className="flex items-start gap-3">
+                            <Avatar className="w-8 h-8">
+                              <AvatarImage src={activity.userAvatar} />
+                              <AvatarFallback>{activity.userName?.[0] || '?'}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm">
+                                <span className="font-medium">{activity.userName}</span>
+                                <span className="text-muted-foreground"> chipped in </span>
+                                <span className="text-green-400 font-semibold">${parseFloat(activity.amount).toFixed(2)}</span>
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">to {activity.poolTitle}</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">
+                                {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
-          <div className="mt-6">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-display font-bold flex items-center gap-2">
+                <Bell className="w-5 h-5" /> Notifications
+              </h2>
+            </div>
+            <Card className="bg-white/[0.02] border-white/5">
+              <CardContent className="p-0">
+                {recentNotifications.length === 0 ? (
+                  <div className="p-6 text-center text-muted-foreground text-sm">
+                    No recent notifications
+                  </div>
+                ) : (
+                  <div className="divide-y divide-white/5">
+                    {recentNotifications.map((notification: any) => (
+                      <Link key={notification.id} href={notification.link || '#'}>
+                        <div className={`p-4 hover:bg-white/5 transition-colors cursor-pointer ${!notification.read ? 'bg-primary/5' : ''}`}>
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 rounded-full bg-white/5">
+                              <Clock className="w-3 h-3 text-muted-foreground" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{notification.title}</p>
+                              <p className="text-xs text-muted-foreground line-clamp-2">{notification.message}</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">
+                                {format(new Date(notification.createdAt), 'MMM d, h:mm a')}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Recent Contributors</h3>
             <div className="flex -space-x-2">
               {pools.slice(0, 5).flatMap((p: any) => p.contributors || []).slice(0, 8).map((contributor: any, i: number) => (
