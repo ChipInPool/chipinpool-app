@@ -480,6 +480,11 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Pool not found" });
       }
 
+      // Authorization: Only pool creator can access virtual card
+      if (pool.creatorId !== req.session.userId) {
+        return res.status(403).json({ message: "Only pool creator can access the virtual card" });
+      }
+
       let card = await storage.getVirtualCardByPool(pool.id);
       
       // Create virtual card if it doesn't exist
@@ -552,18 +557,37 @@ export async function registerRoutes(
           }
         }
         
+        // Store only masked data - never store full PAN/CVC
+        // For demo cards, store a placeholder; for real Stripe cards, only store last 4
+        const maskedCardNumber = `************${cardNumber.slice(-4)}`;
+        const maskedCvc = '***';
+        
         card = await storage.createVirtualCard({
           poolId: pool.id,
-          cardNumber,
+          cardNumber: maskedCardNumber,
           expiry,
-          cvc,
+          cvc: maskedCvc,
           balance: pool.currentAmount,
           stripeCardId,
-          lastFour,
+          lastFour: lastFour || cardNumber.slice(-4),
         });
       }
 
-      res.json({ card });
+      // Mask sensitive card data for response - only show last 4 digits
+      const maskedCard = {
+        id: card.id,
+        poolId: card.poolId,
+        cardNumber: `**** **** **** ${card.cardNumber.slice(-4)}`,
+        lastFour: card.lastFour || card.cardNumber.slice(-4),
+        expiry: card.expiry,
+        cvc: '***', // Never expose CVC
+        balance: card.balance,
+        isActive: card.isActive,
+        stripeCardId: card.stripeCardId,
+        createdAt: card.createdAt,
+      };
+
+      res.json({ card: maskedCard });
     } catch (error) {
       next(error);
     }
@@ -579,6 +603,12 @@ export async function registerRoutes(
       const card = await storage.getVirtualCardById(req.params.id);
       if (!card) {
         return res.status(404).json({ message: "Virtual card not found" });
+      }
+
+      // Authorization: Only pool creator can spend from card
+      const pool = await storage.getPool(card.poolId);
+      if (!pool || pool.creatorId !== req.session.userId) {
+        return res.status(403).json({ message: "Only pool creator can spend from this card" });
       }
 
       const cardBalance = parseFloat(card.balance);
@@ -602,6 +632,17 @@ export async function registerRoutes(
 
   app.get("/api/virtual-cards/:id/transactions", requireAuth, async (req, res, next) => {
     try {
+      const card = await storage.getVirtualCardById(req.params.id);
+      if (!card) {
+        return res.status(404).json({ message: "Virtual card not found" });
+      }
+
+      // Authorization: Only pool creator can view transactions
+      const pool = await storage.getPool(card.poolId);
+      if (!pool || pool.creatorId !== req.session.userId) {
+        return res.status(403).json({ message: "Only pool creator can view transactions" });
+      }
+
       const transactions = await storage.getTransactionsByCard(req.params.id);
       res.json({ transactions });
     } catch (error) {
