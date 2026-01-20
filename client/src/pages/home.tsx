@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { PoolCard } from "@/components/pool-card";
-import { ArrowRight, Plus, Wallet, TrendingUp, Users, CreditCard, Bell, Clock, DollarSign, Receipt, Shield, Code, Repeat } from "lucide-react";
+import { ArrowRight, Plus, Wallet, TrendingUp, Users, CreditCard, Bell, Clock, DollarSign } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery } from "@tanstack/react-query";
@@ -117,7 +117,7 @@ export default function Home() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-display font-bold">Quick Actions</h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <Link href="/create">
               <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-colors cursor-pointer text-center" data-testid="quick-action-create-pool">
                 <Plus className="w-6 h-6 mx-auto mb-2 text-primary" />
@@ -130,42 +130,16 @@ export default function Home() {
                 <span className="text-sm font-medium">Deposit</span>
               </div>
             </Link>
-            <Link href="/transactions">
-              <div className="p-4 rounded-xl bg-accent/10 border border-accent/20 hover:bg-accent/20 transition-colors cursor-pointer text-center" data-testid="quick-action-transactions">
-                <Receipt className="w-6 h-6 mx-auto mb-2 text-accent" />
-                <span className="text-sm font-medium">Transactions</span>
-              </div>
-            </Link>
-            <Link href="/security">
-              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 transition-colors cursor-pointer text-center" data-testid="quick-action-security">
-                <Shield className="w-6 h-6 mx-auto mb-2 text-blue-400" />
-                <span className="text-sm font-medium">Security</span>
-              </div>
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
             <Link href="/explore">
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/5 transition-colors cursor-pointer text-center" data-testid="quick-action-explore">
-                <Users className="w-5 h-5 mx-auto mb-1.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">Explore</span>
+              <div className="p-4 rounded-xl bg-accent/10 border border-accent/20 hover:bg-accent/20 transition-colors cursor-pointer text-center" data-testid="quick-action-explore">
+                <Users className="w-6 h-6 mx-auto mb-2 text-accent" />
+                <span className="text-sm font-medium">Explore</span>
               </div>
             </Link>
             <Link href="/profile">
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/5 transition-colors cursor-pointer text-center" data-testid="quick-action-profile">
-                <CreditCard className="w-5 h-5 mx-auto mb-1.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">My Cards</span>
-              </div>
-            </Link>
-            <Link href="/api-docs">
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/5 transition-colors cursor-pointer text-center" data-testid="quick-action-api">
-                <Code className="w-5 h-5 mx-auto mb-1.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">API Access</span>
-              </div>
-            </Link>
-            <Link href="/how-it-works">
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/5 transition-colors cursor-pointer text-center" data-testid="quick-action-how">
-                <Repeat className="w-5 h-5 mx-auto mb-1.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">How It Works</span>
+              <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 transition-colors cursor-pointer text-center" data-testid="quick-action-profile">
+                <CreditCard className="w-6 h-6 mx-auto mb-2 text-purple-400" />
+                <span className="text-sm font-medium">My Cards</span>
               </div>
             </Link>
           </div>

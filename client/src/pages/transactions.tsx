@@ -77,36 +77,6 @@ export default function Transactions() {
 
   const totalSpent = transactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
-  const exportToCSV = () => {
-    if (filteredTransactions.length === 0) return;
-    
-    const escapeCSV = (str: string) => `"${str.replace(/"/g, '""')}"`;
-    
-    const headers = ["Date", "Merchant", "Pool", "Amount", "Status"];
-    const rows = filteredTransactions.map(t => [
-      format(new Date(t.createdAt), "yyyy-MM-dd HH:mm"),
-      t.merchant,
-      t.poolTitle || "N/A",
-      `$${parseFloat(t.amount).toFixed(2)}`,
-      t.status
-    ]);
-    
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(row => row.map(cell => escapeCSV(cell)).join(","))
-    ].join("\n");
-    
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case "completed":
@@ -174,14 +144,7 @@ export default function Transactions() {
               <p className="text-sm text-muted-foreground">View all your card spending</p>
             </div>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="border-white/10" 
-            onClick={exportToCSV}
-            disabled={filteredTransactions.length === 0}
-            data-testid="button-export"
-          >
+          <Button variant="outline" size="sm" className="border-white/10" data-testid="button-export">
             <Download className="w-4 h-4 mr-2" /> Export
           </Button>
         </div>
