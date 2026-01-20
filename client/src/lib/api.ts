@@ -95,6 +95,8 @@ export const api = {
     getFollowers: (userId: string) => fetchApi(`/api/users/${userId}/followers`),
     deposit: (amount: string) =>
       fetchApi("/api/user/deposit", { method: "POST", body: JSON.stringify({ amount }) }),
+    depositCheckout: (amount: string) =>
+      fetchApi("/api/user/deposit/checkout", { method: "POST", body: JSON.stringify({ amount }) }),
     withdraw: (amount: string) =>
       fetchApi("/api/user/withdraw", { method: "POST", body: JSON.stringify({ amount }) }),
   },

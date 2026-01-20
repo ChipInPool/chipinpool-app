@@ -4,26 +4,42 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PoolCard } from "@/components/pool-card";
-import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus } from "lucide-react";
+import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus, Clock, Users, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
-import { useLocation } from "wouter";
+import { useLocation, useSearch, Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function Profile() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const queryClient = useQueryClient();
   
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [followersOpen, setFollowersOpen] = useState(false);
+  const [followingOpen, setFollowingOpen] = useState(false);
+  const [followersDialogOpen, setFollowersDialogOpen] = useState(false);
+  const [followingDialogOpen, setFollowingDialogOpen] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    if (params.get('deposit') === 'success') {
+      toast({ description: "Deposit successful! Your balance will be updated shortly." });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user });
+      window.history.replaceState({}, '', '/profile');
+    }
+  }, [searchString, toast, queryClient]);
 
   const handleDeposit = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -32,14 +48,12 @@ export default function Profile() {
     }
     setIsProcessing(true);
     try {
-      await api.users.deposit(amount);
-      toast({ description: `Successfully deposited $${amount}` });
-      queryClient.invalidateQueries({ queryKey: queryKeys.user });
-      setDepositDialogOpen(false);
-      setAmount("");
+      const response = await api.users.depositCheckout(amount);
+      if (response.url) {
+        window.location.href = response.url;
+      }
     } catch (error: any) {
-      toast({ description: error.message || "Deposit failed", variant: "destructive" });
-    } finally {
+      toast({ description: error.message || "Failed to start checkout", variant: "destructive" });
       setIsProcessing(false);
     }
   };
@@ -67,6 +81,18 @@ export default function Profile() {
     queryKey: queryKeys.pools,
     queryFn: api.pools.list,
     enabled: isAuthenticated,
+  });
+
+  const { data: followersData } = useQuery({
+    queryKey: queryKeys.followers(user?.id || ""),
+    queryFn: () => api.users.getFollowers(user?.id || ""),
+    enabled: isAuthenticated && !!user?.id,
+  });
+
+  const { data: followingData } = useQuery({
+    queryKey: queryKeys.following(user?.id || ""),
+    queryFn: () => api.users.getFollowing(user?.id || ""),
+    enabled: isAuthenticated && !!user?.id,
   });
 
   useEffect(() => {
@@ -108,6 +134,9 @@ export default function Profile() {
   const poolsCreated = parseInt(String(user.poolsCreated)) || 0;
   const totalContributed = parseFloat(user.totalContributed) || 0;
   const rating = parseFloat(user.rating || '5.0') || 5.0;
+
+  const followers = followersData?.followers || [];
+  const following = followingData?.following || [];
 
   return (
     <Layout>
@@ -168,6 +197,107 @@ export default function Profile() {
                 </div>
                 <div className="text-xs text-muted-foreground uppercase tracking-wider">Rating</div>
               </div>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-card border border-white/5" data-testid="network-section">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold flex items-center gap-2">
+                  <Users className="w-4 h-4 text-blue-500" /> Network
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <button 
+                  onClick={() => setFollowersDialogOpen(true)}
+                  className="text-center p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                  data-testid="button-followers-count"
+                >
+                  <div className="text-xl font-bold font-display flex items-center justify-center gap-1">
+                    <Users className="w-4 h-4 text-muted-foreground" /> {followers.length}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Followers</div>
+                </button>
+                <button 
+                  onClick={() => setFollowingDialogOpen(true)}
+                  className="text-center p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                  data-testid="button-following-count"
+                >
+                  <div className="text-xl font-bold font-display flex items-center justify-center gap-1">
+                    <UserPlus className="w-4 h-4 text-muted-foreground" /> {following.length}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Following</div>
+                </button>
+              </div>
+
+              <Collapsible open={followersOpen} onOpenChange={setFollowersOpen}>
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-white/5 transition-colors text-sm" data-testid="trigger-followers">
+                  <span className="text-muted-foreground">Followers</span>
+                  {followersOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-2">
+                  {followers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground px-2">No followers yet</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {followers.slice(0, 5).map((follower: any) => (
+                        <Link key={follower.id} href={`/user/${follower.id}`} data-testid={`link-follower-${follower.id}`}>
+                          <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer">
+                            <Avatar className="w-8 h-8">
+                              <AvatarImage src={follower.avatar || undefined} />
+                              <AvatarFallback>{follower.name?.[0] || 'U'}</AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm font-medium truncate">{follower.name}</span>
+                          </div>
+                        </Link>
+                      ))}
+                      {followers.length > 5 && (
+                        <button 
+                          onClick={() => setFollowersDialogOpen(true)}
+                          className="text-sm text-primary hover:underline px-2"
+                          data-testid="button-view-all-followers"
+                        >
+                          View all {followers.length} followers
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+
+              <Collapsible open={followingOpen} onOpenChange={setFollowingOpen}>
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-white/5 transition-colors text-sm mt-2" data-testid="trigger-following">
+                  <span className="text-muted-foreground">Following</span>
+                  {followingOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-2">
+                  {following.length === 0 ? (
+                    <p className="text-sm text-muted-foreground px-2">Not following anyone yet</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {following.slice(0, 5).map((followedUser: any) => (
+                        <Link key={followedUser.id} href={`/user/${followedUser.id}`} data-testid={`link-following-${followedUser.id}`}>
+                          <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer">
+                            <Avatar className="w-8 h-8">
+                              <AvatarImage src={followedUser.avatar || undefined} />
+                              <AvatarFallback>{followedUser.name?.[0] || 'U'}</AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm font-medium truncate">{followedUser.name}</span>
+                          </div>
+                        </Link>
+                      ))}
+                      {following.length > 5 && (
+                        <button 
+                          onClick={() => setFollowingDialogOpen(true)}
+                          className="text-sm text-primary hover:underline px-2"
+                          data-testid="button-view-all-following"
+                        >
+                          View all {following.length} following
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
             </div>
 
             <div className="p-6 rounded-2xl bg-card border border-white/5" data-testid="wallet-section">
@@ -337,7 +467,7 @@ export default function Profile() {
               Enter the amount you want to withdraw from your wallet.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-4 space-y-4">
             <Input
               type="number"
               placeholder="Enter amount"
@@ -347,6 +477,10 @@ export default function Profile() {
               step="0.01"
               data-testid="input-withdraw-amount"
             />
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+              <Clock className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>Real withdrawals will be processed within 3-5 business days.</span>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setWithdrawDialogOpen(false); setAmount(""); }}>
@@ -356,6 +490,80 @@ export default function Profile() {
               {isProcessing ? "Processing..." : "Withdraw"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={followersDialogOpen} onOpenChange={setFollowersDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" /> Followers ({followers.length})
+            </DialogTitle>
+            <DialogDescription>
+              People who follow you
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[400px] pr-4">
+            {followers.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No followers yet</p>
+            ) : (
+              <div className="space-y-2">
+                {followers.map((follower: any) => (
+                  <Link key={follower.id} href={`/user/${follower.id}`} onClick={() => setFollowersDialogOpen(false)} data-testid={`dialog-link-follower-${follower.id}`}>
+                    <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors cursor-pointer">
+                      <Avatar className="w-10 h-10">
+                        <AvatarImage src={follower.avatar || undefined} />
+                        <AvatarFallback>{follower.name?.[0] || 'U'}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block truncate">{follower.name}</span>
+                        {follower.email && (
+                          <span className="text-xs text-muted-foreground block truncate">{follower.email}</span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={followingDialogOpen} onOpenChange={setFollowingDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5" /> Following ({following.length})
+            </DialogTitle>
+            <DialogDescription>
+              People you follow
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[400px] pr-4">
+            {following.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Not following anyone yet</p>
+            ) : (
+              <div className="space-y-2">
+                {following.map((followedUser: any) => (
+                  <Link key={followedUser.id} href={`/user/${followedUser.id}`} onClick={() => setFollowingDialogOpen(false)} data-testid={`dialog-link-following-${followedUser.id}`}>
+                    <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors cursor-pointer">
+                      <Avatar className="w-10 h-10">
+                        <AvatarImage src={followedUser.avatar || undefined} />
+                        <AvatarFallback>{followedUser.name?.[0] || 'U'}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block truncate">{followedUser.name}</span>
+                        {followedUser.email && (
+                          <span className="text-xs text-muted-foreground block truncate">{followedUser.email}</span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </Layout>

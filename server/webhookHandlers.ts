@@ -34,18 +34,44 @@ export class WebhookHandlers {
   }
 
   static async handleCheckoutCompleted(session: any): Promise<void> {
-    const { poolId, userId, amount } = session.metadata || {};
+    const { type, poolId, userId, amount } = session.metadata || {};
     const sessionId = session.id;
     const guestEmail = session.customer_email || null;
-    
-    if (!poolId || !amount) {
-      console.log('Checkout completed but missing metadata:', { poolId, amount });
-      return;
-    }
 
     // Check if payment was successful
     if (session.payment_status !== 'paid') {
       console.log('Checkout session not paid:', sessionId);
+      return;
+    }
+
+    // Handle wallet deposits
+    if (type === 'wallet_deposit') {
+      if (!userId || !amount) {
+        console.log('Wallet deposit missing metadata:', { userId, amount });
+        return;
+      }
+
+      try {
+        const user = await storage.getUser(userId);
+        if (!user) {
+          console.error('User not found for wallet deposit:', userId);
+          return;
+        }
+
+        const depositAmount = parseFloat(amount);
+        const newBalance = (parseFloat(user.balance) + depositAmount).toFixed(2);
+        await storage.updateUserBalance(user.id, newBalance);
+        
+        console.log(`Wallet deposit processed: $${amount} for user ${userId} (session: ${sessionId})`);
+      } catch (err: any) {
+        console.error('Error processing wallet deposit:', err.message);
+      }
+      return;
+    }
+    
+    // Handle pool contributions
+    if (!poolId || !amount) {
+      console.log('Checkout completed but missing metadata:', { poolId, amount });
       return;
     }
 

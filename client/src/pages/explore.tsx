@@ -3,12 +3,13 @@ import { Layout } from "@/components/layout";
 import { PoolCard } from "@/components/pool-card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, TrendingUp, Users } from "lucide-react";
+import { Search, Filter, TrendingUp, Users, ArrowRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function Explore() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -26,7 +27,7 @@ export default function Explore() {
   const { data: followingData } = useQuery({
     queryKey: queryKeys.following(user?.id || ""),
     queryFn: () => api.users.getFollowing(user?.id || ""),
-    enabled: isAuthenticated && !!user?.id && filterMode === "following",
+    enabled: isAuthenticated && !!user?.id,
   });
 
   useEffect(() => {
@@ -40,7 +41,8 @@ export default function Explore() {
   }
 
   const pools = poolsData?.pools || [];
-  const followingIds = followingData?.following?.map((u: any) => u.id) || [];
+  const following = followingData?.following || [];
+  const followingIds = following.map((u: any) => u.id);
   
   const filteredPools = pools.filter((pool: any) => {
     const matchesSearch = pool.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -60,6 +62,42 @@ export default function Explore() {
           Discover public pools, join community causes, or get inspired by what others are chipping in for.
         </p>
       </div>
+
+      {following.length > 0 && (
+        <div className="mb-8 p-4 rounded-2xl bg-card border border-white/5" data-testid="your-network-section">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-500" />
+                <h3 className="font-bold">Your Network</h3>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                Following {following.length} {following.length === 1 ? 'person' : 'people'}
+              </span>
+              <div className="flex -space-x-2 ml-2">
+                {following.slice(0, 5).map((followedUser: any) => (
+                  <Link key={followedUser.id} href={`/user/${followedUser.id}`} data-testid={`network-avatar-${followedUser.id}`}>
+                    <Avatar className="w-8 h-8 border-2 border-background hover:z-10 transition-transform hover:scale-110 cursor-pointer">
+                      <AvatarImage src={followedUser.avatar || undefined} />
+                      <AvatarFallback className="text-xs">{followedUser.name?.[0] || 'U'}</AvatarFallback>
+                    </Avatar>
+                  </Link>
+                ))}
+                {following.length > 5 && (
+                  <div className="w-8 h-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium">
+                    +{following.length - 5}
+                  </div>
+                )}
+              </div>
+            </div>
+            <Link href="/profile" data-testid="link-view-network">
+              <Button variant="ghost" size="sm" className="text-sm gap-1">
+                View all <ArrowRight className="w-4 h-4" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-2 mb-6">
         <button

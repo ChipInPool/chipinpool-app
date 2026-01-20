@@ -412,6 +412,56 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/user/deposit/checkout", requireAuth, async (req, res, next) => {
+    try {
+      const { amount } = z.object({ amount: z.string() }).parse(req.body);
+      const depositAmount = parseFloat(amount);
+      
+      if (isNaN(depositAmount) || depositAmount <= 0) {
+        return res.status(400).json({ message: "Invalid amount" });
+      }
+
+      if (depositAmount > 10000) {
+        return res.status(400).json({ message: "Maximum deposit amount is $10,000" });
+      }
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Wallet Deposit',
+              description: `Add $${amount} to your ChipIn wallet`,
+            },
+            unit_amount: Math.round(depositAmount * 100),
+          },
+          quantity: 1,
+        }],
+        mode: 'payment',
+        success_url: `${baseUrl}/profile?deposit=success`,
+        cancel_url: `${baseUrl}/profile`,
+        metadata: {
+          type: 'wallet_deposit',
+          userId: user.id,
+          amount,
+        },
+      });
+
+      res.json({ url: session.url });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Virtual Card routes
   app.get("/api/pools/:id/virtual-card", requireAuth, async (req, res, next) => {
     try {
