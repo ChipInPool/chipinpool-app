@@ -6,6 +6,8 @@ import { registerSchema, loginSchema, insertPoolSchema, insertContributionSchema
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+import { sendPoolInviteEmail } from "./resendClient";
+import { sendPoolInviteSMS } from "./clicksendClient";
 
 declare module "express-session" {
   interface SessionData {
@@ -699,6 +701,10 @@ export async function registerRoutes(
           });
           invites.push(invite);
 
+          // Send actual email via Resend
+          const poolUrl = `${req.protocol}://${req.get('host')}/pool/${poolId}`;
+          await sendPoolInviteEmail(recipient, inviter.name, pool.title, poolUrl);
+
           if (existingUser) {
             const notification = await storage.createNotification({
               userId: existingUser.id,
@@ -719,6 +725,10 @@ export async function registerRoutes(
             method: 'sms',
           });
           invites.push(invite);
+
+          // Send actual SMS via ClickSend
+          const poolUrl = `${req.protocol}://${req.get('host')}/pool/${poolId}`;
+          await sendPoolInviteSMS(recipient, inviter.name, pool.title, poolUrl);
 
           if (existingUser) {
             const notification = await storage.createNotification({
