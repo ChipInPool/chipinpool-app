@@ -18,6 +18,11 @@ import Profile from "@/pages/profile";
 import UserProfile from "@/pages/user-profile";
 import Security from "@/pages/security";
 import Transactions from "@/pages/transactions";
+import Recurring from "@/pages/recurring";
+import PoolAnalytics from "@/pages/pool-analytics";
+import ActivityFeed from "@/pages/activity";
+import Settings from "@/pages/settings";
+import SplitCalculator from "@/pages/split-calculator";
 import { ThemeProvider } from "@/components/theme-provider";
 
 function Router() {
@@ -36,6 +41,11 @@ function Router() {
       <Route path="/pool/:id" component={PoolDetails} />
       <Route path="/pool/:id/spend" component={SpendPool} />
       <Route path="/transactions" component={Transactions} />
+      <Route path="/recurring" component={Recurring} />
+      <Route path="/pool/:id/analytics" component={PoolAnalytics} />
+      <Route path="/activity" component={ActivityFeed} />
+      <Route path="/settings" component={Settings} />
+      <Route path="/split-calculator" component={SplitCalculator} />
       <Route component={NotFound} />
     </Switch>
   );

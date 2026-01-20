@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PoolCard } from "@/components/pool-card";
-import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus, Clock, Users, UserPlus, ChevronDown, ChevronUp, Building, AlertCircle, Receipt } from "lucide-react";
+import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus, Clock, Users, UserPlus, ChevronDown, ChevronUp, Building, AlertCircle, Receipt, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -354,16 +354,28 @@ export default function Profile() {
                   <Minus className="w-4 h-4 mr-2" /> Withdraw
                 </Button>
               </div>
-              <Button
-                variant="ghost"
-                className="w-full text-muted-foreground hover:text-foreground"
-                asChild
-                data-testid="button-transactions"
-              >
-                <Link href="/transactions">
-                  <Receipt className="w-4 h-4 mr-2" /> View Transaction History
-                </Link>
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  className="flex-1 text-muted-foreground hover:text-foreground"
+                  asChild
+                  data-testid="button-transactions"
+                >
+                  <Link href="/transactions">
+                    <Receipt className="w-4 h-4 mr-2" /> Transactions
+                  </Link>
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="flex-1 text-muted-foreground hover:text-foreground"
+                  asChild
+                  data-testid="button-recurring"
+                >
+                  <Link href="/recurring">
+                    <RefreshCw className="w-4 h-4 mr-2" /> Recurring
+                  </Link>
+                </Button>
+              </div>
             </div>
 
             <div className="p-6 rounded-2xl bg-card border border-white/5">

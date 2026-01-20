@@ -2,7 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
-import { registerSchema, loginSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema } from "@shared/schema";
+import { registerSchema, loginSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
@@ -1196,7 +1198,24 @@ export async function registerRoutes(
   app.get("/api/user/recurring-contributions", requireAuth, async (req, res, next) => {
     try {
       const contributions = await storage.getRecurringContributionsByUser(req.session.userId!);
-      res.json({ contributions });
+      
+      // Enrich with pool data
+      const enrichedContributions = await Promise.all(
+        contributions.map(async (c) => {
+          const pool = await storage.getPool(c.poolId);
+          return {
+            ...c,
+            pool: pool ? {
+              id: pool.id,
+              title: pool.title,
+              targetAmount: pool.targetAmount,
+              currentAmount: pool.currentAmount,
+            } : null,
+          };
+        })
+      );
+      
+      res.json({ contributions: enrichedContributions });
     } catch (error) {
       next(error);
     }
@@ -1620,6 +1639,131 @@ export async function registerRoutes(
       const userId = req.session.userId!;
       const transactions = await storage.getUserTransactionHistory(userId);
       res.json({ transactions });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ========== ACTIVITY FEED ROUTES ==========
+
+  // Get activity feed for followed users
+  app.get("/api/activity-feed", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      
+      // Get users this user is following
+      const followingList = await db.select({ followingId: follows.followingId })
+        .from(follows)
+        .where(eq(follows.followerId, userId));
+      
+      const followingIds = followingList.map(f => f.followingId);
+      
+      if (followingIds.length === 0) {
+        return res.json({ activities: [] });
+      }
+
+      // Get recent contributions from followed users
+      const recentContributions = await db.select({
+        id: contributions.id,
+        amount: contributions.amount,
+        createdAt: contributions.createdAt,
+        userId: contributions.userId,
+        poolId: contributions.poolId,
+      })
+      .from(contributions)
+      .where(inArray(contributions.userId, followingIds))
+      .orderBy(desc(contributions.createdAt))
+      .limit(50);
+
+      // Get pool info for contributions
+      const activities = await Promise.all(
+        recentContributions.map(async (c) => {
+          const pool = await storage.getPool(c.poolId);
+          const user = c.userId ? await storage.getUser(c.userId) : null;
+          return {
+            id: `contrib-${c.id}`,
+            type: 'contribution' as const,
+            userId: c.userId || '',
+            userName: user?.name || 'Anonymous',
+            userAvatar: user?.avatar || undefined,
+            poolId: c.poolId,
+            poolTitle: pool?.title || 'Unknown Pool',
+            amount: c.amount,
+            createdAt: c.createdAt?.toISOString() || new Date().toISOString(),
+          };
+        })
+      );
+
+      res.json({ activities });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ========== NOTIFICATION PREFERENCES ROUTES ==========
+
+  // Get notification preferences
+  app.get("/api/user/notification-preferences", requireAuth, async (req, res, next) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      res.json({
+        preferences: {
+          emailContributions: user.notifyEmail,
+          emailPoolUpdates: user.notifyEmail,
+          emailPoolComplete: user.notifyEmail,
+          emailInvites: user.notifyEmail,
+          smsContributions: user.notifySMS,
+          smsPoolComplete: user.notifySMS,
+          smsInvites: user.notifySMS,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Update notification preferences
+  app.put("/api/user/notification-preferences", requireAuth, async (req, res, next) => {
+    try {
+      const prefsSchema = z.object({
+        emailContributions: z.boolean().optional(),
+        emailPoolUpdates: z.boolean().optional(),
+        emailPoolComplete: z.boolean().optional(),
+        emailInvites: z.boolean().optional(),
+        smsContributions: z.boolean().optional(),
+        smsPoolComplete: z.boolean().optional(),
+        smsInvites: z.boolean().optional(),
+      });
+
+      const prefs = prefsSchema.parse(req.body);
+      const userId = req.session.userId!;
+
+      // Determine overall email/sms preferences based on individual settings
+      // Only set to true if at least one flag is explicitly true
+      // Set to false if all flags are explicitly false
+      const hasEmailPrefs = prefs.emailContributions !== undefined || prefs.emailPoolUpdates !== undefined || 
+                            prefs.emailPoolComplete !== undefined || prefs.emailInvites !== undefined;
+      const hasSmsPrefs = prefs.smsContributions !== undefined || prefs.smsPoolComplete !== undefined || 
+                          prefs.smsInvites !== undefined;
+
+      const notifyEmail = hasEmailPrefs ? Boolean(prefs.emailContributions || prefs.emailPoolUpdates || 
+                                                   prefs.emailPoolComplete || prefs.emailInvites) : undefined;
+      const notifySMS = hasSmsPrefs ? Boolean(prefs.smsContributions || prefs.smsPoolComplete || 
+                                               prefs.smsInvites) : undefined;
+
+      const updateData: Record<string, boolean> = {};
+      if (notifyEmail !== undefined) updateData.notifyEmail = notifyEmail;
+      if (notifySMS !== undefined) updateData.notifySMS = notifySMS;
+
+      if (Object.keys(updateData).length > 0) {
+        await db.update(users)
+          .set(updateData)
+          .where(eq(users.id, userId));
+      }
+
+      res.json({ message: "Preferences updated successfully" });
     } catch (error) {
       next(error);
     }

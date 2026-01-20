@@ -48,14 +48,30 @@ Preferred communication style: Simple, everyday language.
 - **Connection**: node-postgres (pg) Pool
 
 **Database Schema**:
-- `users`: User accounts with balance, stats, and profile info
+- `users`: User accounts with balance, stats, notification preferences, and profile info
 - `pools`: Fund collection pools with targets, deadlines, and status
 - `contributions`: Individual contributions to pools
 - `comments`: Discussion on pools
 - `notifications`: User notification system
 - `virtualCards`: Virtual payment cards linked to pools
-- `transactions`: Spending transactions from virtual cards
+- `transactions`: Spending transactions from virtual cards (with receipt/notes support)
 - `badges` / `userBadges`: Gamification badges
+- `recurringContributions`: Scheduled recurring payments
+- `follows`: Social follow relationships between users
+- `apiAccessRequests`: Developer API access requests
+
+## Recent Changes (January 2026)
+
+### New Features Added:
+1. **Recurring Contributions Dashboard** (`/recurring`) - Manage all recurring payments in one place
+2. **Pool Analytics** (`/pool/:id/analytics`) - Detailed insights on contribution trends and patterns
+3. **Activity Feed** (`/activity`) - See what people you follow are doing
+4. **Settings Page** (`/settings`) - Notification preferences and theme toggle
+5. **Split Calculator** (`/split-calculator`) - Easy bill splitting tool
+6. **Pool Templates** - Quick templates for common pool types (birthday, trip, wedding, etc.)
+7. **Transaction History** (`/transactions`) - View all card spending with search/filter
+8. **Receipt Attachments** - Transactions support receipt URLs and notes
+9. **Dark/Light Theme Toggle** - User can switch between themes
 
 ### Authentication
 

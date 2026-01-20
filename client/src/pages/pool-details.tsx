@@ -3,7 +3,7 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check } from "lucide-react";
+import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3 } from "lucide-react";
 import { Link, useRoute, useLocation } from "wouter";
 import { formatDistanceToNow, format } from "date-fns";
 import { CircularProgressbarWithChildren, buildStyles } from 'react-circular-progressbar';
@@ -382,16 +382,29 @@ export default function PoolDetails() {
 
               <div className="space-y-4">
                 {isCreator && (
-                  <Button 
-                    size="lg" 
-                    className="w-full h-14 text-lg font-bold bg-gradient-to-r from-primary to-primary/80 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all" 
-                    asChild
-                    data-testid="button-spend-pool-funds"
-                  >
-                    <Link href={`/pool/${pool.id}/spend`}>
-                      <CreditCard className="w-5 h-5 mr-2" /> Spend Pool Funds
-                    </Link>
-                  </Button>
+                  <>
+                    <Button 
+                      size="lg" 
+                      className="w-full h-14 text-lg font-bold bg-gradient-to-r from-primary to-primary/80 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all" 
+                      asChild
+                      data-testid="button-spend-pool-funds"
+                    >
+                      <Link href={`/pool/${pool.id}/spend`}>
+                        <CreditCard className="w-5 h-5 mr-2" /> Spend Pool Funds
+                      </Link>
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      size="lg" 
+                      className="w-full border-white/10" 
+                      asChild
+                      data-testid="button-pool-analytics"
+                    >
+                      <Link href={`/pool/${pool.id}/analytics`}>
+                        <BarChart3 className="w-5 h-5 mr-2" /> View Analytics
+                      </Link>
+                    </Button>
+                  </>
                 )}
 
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

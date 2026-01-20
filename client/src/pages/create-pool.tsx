@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Gift, Plane, ShoppingBag, Calendar, ImagePlus, RefreshCw, Loader2 } from "lucide-react";
+import { ArrowLeft, Gift, Plane, ShoppingBag, Calendar, ImagePlus, RefreshCw, Loader2, Sparkles, PartyPopper, Home, GraduationCap, Heart, Coffee } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -88,6 +88,39 @@ export default function CreatePool() {
         <div className="mb-8">
           <h1 className="text-3xl font-display font-bold mb-2">Create a New Pool</h1>
           <p className="text-muted-foreground">Set up a pool to split costs for a gift, trip, or purchase.</p>
+        </div>
+
+        <div className="mb-8">
+          <h2 className="font-semibold mb-4 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" /> Quick Templates
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {[
+              { icon: PartyPopper, label: "Birthday Gift", category: "gift", amount: "100", desc: "Chip in for a birthday present" },
+              { icon: Plane, label: "Group Trip", category: "trip", amount: "500", desc: "Pool funds for travel expenses" },
+              { icon: Home, label: "Housewarming", category: "gift", amount: "200", desc: "Welcome gift for a new home" },
+              { icon: GraduationCap, label: "Graduation", category: "gift", amount: "150", desc: "Celebrate a graduate" },
+              { icon: Heart, label: "Wedding Gift", category: "gift", amount: "300", desc: "Gift for the newlyweds" },
+              { icon: Coffee, label: "Office Fund", category: "recurring", amount: "50", desc: "Monthly office snacks/coffee" },
+            ].map((template) => (
+              <button
+                key={template.label}
+                type="button"
+                onClick={() => {
+                  setCategory(template.category);
+                  setTargetAmount(template.amount);
+                  setDescription(template.desc);
+                  setIsRecurring(template.category === "recurring");
+                }}
+                className="p-4 rounded-xl border border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all text-left group"
+                data-testid={`template-${template.label.toLowerCase().replace(' ', '-')}`}
+              >
+                <template.icon className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors mb-2" />
+                <div className="font-medium text-sm">{template.label}</div>
+                <div className="text-xs text-muted-foreground">${template.amount}</div>
+              </button>
+            ))}
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
