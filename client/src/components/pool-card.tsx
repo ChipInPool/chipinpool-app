@@ -84,9 +84,12 @@ export function PoolCard({ pool }: PoolCardProps) {
           </CardContent>
           
           <CardFooter className="px-5 py-3 border-t border-white/5 bg-white/[0.02] flex justify-between items-center">
-            <button 
+            <span 
               onClick={handleCreatorClick}
-              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+              onKeyDown={(e) => e.key === 'Enter' && handleCreatorClick(e as any)}
+              role="button"
+              tabIndex={0}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
               data-testid={`link-creator-${pool.creatorId}`}
             >
               <Avatar className="w-5 h-5">
@@ -94,7 +97,7 @@ export function PoolCard({ pool }: PoolCardProps) {
                 <AvatarFallback>{creator.name?.[0] || '?'}</AvatarFallback>
               </Avatar>
               <span className="text-xs text-muted-foreground hover:text-foreground transition-colors">by {pool.creatorId === user?.id ? 'You' : creator.name}</span>
-            </button>
+            </span>
             {isCompleted ? (
               <CheckCircle2 className="w-5 h-5 text-primary" />
             ) : (
