@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { PoolCard } from "@/components/pool-card";
@@ -21,9 +22,20 @@ export default function Home() {
 
   const pools = poolsData?.pools || [];
 
-  if (!authLoading && !isAuthenticated) {
-    window.location.href = "/login";
-    return null;
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      setLocation("/login");
+    }
+  }, [authLoading, isAuthenticated, setLocation]);
+
+  if (authLoading || !isAuthenticated) {
+    return (
+      <Layout>
+        <div className="flex justify-center items-center py-20">
+          <Skeleton className="h-[400px] w-full max-w-4xl rounded-3xl" />
+        </div>
+      </Layout>
+    );
   }
 
   return (
@@ -53,16 +65,12 @@ export default function Home() {
             Invite friends, track contributions, and pay instantly.
           </p>
           <div className="flex gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
-            <Link href="/create">
-              <Button size="lg" className="font-semibold text-base px-8 h-12 shadow-lg shadow-primary/20 hover:scale-105 transition-transform" data-testid="button-hero-start-pool">
-                Start a Pool
-              </Button>
-            </Link>
-            <Link href="/how-it-works">
-              <Button variant="outline" size="lg" className="h-12 px-8 border-white/10 bg-white/5 hover:bg-white/10 text-foreground">
-                How it works
-              </Button>
-            </Link>
+            <Button size="lg" className="font-semibold text-base px-8 h-12 shadow-lg shadow-primary/20 hover:scale-105 transition-transform" data-testid="button-hero-start-pool" asChild>
+              <Link href="/create">Start a Pool</Link>
+            </Button>
+            <Button variant="outline" size="lg" className="h-12 px-8 border-white/10 bg-white/5 hover:bg-white/10 text-foreground" asChild>
+              <Link href="/how-it-works">How it works</Link>
+            </Button>
           </div>
         </div>
       </section>
@@ -100,11 +108,9 @@ export default function Home() {
       <section>
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-display font-bold">Your Pools</h2>
-          <Link href="/explore">
-            <Button variant="ghost" className="text-muted-foreground hover:text-primary">
-              View All <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </Link>
+          <Button variant="ghost" className="text-muted-foreground hover:text-primary" asChild>
+            <Link href="/explore">View All <ArrowRight className="w-4 h-4 ml-2" /></Link>
+          </Button>
         </div>
 
         {poolsLoading ? (

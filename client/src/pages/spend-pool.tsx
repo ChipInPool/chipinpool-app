@@ -1,9 +1,9 @@
+import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { VirtualCard } from "@/components/virtual-card";
 import { ArrowLeft, Copy, Eye, EyeOff, ShoppingBag, ExternalLink, ShieldCheck, Store } from "lucide-react";
 import { Link, useRoute, useLocation } from "wouter";
-import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
@@ -41,8 +41,13 @@ export default function SpendPool() {
     enabled: !!params?.id && isAuthenticated,
   });
 
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      setLocation("/login");
+    }
+  }, [authLoading, isAuthenticated, setLocation]);
+
   if (!authLoading && !isAuthenticated) {
-    window.location.href = "/login";
     return null;
   }
 
@@ -68,9 +73,9 @@ export default function SpendPool() {
         <div className="text-center py-20">
           <h2 className="text-xl font-bold mb-2">Access Denied</h2>
           <p className="text-muted-foreground">Only the pool creator can spend pool funds.</p>
-          <Link href={`/pool/${pool.id}`}>
-            <Button className="mt-4">Back to Pool</Button>
-          </Link>
+          <Button className="mt-4" asChild>
+            <Link href={`/pool/${pool.id}`}>Back to Pool</Link>
+          </Button>
         </div>
       </Layout>
     );

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,7 +12,6 @@ import { CommentsSection } from "@/components/comments-section";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import Confetti from "react-dom-confetti";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -63,8 +63,13 @@ export default function PoolDetails() {
     },
   });
 
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      setLocation("/login");
+    }
+  }, [authLoading, isAuthenticated, setLocation]);
+
   if (!authLoading && !isAuthenticated) {
-    window.location.href = "/login";
     return null;
   }
 
@@ -124,10 +129,8 @@ export default function PoolDetails() {
   return (
     <Layout>
       <div className="max-w-5xl mx-auto">
-        <Link href="/">
-          <a className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
-          </a>
+        <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
+          <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -311,11 +314,9 @@ export default function PoolDetails() {
               <div className="mt-8 pt-6 border-t border-white/5 text-center">
                 {pool.creatorId === user?.id && (
                   <div className="mb-4">
-                    <Link href={`/pool/${pool.id}/spend`}>
-                      <Button variant="secondary" className="w-full bg-white/5 hover:bg-white/10 border-white/10 text-muted-foreground hover:text-foreground transition-colors">
-                        Creator Settings & Spend
-                      </Button>
-                    </Link>
+                    <Button variant="secondary" className="w-full bg-white/5 hover:bg-white/10 border-white/10 text-muted-foreground hover:text-foreground transition-colors" asChild>
+                      <Link href={`/pool/${pool.id}/spend`}>Creator Settings & Spend</Link>
+                    </Button>
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">

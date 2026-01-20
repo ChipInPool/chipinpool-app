@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Gift, Plane, ShoppingBag, Calendar, ImagePlus, RefreshCw, Loader2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
@@ -45,8 +45,13 @@ export default function CreatePool() {
     },
   });
 
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      setLocation("/login");
+    }
+  }, [authLoading, isAuthenticated, setLocation]);
+
   if (!authLoading && !isAuthenticated) {
-    window.location.href = "/login";
     return null;
   }
 
@@ -76,10 +81,8 @@ export default function CreatePool() {
   return (
     <Layout>
       <div className="max-w-2xl mx-auto">
-        <Link href="/">
-          <a className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
-          </a>
+        <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
+          <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
         </Link>
         
         <div className="mb-8">

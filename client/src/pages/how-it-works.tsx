@@ -58,11 +58,9 @@ export default function HowItWorks() {
             <div className="bg-[#0B0E14] rounded-[22px] p-12 text-center">
                <h2 className="text-3xl font-display font-bold mb-4">Ready to start?</h2>
                <p className="text-muted-foreground mb-8">Join thousands of users pooling for trips, gifts, and more.</p>
-               <Link href="/create">
-                  <Button size="lg" className="h-14 px-8 text-lg font-bold shadow-xl shadow-primary/20 hover:scale-105 transition-transform">
-                     Start Your First Pool <ArrowRight className="w-5 h-5 ml-2" />
-                  </Button>
-               </Link>
+               <Button size="lg" className="h-14 px-8 text-lg font-bold shadow-xl shadow-primary/20 hover:scale-105 transition-transform" asChild>
+                 <Link href="/create">Start Your First Pool <ArrowRight className="w-5 h-5 ml-2" /></Link>
+               </Button>
             </div>
          </div>
       </div>

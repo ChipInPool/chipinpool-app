@@ -129,11 +129,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </PopoverContent>
                 </Popover>
 
-                <Link href="/create">
-                  <Button size="sm" className="font-semibold shadow-lg shadow-primary/20" data-testid="button-start-pool">
-                    <Plus className="w-4 h-4 mr-1.5" /> Start Pool
-                  </Button>
-                </Link>
+                <Button size="sm" className="font-semibold shadow-lg shadow-primary/20" data-testid="button-start-pool" asChild>
+                  <Link href="/create"><Plus className="w-4 h-4 mr-1.5" /> Start Pool</Link>
+                </Button>
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -169,19 +167,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </DropdownMenu>
               </>
             ) : (
-              <Link href="/login">
-                <Button size="sm" className="font-semibold" data-testid="button-login">Sign In</Button>
-              </Link>
+              <Button size="sm" className="font-semibold" data-testid="button-login" asChild>
+                <Link href="/login">Sign In</Link>
+              </Button>
             )}
           </div>
 
           <div className="md:hidden flex items-center gap-3">
             {isAuthenticated && (
-              <Link href="/create">
-                <Button size="sm" className="font-semibold h-8 px-3">
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </Link>
+              <Button size="sm" className="font-semibold h-8 px-3" asChild>
+                <Link href="/create"><Plus className="w-4 h-4" /></Link>
+              </Button>
             )}
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
@@ -203,9 +199,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       </div>
                     </div>
                   ) : (
-                    <Link href="/login">
-                      <Button className="w-full" onClick={() => setIsMobileMenuOpen(false)}>Sign In</Button>
-                    </Link>
+                    <Button className="w-full" onClick={() => setIsMobileMenuOpen(false)} asChild>
+                      <Link href="/login">Sign In</Link>
+                    </Button>
                   )}
                   <div className="flex flex-col gap-2">
                     <Link href="/" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Dashboard</Link>

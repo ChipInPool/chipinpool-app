@@ -1,9 +1,9 @@
+import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { PoolCard } from "@/components/pool-card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Filter, TrendingUp } from "lucide-react";
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -22,8 +22,13 @@ export default function Explore() {
     enabled: isAuthenticated,
   });
 
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      setLocation("/login");
+    }
+  }, [authLoading, isAuthenticated, setLocation]);
+
   if (!authLoading && !isAuthenticated) {
-    window.location.href = "/login";
     return null;
   }
 
