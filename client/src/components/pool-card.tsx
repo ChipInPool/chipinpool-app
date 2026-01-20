@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Clock, ArrowRight, CheckCircle2 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/lib/auth-context";
 
@@ -13,12 +13,19 @@ interface PoolCardProps {
 
 export function PoolCard({ pool }: PoolCardProps) {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const currentAmount = parseFloat(pool.currentAmount || '0');
   const targetAmount = parseFloat(pool.targetAmount || '1');
   const percentage = Math.min(100, Math.round((currentAmount / targetAmount) * 100));
   const isCompleted = pool.status === 'completed';
   const contributors = pool.contributors || [];
   const creator = pool.creator || { name: 'Unknown', avatar: null };
+
+  const handleCreatorClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setLocation(pool.creatorId === user?.id ? '/profile' : `/user/${pool.creatorId}`);
+  };
 
   return (
     <Link href={`/pool/${pool.id}`}>
@@ -77,9 +84,8 @@ export function PoolCard({ pool }: PoolCardProps) {
           </CardContent>
           
           <CardFooter className="px-5 py-3 border-t border-white/5 bg-white/[0.02] flex justify-between items-center">
-            <Link 
-              href={pool.creatorId === user?.id ? '/profile' : `/user/${pool.creatorId}`} 
-              onClick={(e) => e.stopPropagation()}
+            <button 
+              onClick={handleCreatorClick}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity"
               data-testid={`link-creator-${pool.creatorId}`}
             >
@@ -88,7 +94,7 @@ export function PoolCard({ pool }: PoolCardProps) {
                 <AvatarFallback>{creator.name?.[0] || '?'}</AvatarFallback>
               </Avatar>
               <span className="text-xs text-muted-foreground hover:text-foreground transition-colors">by {pool.creatorId === user?.id ? 'You' : creator.name}</span>
-            </Link>
+            </button>
             {isCompleted ? (
               <CheckCircle2 className="w-5 h-5 text-primary" />
             ) : (
