@@ -43,6 +43,7 @@ export interface IStorage {
   
   // Virtual Card operations
   getVirtualCardByPool(poolId: string): Promise<VirtualCard | undefined>;
+  getVirtualCardById(id: string): Promise<VirtualCard | undefined>;
   createVirtualCard(card: InsertVirtualCard): Promise<VirtualCard>;
   updateCardBalance(id: string, amount: string): Promise<void>;
   
@@ -202,6 +203,11 @@ export class DatabaseStorage implements IStorage {
 
   async getVirtualCardByPool(poolId: string): Promise<VirtualCard | undefined> {
     const [card] = await db.select().from(virtualCards).where(eq(virtualCards.poolId, poolId));
+    return card;
+  }
+
+  async getVirtualCardById(id: string): Promise<VirtualCard | undefined> {
+    const [card] = await db.select().from(virtualCards).where(eq(virtualCards.id, id));
     return card;
   }
 

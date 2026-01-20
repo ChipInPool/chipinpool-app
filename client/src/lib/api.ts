@@ -73,6 +73,11 @@ export const api = {
     get: (poolId: string) => fetchApi(`/api/pools/${poolId}/virtual-card`),
     getTransactions: (cardId: string) =>
       fetchApi(`/api/virtual-cards/${cardId}/transactions`),
+    createTransaction: (cardId: string, merchant: string, amount: string) =>
+      fetchApi(`/api/virtual-cards/${cardId}/transactions`, {
+        method: "POST",
+        body: JSON.stringify({ merchant, amount }),
+      }),
   },
   users: {
     getPools: (userId: string) => fetchApi(`/api/users/${userId}/pools`),
@@ -89,6 +94,7 @@ export const queryKeys = {
   pool: (id: string) => ["pool", id] as const,
   notifications: ["notifications"] as const,
   virtualCard: (poolId: string) => ["virtualCard", poolId] as const,
+  cardTransactions: (cardId: string) => ["cardTransactions", cardId] as const,
 };
 
 export const userQueryOptions = queryOptions({

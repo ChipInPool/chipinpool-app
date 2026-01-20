@@ -366,7 +366,7 @@ export async function registerRoutes(
         virtualCardId: req.params.id,
       });
 
-      const card = await storage.getVirtualCardByPool(data.virtualCardId);
+      const card = await storage.getVirtualCardById(req.params.id);
       if (!card) {
         return res.status(404).json({ message: "Virtual card not found" });
       }

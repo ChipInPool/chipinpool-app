@@ -2,21 +2,24 @@ import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { VirtualCard } from "@/components/virtual-card";
-import { ArrowLeft, Copy, Eye, EyeOff, ShoppingBag, ExternalLink, ShieldCheck, Store } from "lucide-react";
+import { ArrowLeft, Copy, Eye, EyeOff, ShoppingBag, ExternalLink, ShieldCheck, Store, Zap, Plus, DollarSign, Radio } from "lucide-react";
 import { Link, useRoute, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface Transaction {
   id: string;
   merchant: string;
-  amount: number;
-  date: string;
-  status: 'pending' | 'completed';
+  amount: string;
+  status: string;
+  createdAt: string;
 }
 
 export default function SpendPool() {
@@ -26,8 +29,11 @@ export default function SpendPool() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const [showCardDetails, setShowCardDetails] = useState(false);
   const [activeTab, setActiveTab] = useState<'virtual' | 'transfer'>('virtual');
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isSimulating, setIsSimulating] = useState(false);
+  const [liveMode, setLiveMode] = useState(false);
+  const [purchaseOpen, setPurchaseOpen] = useState(false);
+  const [merchantName, setMerchantName] = useState("");
+  const [purchaseAmount, setPurchaseAmount] = useState("");
+  const queryClient = useQueryClient();
 
   const { data: poolData, isLoading: poolLoading } = useQuery({
     queryKey: queryKeys.pool(params?.id || ''),
@@ -35,10 +41,45 @@ export default function SpendPool() {
     enabled: !!params?.id && isAuthenticated,
   });
 
-  const { data: cardData, isLoading: cardLoading } = useQuery({
+  const { data: cardData, isLoading: cardLoading, refetch: refetchCard } = useQuery({
     queryKey: queryKeys.virtualCard(params?.id || ''),
     queryFn: () => api.virtualCards.get(params?.id || ''),
     enabled: !!params?.id && isAuthenticated,
+    refetchInterval: liveMode ? 2000 : false,
+  });
+
+  const card = cardData?.card;
+
+  const { data: transactionsData, refetch: refetchTransactions } = useQuery({
+    queryKey: queryKeys.cardTransactions(card?.id || ''),
+    queryFn: () => api.virtualCards.getTransactions(card?.id || ''),
+    enabled: !!card?.id,
+    refetchInterval: liveMode ? 2000 : false,
+  });
+
+  const createTransactionMutation = useMutation({
+    mutationFn: async ({ merchant, amount }: { merchant: string; amount: string }) => {
+      return api.virtualCards.createTransaction(card!.id, merchant, amount);
+    },
+    onSuccess: (data, variables) => {
+      toast({
+        title: "Payment Successful",
+        description: `Paid $${parseFloat(variables.amount).toFixed(2)} to ${variables.merchant}`,
+      });
+      setPurchaseOpen(false);
+      setMerchantName("");
+      setPurchaseAmount("");
+      refetchCard();
+      refetchTransactions();
+      queryClient.invalidateQueries({ queryKey: queryKeys.virtualCard(params?.id || '') });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Payment Failed",
+        description: error.message || "Could not process payment",
+        variant: "destructive",
+      });
+    },
   });
 
   useEffect(() => {
@@ -63,7 +104,7 @@ export default function SpendPool() {
   }
 
   const pool = poolData?.pool;
-  const card = cardData?.card;
+  const transactions: Transaction[] = transactionsData?.transactions || [];
 
   if (!pool) return <Layout><div className="text-center py-20">Pool not found</div></Layout>;
   
@@ -99,23 +140,45 @@ export default function SpendPool() {
     toast({ description: `${label} copied to clipboard` });
   };
 
-  const simulateTransaction = (merchant: string, amount: number) => {
-    setIsSimulating(true);
-    setTimeout(() => {
-      const newTx: Transaction = {
-        id: `tx_${Math.random().toString(36).substr(2, 9)}`,
-        merchant,
-        amount,
-        date: 'Just now',
-        status: 'completed'
-      };
-      setTransactions([newTx, ...transactions]);
-      setIsSimulating(false);
+  const handleQuickPurchase = (merchant: string, amount: number) => {
+    if (currentBalance < amount) {
       toast({
-        title: `Payment Successful: ${merchant}`,
-        description: `You spent $${amount.toFixed(2)}.`
+        title: "Insufficient Balance",
+        description: `You need $${amount.toFixed(2)} but only have $${currentBalance.toFixed(2)}`,
+        variant: "destructive",
       });
-    }, 1500);
+      return;
+    }
+    createTransactionMutation.mutate({ merchant, amount: amount.toString() });
+  };
+
+  const handleCustomPurchase = () => {
+    const amount = parseFloat(purchaseAmount);
+    if (!merchantName.trim()) {
+      toast({ title: "Enter merchant name", variant: "destructive" });
+      return;
+    }
+    if (isNaN(amount) || amount <= 0) {
+      toast({ title: "Enter valid amount", variant: "destructive" });
+      return;
+    }
+    if (amount > currentBalance) {
+      toast({ title: "Insufficient balance", variant: "destructive" });
+      return;
+    }
+    createTransactionMutation.mutate({ merchant: merchantName, amount: amount.toString() });
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
+    return date.toLocaleDateString();
   };
 
   return (
@@ -130,9 +193,30 @@ export default function SpendPool() {
             <h1 className="text-3xl font-display font-bold mb-2">Spend Pool Funds</h1>
             <p className="text-muted-foreground">Use the collected funds securely online or transfer to a merchant.</p>
           </div>
-          <div className="text-right">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Available to Spend</p>
-            <p className="text-3xl font-mono font-bold text-primary">${currentBalance.toFixed(2)}</p>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setLiveMode(!liveMode)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                liveMode 
+                  ? 'bg-primary/20 text-primary border border-primary/30' 
+                  : 'bg-white/5 text-muted-foreground border border-white/10 hover:bg-white/10'
+              }`}
+              data-testid="button-toggle-live-mode"
+            >
+              <Radio className={`w-3 h-3 ${liveMode ? 'animate-pulse' : ''}`} />
+              {liveMode ? 'LIVE' : 'Live Mode'}
+            </button>
+            <div className="text-right">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Available to Spend</p>
+              <motion.p 
+                key={currentBalance}
+                initial={{ scale: 1.1, color: 'hsl(var(--primary))' }}
+                animate={{ scale: 1, color: 'hsl(var(--primary))' }}
+                className="text-3xl font-mono font-bold"
+              >
+                ${currentBalance.toFixed(2)}
+              </motion.p>
+            </div>
           </div>
         </div>
 
@@ -230,18 +314,77 @@ export default function SpendPool() {
                       Use the virtual card details to pay on any website that accepts Visa. Perfect for booking flights or buying gifts.
                     </p>
                     
+                    <Dialog open={purchaseOpen} onOpenChange={setPurchaseOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="w-full group" data-testid="button-make-purchase">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Make Purchase
+                          <Zap className="w-3 h-3 ml-2 group-hover:scale-110 transition-transform" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="bg-card border-white/10">
+                        <DialogHeader>
+                          <DialogTitle>Make a Purchase</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 pt-4">
+                          <div>
+                            <Label htmlFor="merchant">Merchant Name</Label>
+                            <Input
+                              id="merchant"
+                              placeholder="e.g., Amazon, Uber, Netflix"
+                              value={merchantName}
+                              onChange={(e) => setMerchantName(e.target.value)}
+                              className="mt-1.5"
+                              data-testid="input-merchant-name"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="amount">Amount ($)</Label>
+                            <div className="relative mt-1.5">
+                              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                              <Input
+                                id="amount"
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                max={currentBalance}
+                                placeholder="0.00"
+                                value={purchaseAmount}
+                                onChange={(e) => setPurchaseAmount(e.target.value)}
+                                className="pl-9"
+                                data-testid="input-purchase-amount"
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Available: ${currentBalance.toFixed(2)}
+                            </p>
+                          </div>
+                          <Button 
+                            className="w-full" 
+                            onClick={handleCustomPurchase}
+                            disabled={createTransactionMutation.isPending}
+                            data-testid="button-confirm-purchase"
+                          >
+                            {createTransactionMutation.isPending ? "Processing..." : "Confirm Purchase"}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    
                     <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5">
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs font-bold uppercase text-muted-foreground">Simulate Purchase</span>
-                        {isSimulating && <span className="text-xs text-primary animate-pulse">Processing...</span>}
+                        <span className="text-xs font-bold uppercase text-muted-foreground">Quick Purchase</span>
+                        {createTransactionMutation.isPending && (
+                          <span className="text-xs text-primary animate-pulse">Processing...</span>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Button 
                           variant="outline" 
                           className="w-full justify-between border-white/10 hover:bg-white/5"
-                          onClick={() => simulateTransaction('Amazon.com', 124.50)}
-                          disabled={isSimulating || currentBalance < 124.50}
-                          data-testid="button-simulate-amazon"
+                          onClick={() => handleQuickPurchase('Amazon.com', 124.50)}
+                          disabled={createTransactionMutation.isPending || currentBalance < 124.50}
+                          data-testid="button-quick-amazon"
                         >
                           <span className="flex items-center"><Store className="w-4 h-4 mr-2" /> Amazon</span>
                           <span>$124.50</span>
@@ -249,12 +392,22 @@ export default function SpendPool() {
                         <Button 
                           variant="outline" 
                           className="w-full justify-between border-white/10 hover:bg-white/5"
-                          onClick={() => simulateTransaction('Airbnb Inc.', 450.00)}
-                          disabled={isSimulating || currentBalance < 450}
-                          data-testid="button-simulate-airbnb"
+                          onClick={() => handleQuickPurchase('Airbnb Inc.', 450.00)}
+                          disabled={createTransactionMutation.isPending || currentBalance < 450}
+                          data-testid="button-quick-airbnb"
                         >
                           <span className="flex items-center"><Store className="w-4 h-4 mr-2" /> Airbnb</span>
                           <span>$450.00</span>
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          className="w-full justify-between border-white/10 hover:bg-white/5"
+                          onClick={() => handleQuickPurchase('Uber', 25.00)}
+                          disabled={createTransactionMutation.isPending || currentBalance < 25}
+                          data-testid="button-quick-uber"
+                        >
+                          <span className="flex items-center"><Store className="w-4 h-4 mr-2" /> Uber</span>
+                          <span>$25.00</span>
                         </Button>
                       </div>
                     </div>
@@ -283,23 +436,40 @@ export default function SpendPool() {
             </div>
 
             <div className="rounded-2xl bg-card border border-white/10 p-6">
-              <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider text-muted-foreground">Recent Activity</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Recent Activity</h3>
+                {liveMode && (
+                  <span className="flex items-center gap-1.5 text-xs text-primary">
+                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    Live
+                  </span>
+                )}
+              </div>
               {transactions.length > 0 ? (
-                <div className="space-y-3">
-                  {transactions.map(tx => (
-                    <div key={tx.id} className="flex items-center justify-between animate-in fade-in slide-in-from-top-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
-                          <ShoppingBag className="w-4 h-4 text-primary" />
+                <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                  <AnimatePresence mode="popLayout">
+                    {transactions.map((tx, index) => (
+                      <motion.div 
+                        key={tx.id} 
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
+                            <ShoppingBag className="w-4 h-4 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{tx.merchant}</p>
+                            <p className="text-xs text-muted-foreground">{formatDate(tx.createdAt)}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium text-sm">{tx.merchant}</p>
-                          <p className="text-xs text-muted-foreground">{tx.date}</p>
-                        </div>
-                      </div>
-                      <span className="font-mono text-sm">-${tx.amount.toFixed(2)}</span>
-                    </div>
-                  ))}
+                        <span className="font-mono text-sm text-red-400">-${parseFloat(tx.amount).toFixed(2)}</span>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
                 </div>
               ) : (
                 <div className="text-center py-8 text-sm text-muted-foreground">
