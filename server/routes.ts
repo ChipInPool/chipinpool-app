@@ -16,6 +16,14 @@ import {
   hashTransactionPin,
   verifyTransactionPin
 } from "./verificationService";
+import {
+  sendPoolContributionNotification,
+  sendPoolCompletedNotification,
+  sendPoolInviteNotification,
+  sendVerificationEmail,
+  sendVerificationSMS,
+  sendWelcomeEmail
+} from "./notificationService";
 
 declare module "express-session" {
   interface SessionData {
@@ -66,6 +74,12 @@ export async function registerRoutes(
       });
 
       req.session.userId = user.id;
+      
+      // Send welcome email asynchronously
+      sendWelcomeEmail(user.email, user.name).catch(err => 
+        console.error('[Notification] Welcome email failed:', err)
+      );
+
       const { password, ...userWithoutPassword } = user;
       res.json({ user: userWithoutPassword });
     } catch (error) {
@@ -292,6 +306,9 @@ export async function registerRoutes(
       const newTotalContributed = (parseFloat(user.totalContributed) + contributionAmount).toFixed(2);
       await storage.updateUserStats(user.id, undefined, newTotalContributed);
 
+      // Get pool creator for notifications
+      const poolCreator = await storage.getUser(pool.creatorId);
+
       // Check if pool goal is reached
       if (parseFloat(newPoolAmount) >= parseFloat(pool.targetAmount)) {
         await storage.updatePoolStatus(pool.id, 'completed');
@@ -304,6 +321,20 @@ export async function registerRoutes(
           message: `${pool.title} has been fully funded!`,
           link: `/pool/${pool.id}`,
         });
+
+        // Send email/SMS notification for pool completion
+        if (poolCreator) {
+          sendPoolCompletedNotification(
+            poolCreator.email,
+            poolCreator.phone,
+            poolCreator.name,
+            pool.id,
+            pool.title,
+            pool.targetAmount,
+            poolCreator.notifyEmail,
+            poolCreator.notifySMS
+          ).catch(err => console.error('[Notification] Pool completed notification failed:', err));
+        }
       }
 
       // Create notification for pool creator
@@ -314,6 +345,21 @@ export async function registerRoutes(
         message: `${user.name} chipped in $${amount} to ${pool.title}`,
         link: `/pool/${pool.id}`,
       });
+
+      // Send email/SMS notification for contribution (only if contributor is not the pool creator)
+      if (poolCreator && pool.creatorId !== user.id) {
+        sendPoolContributionNotification(
+          poolCreator.email,
+          poolCreator.phone,
+          poolCreator.name,
+          user.name,
+          pool.id,
+          pool.title,
+          amount,
+          poolCreator.notifyEmail,
+          poolCreator.notifySMS
+        ).catch(err => console.error('[Notification] Contribution notification failed:', err));
+      }
 
       res.json({ contribution });
     } catch (error) {
@@ -1340,17 +1386,9 @@ export async function registerRoutes(
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
       await storage.createVerificationCode({ userId: user.id, type: 'email', code, expiresAt });
 
-      // Send via Resend
-      try {
-        const { Resend } = await import('resend');
-        const resend = new Resend(process.env.RESEND_API_KEY);
-        await resend.emails.send({
-          from: 'ChipInPay <onboarding@resend.dev>',
-          to: user.email,
-          subject: 'Verify your email - ChipInPay',
-          html: `<h1>Your verification code: <strong>${code}</strong></h1><p>Expires in 15 minutes.</p>`,
-        });
-      } catch (e) {
+      // Send via notification service
+      const sent = await sendVerificationEmail(user.email, code);
+      if (!sent) {
         console.log(`[DEV] Email verification code for ${user.email}: ${code}`);
       }
 
@@ -1394,23 +1432,9 @@ export async function registerRoutes(
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
       await storage.createVerificationCode({ userId, type: 'phone', code, expiresAt });
 
-      // Send via ClickSend
-      const username = process.env.CLICKSEND_USERNAME;
-      const apiKey = process.env.CLICKSEND_API_KEY;
-      if (username && apiKey) {
-        let phoneNumber = phone.replace(/\D/g, '');
-        if (!phoneNumber.startsWith('1') && phoneNumber.length === 10) phoneNumber = '1' + phoneNumber;
-        if (!phoneNumber.startsWith('+')) phoneNumber = '+' + phoneNumber;
-
-        await fetch('https://rest.clicksend.com/v3/sms/send', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Basic ' + Buffer.from(`${username}:${apiKey}`).toString('base64'),
-          },
-          body: JSON.stringify({ messages: [{ source: 'chipin', body: `Your ChipInPay code: ${code}`, to: phoneNumber }] }),
-        });
-      } else {
+      // Send via notification service
+      const sent = await sendVerificationSMS(phone, code);
+      if (!sent) {
         console.log(`[DEV] Phone verification code for ${phone}: ${code}`);
       }
 
@@ -1582,6 +1606,63 @@ export async function registerRoutes(
         hasTransactionPin: !!user.transactionPin,
         twoFactorEnabled: user.twoFactorEnabled,
         kycStatus: user.kycStatus,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ========== TRANSACTION HISTORY ROUTES ==========
+
+  // Get user transaction history
+  app.get("/api/user/transactions", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const transactions = await storage.getUserTransactionHistory(userId);
+      res.json({ transactions });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ========== DEVELOPER API ROUTES ==========
+
+  // Request developer API access
+  app.post("/api/developer/request-access", requireAuth, async (req, res, next) => {
+    try {
+      const requestSchema = z.object({
+        companyName: z.string().min(1),
+        website: z.string().url(),
+        useCase: z.string().min(10),
+        monthlyVolume: z.string().min(1),
+        email: z.string().email().optional(),
+        name: z.string().optional(),
+      });
+
+      const data = requestSchema.parse(req.body);
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Store API access request
+      await storage.createApiAccessRequest({
+        userId: user.id,
+        companyName: data.companyName,
+        website: data.website,
+        useCase: data.useCase,
+        monthlyVolume: data.monthlyVolume,
+      });
+
+      // Send notification email to admin (in real scenario)
+      console.log(`[Developer API] New access request from ${user.email}:`, {
+        companyName: data.companyName,
+        website: data.website,
+        useCase: data.useCase,
+        monthlyVolume: data.monthlyVolume,
+      });
+
+      res.json({ 
+        message: "API access request submitted successfully",
+        email: user.email,
       });
     } catch (error) {
       next(error);

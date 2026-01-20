@@ -1,10 +1,11 @@
 import { db } from "./db";
 import { 
-  users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites, walletDeposits, verificationCodes, bankAccounts, recurringContributions,
+  users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites, walletDeposits, verificationCodes, bankAccounts, recurringContributions, apiAccessRequests,
   type User, type InsertUser, type Pool, type InsertPool, type Contribution, type InsertContribution,
   type Comment, type InsertComment, type Notification, type InsertNotification,
   type VirtualCard, type InsertVirtualCard, type Transaction, type InsertTransaction,
-  type Invite, type InsertInvite, type RecurringContribution, type InsertRecurringContribution
+  type Invite, type InsertInvite, type RecurringContribution, type InsertRecurringContribution,
+  type ApiAccessRequest, type InsertApiAccessRequest
 } from "@shared/schema";
 import { eq, desc, and, sql, gt } from "drizzle-orm";
 
@@ -76,6 +77,12 @@ export interface IStorage {
   getRecurringContributionsByUser(userId: string): Promise<RecurringContribution[]>;
   updateRecurringContributionStatus(id: string, status: string): Promise<void>;
   cancelRecurringContribution(id: string): Promise<void>;
+  
+  // API access request operations
+  createApiAccessRequest(data: InsertApiAccessRequest): Promise<ApiAccessRequest>;
+  
+  // User transaction history
+  getUserTransactionHistory(userId: string): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -399,6 +406,42 @@ export class DatabaseStorage implements IStorage {
 
   async cancelRecurringContribution(id: string): Promise<void> {
     await db.update(recurringContributions).set({ status: 'cancelled' }).where(eq(recurringContributions.id, id));
+  }
+
+  async createApiAccessRequest(data: InsertApiAccessRequest): Promise<ApiAccessRequest> {
+    const [result] = await db.insert(apiAccessRequests).values(data).returning();
+    return result;
+  }
+
+  async getUserTransactionHistory(userId: string): Promise<any[]> {
+    const userPools = await db.select({ id: pools.id, title: pools.title })
+      .from(pools)
+      .where(eq(pools.creatorId, userId));
+
+    if (userPools.length === 0) return [];
+
+    const poolIds = userPools.map(p => p.id);
+    const poolTitleMap = new Map(userPools.map(p => [p.id, p.title]));
+
+    const cards = await db.select()
+      .from(virtualCards)
+      .where(sql`${virtualCards.poolId} = ANY(${poolIds})`);
+
+    if (cards.length === 0) return [];
+
+    const cardIds = cards.map(c => c.id);
+    const cardPoolMap = new Map(cards.map(c => [c.id, c.poolId]));
+
+    const allTransactions = await db.select()
+      .from(transactions)
+      .where(sql`${transactions.virtualCardId} = ANY(${cardIds})`)
+      .orderBy(desc(transactions.createdAt));
+
+    return allTransactions.map(t => ({
+      ...t,
+      poolId: cardPoolMap.get(t.virtualCardId),
+      poolTitle: poolTitleMap.get(cardPoolMap.get(t.virtualCardId) || ''),
+    }));
   }
 }
 

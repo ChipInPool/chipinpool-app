@@ -17,6 +17,7 @@ import HowItWorks from "@/pages/how-it-works";
 import Profile from "@/pages/profile";
 import UserProfile from "@/pages/user-profile";
 import Security from "@/pages/security";
+import Transactions from "@/pages/transactions";
 import { ThemeProvider } from "@/components/theme-provider";
 
 function Router() {
@@ -34,6 +35,7 @@ function Router() {
       <Route path="/user/:id" component={UserProfile} />
       <Route path="/pool/:id" component={PoolDetails} />
       <Route path="/pool/:id/spend" component={SpendPool} />
+      <Route path="/transactions" component={Transactions} />
       <Route component={NotFound} />
     </Switch>
   );

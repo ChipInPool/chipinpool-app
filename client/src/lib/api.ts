@@ -105,6 +105,7 @@ export const api = {
       fetchApi("/api/user/deposit/checkout", { method: "POST", body: JSON.stringify({ amount }) }),
     withdraw: (amount: string) =>
       fetchApi("/api/user/withdraw", { method: "POST", body: JSON.stringify({ amount }) }),
+    getTransactionHistory: () => fetchApi("/api/user/transactions"),
   },
   recurring: {
     create: (poolId: string, amount: string, frequency: 'weekly' | 'monthly' | 'quarterly') =>
@@ -157,6 +158,7 @@ export const queryKeys = {
   following: (userId: string) => ["following", userId] as const,
   followers: (userId: string) => ["followers", userId] as const,
   myFollowers: ["myFollowers"] as const,
+  transactionHistory: ["transactionHistory"] as const,
 };
 
 export const userQueryOptions = queryOptions({

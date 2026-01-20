@@ -1,17 +1,61 @@
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Copy, Terminal, Code2, Globe, Shield, Zap } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Check, Copy, Terminal, Code2, Globe, Shield, Zap, Mail, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import heroImage from "@assets/generated_images/developer_api_documentation_abstract_visualization_with_code_blocks.png";
 
 export default function ApiDocs() {
   const [copied, setCopied] = useState(false);
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const [formData, setFormData] = useState({
+    companyName: "",
+    website: "",
+    useCase: "",
+    monthlyVolume: "",
+  });
 
   const copyCode = () => {
     navigator.clipboard.writeText(`npm install @chipin/sdk`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSubmitRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    try {
+      await apiRequest("POST", "/api/developer/request-access", {
+        ...formData,
+        email: user?.email,
+        name: user?.name,
+      });
+      setSubmitted(true);
+      toast({
+        title: "Request Submitted!",
+        description: "We'll review your application and get back to you within 2-3 business days.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit request",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -30,11 +74,138 @@ export default function ApiDocs() {
              Allow your customers to split costs instantly without leaving your site.
            </p>
            <div className="flex flex-wrap gap-4">
-              <Button size="lg" className="h-12 px-8 font-bold shadow-lg shadow-primary/20">Get API Keys</Button>
+              <Button 
+                size="lg" 
+                className="h-12 px-8 font-bold shadow-lg shadow-primary/20"
+                onClick={() => setShowRequestForm(true)}
+                data-testid="button-request-api-keys"
+              >
+                Request API Keys
+              </Button>
               <Button variant="outline" size="lg" className="h-12 px-8 border-white/10 bg-white/5">View on GitHub</Button>
            </div>
         </div>
       </div>
+
+      {/* API Access Request Form Modal */}
+      {showRequestForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-card border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-display font-bold">Request API Access</h2>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setShowRequestForm(false)}
+                className="text-muted-foreground hover:text-foreground"
+                data-testid="button-close-api-form"
+              >
+                &times;
+              </Button>
+            </div>
+
+            {submitted ? (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+                  <Check className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">Application Submitted!</h3>
+                <p className="text-muted-foreground mb-6">
+                  We'll review your request and send your API keys to <strong>{user?.email}</strong> within 2-3 business days.
+                </p>
+                <Button onClick={() => setShowRequestForm(false)} data-testid="button-close-success">
+                  Close
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitRequest} className="space-y-5">
+                <div>
+                  <Label htmlFor="companyName" className="text-sm font-medium">Company Name</Label>
+                  <Input
+                    id="companyName"
+                    value={formData.companyName}
+                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                    placeholder="Acme Inc."
+                    required
+                    className="mt-1.5 bg-background/50 border-white/10"
+                    data-testid="input-company-name"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="website" className="text-sm font-medium">Website</Label>
+                  <Input
+                    id="website"
+                    type="url"
+                    value={formData.website}
+                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                    placeholder="https://example.com"
+                    required
+                    className="mt-1.5 bg-background/50 border-white/10"
+                    data-testid="input-website"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="useCase" className="text-sm font-medium">Describe Your Use Case</Label>
+                  <Textarea
+                    id="useCase"
+                    value={formData.useCase}
+                    onChange={(e) => setFormData({ ...formData, useCase: e.target.value })}
+                    placeholder="We're building an e-commerce platform and want to offer split payments for group purchases..."
+                    required
+                    rows={4}
+                    className="mt-1.5 bg-background/50 border-white/10 resize-none"
+                    data-testid="input-use-case"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="monthlyVolume" className="text-sm font-medium">Expected Monthly Transaction Volume</Label>
+                  <select
+                    id="monthlyVolume"
+                    value={formData.monthlyVolume}
+                    onChange={(e) => setFormData({ ...formData, monthlyVolume: e.target.value })}
+                    required
+                    className="w-full mt-1.5 px-3 py-2 rounded-md bg-background/50 border border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="select-monthly-volume"
+                  >
+                    <option value="">Select volume...</option>
+                    <option value="under_10k">Under $10,000</option>
+                    <option value="10k_50k">$10,000 - $50,000</option>
+                    <option value="50k_100k">$50,000 - $100,000</option>
+                    <option value="100k_500k">$100,000 - $500,000</option>
+                    <option value="over_500k">Over $500,000</option>
+                  </select>
+                </div>
+
+                <div className="flex items-start gap-3 pt-2">
+                  <Mail className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground">
+                    API keys will be sent to <strong>{user?.email || "your email"}</strong>. Make sure this email is correct in your profile settings.
+                  </p>
+                </div>
+
+                <Button 
+                  type="submit" 
+                  className="w-full h-11 font-bold"
+                  disabled={submitting}
+                  data-testid="button-submit-api-request"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    "Submit Request"
+                  )}
+                </Button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         {/* Sidebar Navigation */}
@@ -108,6 +279,30 @@ export default function ApiDocs() {
               </div>
            </section>
 
+           {/* Authentication */}
+           <section id="authentication" className="space-y-6">
+              <h2 className="text-3xl font-display font-bold">Authentication</h2>
+              <p className="text-muted-foreground">All API requests require authentication via your API key.</p>
+              
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
+                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+                    <span className="text-xs text-muted-foreground">HTTP Request</span>
+                    <Terminal className="w-4 h-4 text-muted-foreground" />
+                 </div>
+                 <div className="p-6 overflow-x-auto">
+<pre className="text-gray-300">
+<span className="text-purple-400">Authorization:</span> Bearer <span className="text-green-400">pk_live_your_api_key_here</span>
+
+<span className="text-muted-foreground"># Example cURL request</span>
+<span className="text-blue-400">curl</span> -X POST https://api.chipinpay.com/v1/pools \
+  -H <span className="text-green-400">"Authorization: Bearer pk_live_..."</span> \
+  -H <span className="text-green-400">"Content-Type: application/json"</span> \
+  -d <span className="text-green-400">'{"{"}"amount": 50000, "currency": "usd"{"}"}'</span>
+</pre>
+                 </div>
+              </div>
+           </section>
+
            {/* Integration Example */}
            <section id="checkout" className="space-y-6">
               <h2 className="text-3xl font-display font-bold">Create a Checkout Session</h2>
@@ -140,6 +335,36 @@ export default function ApiDocs() {
       <span className="text-gray-500">&lt;/</span><span className="text-yellow-400">div</span><span className="text-gray-500">&gt;</span>
     <span className="text-gray-500">&lt;/</span><span className="text-yellow-400">ChipInProvider</span><span className="text-gray-500">&gt;</span>
   );
+{"}"}
+</pre>
+                 </div>
+              </div>
+           </section>
+
+           {/* Webhooks */}
+           <section id="webhooks" className="space-y-6">
+              <h2 className="text-3xl font-display font-bold">Webhooks</h2>
+              <p className="text-muted-foreground">Receive real-time updates when pools are funded or contributions are made.</p>
+              
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
+                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+                    <span className="text-xs text-muted-foreground">Webhook Payload</span>
+                    <Code2 className="w-4 h-4 text-muted-foreground" />
+                 </div>
+                 <div className="p-6 overflow-x-auto">
+<pre className="text-gray-300">
+{"{"}
+  <span className="text-blue-300">"event"</span>: <span className="text-green-400">"pool.funded"</span>,
+  <span className="text-blue-300">"data"</span>: {"{"}
+    <span className="text-blue-300">"pool_id"</span>: <span className="text-green-400">"pool_123abc"</span>,
+    <span className="text-blue-300">"amount"</span>: <span className="text-yellow-400">50000</span>,
+    <span className="text-blue-300">"currency"</span>: <span className="text-green-400">"usd"</span>,
+    <span className="text-blue-300">"contributors"</span>: <span className="text-yellow-400">4</span>,
+    <span className="text-blue-300">"metadata"</span>: {"{"}
+      <span className="text-blue-300">"order_id"</span>: <span className="text-green-400">"ord_789xyz"</span>
+    {"}"}
+  {"}"},
+  <span className="text-blue-300">"created_at"</span>: <span className="text-green-400">"2026-01-20T12:00:00Z"</span>
 {"}"}
 </pre>
                  </div>

@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PoolCard } from "@/components/pool-card";
-import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus, Clock, Users, UserPlus, ChevronDown, ChevronUp, Building, AlertCircle } from "lucide-react";
+import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus, Clock, Users, UserPlus, ChevronDown, ChevronUp, Building, AlertCircle, Receipt } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -337,7 +337,7 @@ export default function Profile() {
                 </div>
                 <div className="text-xs text-muted-foreground uppercase tracking-wider">Available Balance</div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 mb-3">
                 <Button 
                   className="flex-1" 
                   onClick={() => setDepositDialogOpen(true)}
@@ -354,6 +354,16 @@ export default function Profile() {
                   <Minus className="w-4 h-4 mr-2" /> Withdraw
                 </Button>
               </div>
+              <Button
+                variant="ghost"
+                className="w-full text-muted-foreground hover:text-foreground"
+                asChild
+                data-testid="button-transactions"
+              >
+                <Link href="/transactions">
+                  <Receipt className="w-4 h-4 mr-2" /> View Transaction History
+                </Link>
+              </Button>
             </div>
 
             <div className="p-6 rounded-2xl bg-card border border-white/5">

@@ -187,6 +187,17 @@ export const bankAccounts = pgTable("bank_accounts", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const apiAccessRequests = pgTable("api_access_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  companyName: text("company_name").notNull(),
+  website: text("website").notNull(),
+  useCase: text("use_case").notNull(),
+  monthlyVolume: text("monthly_volume").notNull(),
+  status: text("status").notNull().default('pending'),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({ 
   id: true, 
@@ -215,6 +226,7 @@ export const insertVirtualCardSchema = createInsertSchema(virtualCards).omit({ i
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true, status: true });
 export const insertInviteSchema = createInsertSchema(invites).omit({ id: true, createdAt: true, status: true });
 export const insertRecurringContributionSchema = createInsertSchema(recurringContributions).omit({ id: true, createdAt: true, status: true });
+export const insertApiAccessRequestSchema = createInsertSchema(apiAccessRequests).omit({ id: true, createdAt: true, status: true });
 
 // Login/Register Schemas
 export const loginSchema = z.object({
@@ -247,3 +259,5 @@ export type Invite = typeof invites.$inferSelect;
 export type InsertInvite = z.infer<typeof insertInviteSchema>;
 export type RecurringContribution = typeof recurringContributions.$inferSelect;
 export type InsertRecurringContribution = z.infer<typeof insertRecurringContributionSchema>;
+export type ApiAccessRequest = typeof apiAccessRequests.$inferSelect;
+export type InsertApiAccessRequest = z.infer<typeof insertApiAccessRequestSchema>;
