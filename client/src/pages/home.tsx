@@ -53,7 +53,7 @@ export default function Home() {
     }
   }, [authLoading, isAuthenticated, setLocation]);
 
-  if (authLoading || !isAuthenticated) {
+  if (authLoading) {
     return (
       <Layout>
         <div className="flex justify-center items-center py-20">
@@ -61,6 +61,10 @@ export default function Home() {
         </div>
       </Layout>
     );
+  }
+
+  if (!isAuthenticated) {
+    return null;
   }
 
   return (
