@@ -80,6 +80,8 @@ export default function Transactions() {
   const exportToCSV = () => {
     if (filteredTransactions.length === 0) return;
     
+    const escapeCSV = (str: string) => `"${str.replace(/"/g, '""')}"`;
+    
     const headers = ["Date", "Merchant", "Pool", "Amount", "Status"];
     const rows = filteredTransactions.map(t => [
       format(new Date(t.createdAt), "yyyy-MM-dd HH:mm"),
@@ -91,7 +93,7 @@ export default function Transactions() {
     
     const csvContent = [
       headers.join(","),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+      ...rows.map(row => row.map(cell => escapeCSV(cell)).join(","))
     ].join("\n");
     
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
