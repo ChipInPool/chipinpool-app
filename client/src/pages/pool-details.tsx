@@ -8,6 +8,7 @@ import { Link, useRoute } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { CircularProgressbarWithChildren, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
+import { PaymentMethodSelector } from "@/components/payment-method-selector";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +24,7 @@ export default function PoolDetails() {
   const [chipInAmount, setChipInAmount] = useState("");
   const [isChippingIn, setIsChippingIn] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [paymentStep, setPaymentStep] = useState<'amount' | 'method'>('amount');
 
   if (!pool) return <Layout><div className="text-center py-20">Pool not found</div></Layout>;
 
@@ -33,13 +35,14 @@ export default function PoolDetails() {
     // Mock API
     setTimeout(() => {
         setIsChippingIn(false);
+        setPaymentStep('amount');
         setShowConfetti(true);
         toast({
             title: "Contribution Successful! 🎉",
             description: `You chipped in $${chipInAmount}.`,
         });
         setTimeout(() => setShowConfetti(false), 2000);
-    }, 1000);
+    }, 1500);
   };
 
   const confettiConfig = {
@@ -160,39 +163,66 @@ export default function PoolDetails() {
                                 <DialogHeader>
                                     <DialogTitle>Chip in to {pool.title}</DialogTitle>
                                 </DialogHeader>
-                                <div className="grid gap-6 py-4">
-                                    <div className="grid grid-cols-4 gap-4">
-                                        {[25, 50, 100].map((amt) => (
-                                            <Button 
-                                                key={amt} 
-                                                variant="outline" 
-                                                className="border-white/10 hover:border-primary/50 hover:bg-primary/5 hover:text-primary transition-all"
-                                                onClick={() => setChipInAmount(amt.toString())}
-                                            >
-                                                ${amt}
-                                            </Button>
-                                        ))}
-                                        <Button variant="outline" className="border-white/10" onClick={() => setChipInAmount("")}>Custom</Button>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="amount" className="text-right">Amount ($)</Label>
-                                        <Input
-                                            id="amount"
-                                            value={chipInAmount}
-                                            onChange={(e) => setChipInAmount(e.target.value)}
-                                            placeholder="0.00"
-                                            className="text-2xl h-14 bg-white/5 border-white/10 text-center font-bold"
-                                        />
-                                    </div>
-                                </div>
+                                
+                                {paymentStep === 'amount' ? (
+                                  <div className="grid gap-6 py-4 animate-in fade-in slide-in-from-left-4">
+                                      <div className="grid grid-cols-4 gap-4">
+                                          {[25, 50, 100].map((amt) => (
+                                              <Button 
+                                                  key={amt} 
+                                                  variant="outline" 
+                                                  className="border-white/10 hover:border-primary/50 hover:bg-primary/5 hover:text-primary transition-all"
+                                                  onClick={() => setChipInAmount(amt.toString())}
+                                              >
+                                                  ${amt}
+                                              </Button>
+                                          ))}
+                                          <Button variant="outline" className="border-white/10" onClick={() => setChipInAmount("")}>Custom</Button>
+                                      </div>
+                                      <div className="space-y-2">
+                                          <Label htmlFor="amount" className="text-right">Amount ($)</Label>
+                                          <Input
+                                              id="amount"
+                                              value={chipInAmount}
+                                              onChange={(e) => setChipInAmount(e.target.value)}
+                                              placeholder="0.00"
+                                              className="text-2xl h-14 bg-white/5 border-white/10 text-center font-bold"
+                                          />
+                                      </div>
+                                  </div>
+                                ) : (
+                                  <div className="py-4 animate-in fade-in slide-in-from-right-4">
+                                     <div className="mb-4 flex items-center justify-between">
+                                        <span className="text-sm text-muted-foreground">Payment Method</span>
+                                        <span className="font-bold text-lg">${chipInAmount}</span>
+                                     </div>
+                                     <PaymentMethodSelector onMethodChange={() => {}} />
+                                  </div>
+                                )}
+
                                 <DialogFooter className="sm:justify-between gap-4">
                                    <div className="flex items-center text-sm text-muted-foreground">
-                                      <Wallet className="w-4 h-4 mr-2" />
-                                      Balance: $1,240.50
+                                      {paymentStep === 'amount' && (
+                                        <>
+                                          <Wallet className="w-4 h-4 mr-2" />
+                                          Balance: $1,240.50
+                                        </>
+                                      )}
+                                      {paymentStep === 'method' && (
+                                        <Button variant="ghost" className="h-auto p-0 hover:bg-transparent hover:text-primary" onClick={() => setPaymentStep('amount')}>
+                                          Back
+                                        </Button>
+                                      )}
                                    </div>
-                                    <Button type="submit" className="w-full sm:w-auto font-bold" onClick={handleChipIn} disabled={!chipInAmount || isChippingIn}>
-                                        {isChippingIn ? "Processing..." : "Confirm Payment"}
-                                    </Button>
+                                    {paymentStep === 'amount' ? (
+                                      <Button type="button" className="w-full sm:w-auto font-bold" onClick={() => setPaymentStep('method')} disabled={!chipInAmount}>
+                                          Continue
+                                      </Button>
+                                    ) : (
+                                      <Button type="submit" className="w-full sm:w-auto font-bold" onClick={handleChipIn} disabled={isChippingIn}>
+                                          {isChippingIn ? "Processing..." : "Confirm Payment"}
+                                      </Button>
+                                    )}
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>
@@ -208,6 +238,14 @@ export default function PoolDetails() {
                     </div>
                     
                     <div className="mt-8 pt-6 border-t border-white/5 text-center">
+                       {/* Creator Actions */}
+                       <div className="mb-4">
+                          <Link href={`/pool/${pool.id}/spend`}>
+                             <Button variant="secondary" className="w-full bg-white/5 hover:bg-white/10 border-white/10 text-muted-foreground hover:text-foreground transition-colors">
+                                Creator Settings & Spend
+                             </Button>
+                          </Link>
+                       </div>
                        <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                           <ShieldCheck className="w-3 h-3 text-green-500" /> Secure payment powered by Stripe
                        </p>

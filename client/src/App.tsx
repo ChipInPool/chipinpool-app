@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import CreatePool from "@/pages/create-pool";
 import PoolDetails from "@/pages/pool-details";
+import SpendPool from "@/pages/spend-pool";
 
 function Router() {
   return (
@@ -14,6 +15,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/create" component={CreatePool} />
       <Route path="/pool/:id" component={PoolDetails} />
+      <Route path="/pool/:id/spend" component={SpendPool} />
       <Route component={NotFound} />
     </Switch>
   );
