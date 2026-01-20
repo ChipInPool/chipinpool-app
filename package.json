@@ -72,6 +72,7 @@
     "react-dom": "^19.2.0",
     "react-dom-confetti": "^0.2.0",
     "react-hook-form": "^7.66.0",
+    "react-plaid-link": "^4.1.1",
     "react-resizable-panels": "^2.1.9",
     "recharts": "^2.15.4",
     "resend": "^4.0.0",

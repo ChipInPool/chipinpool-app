@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Shield, Mail, Phone, Key, Smartphone, UserCheck, CheckCircle, XCircle, Loader2, Building } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { usePlaidLink } from "react-plaid-link";
 
 export default function Security() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -34,48 +35,61 @@ export default function Security() {
     enabled: isAuthenticated,
   });
 
-  const { data: plaidStatus } = useQuery({
+  const { data: plaidStatus, refetch: refetchPlaidStatus } = useQuery({
     queryKey: ["plaidStatus"],
     queryFn: api.plaid.getStatus,
     enabled: isAuthenticated,
   });
 
-  const linkBankMutation = useMutation({
-    mutationFn: async () => {
-      const { linkToken } = await api.plaid.getLinkToken();
-      // Open Plaid Link in a new window for sandbox testing
-      const plaidUrl = `https://cdn.plaid.com/link/v2/stable/link.html?isWebview=true&token=${linkToken}`;
-      const popup = window.open(plaidUrl, 'plaid-link', 'width=400,height=600');
-      
-      // For demo purposes, simulate successful bank linking after a delay
-      // In production, you would use Plaid Link SDK properly
-      return new Promise((resolve, reject) => {
-        const checkClosed = setInterval(() => {
-          if (popup?.closed) {
-            clearInterval(checkClosed);
-            // Refresh status after popup closes
-            queryClient.invalidateQueries({ queryKey: ["plaidStatus"] });
-            resolve({ success: true });
-          }
-        }, 1000);
-        
-        // Timeout after 5 minutes
-        setTimeout(() => {
-          clearInterval(checkClosed);
-          reject(new Error("Bank linking timed out"));
-        }, 300000);
-      });
-    },
+  const [linkToken, setLinkToken] = useState<string | null>(null);
+  const [isGettingToken, setIsGettingToken] = useState(false);
+
+  const exchangeTokenMutation = useMutation({
+    mutationFn: ({ publicToken, accountId }: { publicToken: string; accountId: string }) =>
+      api.plaid.exchangeToken(publicToken, accountId),
     onSuccess: () => {
-      toast({ description: "Bank account linking initiated. Follow the instructions in the popup." });
+      queryClient.invalidateQueries({ queryKey: ["plaidStatus"] });
+      toast({ description: "Bank account linked successfully!" });
+      setLinkToken(null);
     },
     onError: (error: any) => {
       toast({ description: error.message || "Failed to link bank account", variant: "destructive" });
     },
   });
 
-  const handleLinkBank = () => {
-    linkBankMutation.mutate();
+  const onPlaidSuccess = useCallback((publicToken: string, metadata: any) => {
+    const accountId = metadata.accounts?.[0]?.id;
+    if (accountId) {
+      exchangeTokenMutation.mutate({ publicToken, accountId });
+    }
+  }, [exchangeTokenMutation]);
+
+  const onPlaidExit = useCallback(() => {
+    setLinkToken(null);
+  }, []);
+
+  const { open: openPlaidLink, ready: plaidReady } = usePlaidLink({
+    token: linkToken,
+    onSuccess: onPlaidSuccess,
+    onExit: onPlaidExit,
+  });
+
+  useEffect(() => {
+    if (linkToken && plaidReady) {
+      openPlaidLink();
+    }
+  }, [linkToken, plaidReady, openPlaidLink]);
+
+  const handleLinkBank = async () => {
+    setIsGettingToken(true);
+    try {
+      const { linkToken } = await api.plaid.getLinkToken();
+      setLinkToken(linkToken);
+    } catch (error: any) {
+      toast({ description: error.message || "Failed to initialize bank linking", variant: "destructive" });
+    } finally {
+      setIsGettingToken(false);
+    }
   };
 
   const sendEmailMutation = useMutation({
@@ -482,11 +496,11 @@ export default function Security() {
               {!plaidStatus?.hasBankLinked && (
                 <Button 
                   onClick={handleLinkBank}
-                  disabled={linkBankMutation.isPending}
+                  disabled={isGettingToken || exchangeTokenMutation.isPending}
                   className="bg-gradient-to-r from-cyan-500 to-blue-500"
                   data-testid="button-link-bank"
                 >
-                  {linkBankMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {(isGettingToken || exchangeTokenMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   Link Bank Account
                 </Button>
               )}
