@@ -3,7 +3,7 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar } from "lucide-react";
+import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check } from "lucide-react";
 import { Link, useRoute, useLocation } from "wouter";
 import { formatDistanceToNow, format } from "date-fns";
 import { CircularProgressbarWithChildren, buildStyles } from 'react-circular-progressbar';
@@ -19,6 +19,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function PoolDetails() {
   const [, params] = useRoute("/pool/:id");
@@ -33,12 +35,16 @@ export default function PoolDetails() {
   const [paymentStep, setPaymentStep] = useState<'amount' | 'method'>('amount');
   const [paymentMethod, setPaymentMethod] = useState<'balance' | 'stripe'>('stripe');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editTargetAmount, setEditTargetAmount] = useState("");
   const [editDeadline, setEditDeadline] = useState("");
+  const [selectedFollowers, setSelectedFollowers] = useState<string[]>([]);
+  const [inviteEmails, setInviteEmails] = useState("");
+  const [invitePhones, setInvitePhones] = useState("");
+  const [isSendingInvites, setIsSendingInvites] = useState(false);
 
   const { data: poolData, isLoading: poolLoading } = useQuery({
     queryKey: queryKeys.pool(params?.id || ''),
@@ -91,6 +97,60 @@ export default function PoolDetails() {
       });
     },
   });
+
+  const { data: followersData } = useQuery({
+    queryKey: queryKeys.myFollowers,
+    queryFn: () => api.myFollowers(),
+    enabled: isAuthenticated && inviteDialogOpen,
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: ({ method, recipients }: { method: 'email' | 'sms' | 'push', recipients: string[] }) => 
+      api.pools.invite(params?.id || '', method, recipients),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+      toast({
+        title: "Invites Sent!",
+        description: data.message,
+      });
+      setSelectedFollowers([]);
+      setInviteEmails("");
+      setInvitePhones("");
+      setInviteDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to Send Invites",
+        description: error.message || "Could not send invites",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSendInvitesToFollowers = () => {
+    if (selectedFollowers.length === 0) return;
+    inviteMutation.mutate({ method: 'push', recipients: selectedFollowers });
+  };
+
+  const handleSendEmailInvites = () => {
+    const emails = inviteEmails.split(/[,\n]/).map(e => e.trim()).filter(e => e);
+    if (emails.length === 0) return;
+    inviteMutation.mutate({ method: 'email', recipients: emails });
+  };
+
+  const handleSendSMSInvites = () => {
+    const phones = invitePhones.split(/[,\n]/).map(p => p.trim()).filter(p => p);
+    if (phones.length === 0) return;
+    inviteMutation.mutate({ method: 'sms', recipients: phones });
+  };
+
+  const toggleFollowerSelection = (followerId: string) => {
+    setSelectedFollowers(prev => 
+      prev.includes(followerId) 
+        ? prev.filter(id => id !== followerId) 
+        : [...prev, followerId]
+    );
+  };
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -453,77 +513,203 @@ export default function PoolDetails() {
                 </Dialog>
 
                 <div className={`grid gap-3 ${isCreator ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                  <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+                  <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button variant="outline" className="h-12 border-white/10 hover:bg-white/5" data-testid="button-share">
-                        <Share2 className="w-4 h-4 mr-2" /> Share
+                      <Button variant="outline" className="h-12 border-white/10 hover:bg-white/5" data-testid="button-invite">
+                        <UserPlus className="w-4 h-4 mr-2" /> Invite
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-md bg-card border-white/10">
+                    <DialogContent className="sm:max-w-lg bg-card border-white/10">
                       <DialogHeader>
-                        <DialogTitle>Share this Pool</DialogTitle>
+                        <DialogTitle>Invite to {pool.title}</DialogTitle>
                         <DialogDescription>Invite friends to chip in!</DialogDescription>
                       </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="grid grid-cols-2 gap-3">
-                          <Button 
-                            variant="outline" 
-                            className="h-12 border-white/10 hover:bg-white/5 justify-start"
-                            onClick={copyLink}
-                            data-testid="button-share-copy"
-                          >
-                            <Copy className="w-4 h-4 mr-2" /> Copy Link
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            className="h-12 border-white/10 hover:bg-white/5 justify-start"
-                            onClick={shareViaEmail}
-                            data-testid="button-share-email"
-                          >
-                            <Mail className="w-4 h-4 mr-2" /> Email
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            className="h-12 border-white/10 hover:bg-white/5 justify-start"
-                            onClick={shareViaSMS}
-                            data-testid="button-share-sms"
-                          >
-                            <MessageSquare className="w-4 h-4 mr-2" /> Text/SMS
-                          </Button>
-                        </div>
-                        <div className="border-t border-white/10 pt-4">
-                          <p className="text-sm text-muted-foreground mb-3">Share on social media</p>
-                          <div className="flex gap-3">
+                      <Tabs defaultValue="share" className="w-full">
+                        <TabsList className="w-full grid grid-cols-3 bg-white/5">
+                          <TabsTrigger value="share" className="data-[state=active]:bg-primary/20" data-testid="tab-share-link">
+                            <LinkIcon className="w-4 h-4 mr-2" /> Share Link
+                          </TabsTrigger>
+                          <TabsTrigger value="friends" className="data-[state=active]:bg-primary/20" data-testid="tab-invite-friends">
+                            <Users className="w-4 h-4 mr-2" /> Friends
+                          </TabsTrigger>
+                          <TabsTrigger value="contact" className="data-[state=active]:bg-primary/20" data-testid="tab-invite-contact">
+                            <Mail className="w-4 h-4 mr-2" /> Contact
+                          </TabsTrigger>
+                        </TabsList>
+                        
+                        <TabsContent value="share" className="space-y-4 pt-4">
+                          <div className="grid grid-cols-2 gap-3">
                             <Button 
                               variant="outline" 
-                              size="icon"
-                              className="h-12 w-12 border-white/10 hover:bg-[#1DA1F2]/10 hover:border-[#1DA1F2]/50 hover:text-[#1DA1F2]"
-                              onClick={shareViaTwitter}
-                              data-testid="button-share-twitter"
+                              className="h-12 border-white/10 hover:bg-white/5 justify-start"
+                              onClick={copyLink}
+                              data-testid="button-share-copy"
                             >
-                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                              <Copy className="w-4 h-4 mr-2" /> Copy Link
                             </Button>
                             <Button 
                               variant="outline" 
-                              size="icon"
-                              className="h-12 w-12 border-white/10 hover:bg-[#1877F2]/10 hover:border-[#1877F2]/50 hover:text-[#1877F2]"
-                              onClick={shareViaFacebook}
-                              data-testid="button-share-facebook"
+                              className="h-12 border-white/10 hover:bg-white/5 justify-start"
+                              onClick={shareViaEmail}
+                              data-testid="button-share-email"
                             >
-                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                              <Mail className="w-4 h-4 mr-2" /> Email
                             </Button>
                             <Button 
                               variant="outline" 
-                              size="icon"
-                              className="h-12 w-12 border-white/10 hover:bg-[#0A66C2]/10 hover:border-[#0A66C2]/50 hover:text-[#0A66C2]"
-                              onClick={shareViaLinkedIn}
-                              data-testid="button-share-linkedin"
+                              className="h-12 border-white/10 hover:bg-white/5 justify-start"
+                              onClick={shareViaSMS}
+                              data-testid="button-share-sms"
                             >
-                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                              <MessageSquare className="w-4 h-4 mr-2" /> Text/SMS
                             </Button>
                           </div>
-                        </div>
-                      </div>
+                          <div className="border-t border-white/10 pt-4">
+                            <p className="text-sm text-muted-foreground mb-3">Share on social media</p>
+                            <div className="flex gap-3">
+                              <Button 
+                                variant="outline" 
+                                size="icon"
+                                className="h-12 w-12 border-white/10 hover:bg-[#1DA1F2]/10 hover:border-[#1DA1F2]/50 hover:text-[#1DA1F2]"
+                                onClick={shareViaTwitter}
+                                data-testid="button-share-twitter"
+                              >
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="icon"
+                                className="h-12 w-12 border-white/10 hover:bg-[#1877F2]/10 hover:border-[#1877F2]/50 hover:text-[#1877F2]"
+                                onClick={shareViaFacebook}
+                                data-testid="button-share-facebook"
+                              >
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="icon"
+                                className="h-12 w-12 border-white/10 hover:bg-[#0A66C2]/10 hover:border-[#0A66C2]/50 hover:text-[#0A66C2]"
+                                onClick={shareViaLinkedIn}
+                                data-testid="button-share-linkedin"
+                              >
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                              </Button>
+                            </div>
+                          </div>
+                        </TabsContent>
+                        
+                        <TabsContent value="friends" className="space-y-4 pt-4">
+                          <div className="space-y-2">
+                            <Label>Select followers to invite</Label>
+                            <div className="max-h-64 overflow-y-auto space-y-2 rounded-lg border border-white/10 p-2">
+                              {followersData?.followers && followersData.followers.length > 0 ? (
+                                followersData.followers.map((follower: any) => (
+                                  <div 
+                                    key={follower.id}
+                                    className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                                      selectedFollowers.includes(follower.id) ? 'bg-primary/20 border border-primary/50' : 'bg-white/5 hover:bg-white/10'
+                                    }`}
+                                    onClick={() => toggleFollowerSelection(follower.id)}
+                                    data-testid={`follower-item-${follower.id}`}
+                                  >
+                                    <Checkbox 
+                                      checked={selectedFollowers.includes(follower.id)}
+                                      className="pointer-events-none"
+                                    />
+                                    <Avatar className="w-8 h-8">
+                                      <AvatarImage src={follower.avatar} />
+                                      <AvatarFallback>{follower.name?.[0]}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1">
+                                      <p className="font-medium text-sm">{follower.name}</p>
+                                      <p className="text-xs text-muted-foreground">{follower.email}</p>
+                                    </div>
+                                    {selectedFollowers.includes(follower.id) && (
+                                      <Check className="w-4 h-4 text-primary" />
+                                    )}
+                                  </div>
+                                ))
+                              ) : (
+                                <p className="text-sm text-muted-foreground text-center py-4">
+                                  No followers yet. Share your pool to get more followers!
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <Button 
+                            onClick={handleSendInvitesToFollowers}
+                            disabled={selectedFollowers.length === 0 || inviteMutation.isPending}
+                            className="w-full font-bold"
+                            data-testid="button-send-friend-invites"
+                          >
+                            {inviteMutation.isPending ? (
+                              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</>
+                            ) : (
+                              <><Send className="w-4 h-4 mr-2" />Send Invites ({selectedFollowers.length})</>
+                            )}
+                          </Button>
+                        </TabsContent>
+                        
+                        <TabsContent value="contact" className="space-y-4 pt-4">
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="invite-emails">
+                                <Mail className="w-4 h-4 inline mr-2" />
+                                Email Addresses
+                              </Label>
+                              <Textarea 
+                                id="invite-emails"
+                                value={inviteEmails}
+                                onChange={(e) => setInviteEmails(e.target.value)}
+                                placeholder="Enter email addresses (comma or newline separated)"
+                                className="min-h-[80px] bg-white/5 border-white/10 resize-none"
+                                data-testid="input-invite-emails"
+                              />
+                              <Button 
+                                onClick={handleSendEmailInvites}
+                                disabled={!inviteEmails.trim() || inviteMutation.isPending}
+                                variant="outline"
+                                className="w-full border-white/10"
+                                data-testid="button-send-email-invites"
+                              >
+                                {inviteMutation.isPending ? (
+                                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</>
+                                ) : (
+                                  <><Mail className="w-4 h-4 mr-2" />Send Email Invites</>
+                                )}
+                              </Button>
+                            </div>
+                            
+                            <div className="border-t border-white/10 pt-4 space-y-2">
+                              <Label htmlFor="invite-phones">
+                                <Phone className="w-4 h-4 inline mr-2" />
+                                Phone Numbers (SMS)
+                              </Label>
+                              <Textarea 
+                                id="invite-phones"
+                                value={invitePhones}
+                                onChange={(e) => setInvitePhones(e.target.value)}
+                                placeholder="Enter phone numbers (comma or newline separated)"
+                                className="min-h-[80px] bg-white/5 border-white/10 resize-none"
+                                data-testid="input-invite-phones"
+                              />
+                              <Button 
+                                onClick={handleSendSMSInvites}
+                                disabled={!invitePhones.trim() || inviteMutation.isPending}
+                                variant="outline"
+                                className="w-full border-white/10"
+                                data-testid="button-send-sms-invites"
+                              >
+                                {inviteMutation.isPending ? (
+                                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</>
+                                ) : (
+                                  <><Phone className="w-4 h-4 mr-2" />Send SMS Invites</>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
                     </DialogContent>
                   </Dialog>
                   

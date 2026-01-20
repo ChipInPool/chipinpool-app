@@ -6,7 +6,9 @@ import { z } from "zod";
 export const poolCategoryEnum = pgEnum('pool_category', ['Trip', 'Gift', 'Purchase', 'Event', 'Other', 'Recurring']);
 export const poolStatusEnum = pgEnum('pool_status', ['active', 'completed', 'expired']);
 export const frequencyEnum = pgEnum('frequency', ['weekly', 'monthly', 'quarterly']);
-export const notificationTypeEnum = pgEnum('notification_type', ['contribution', 'comment', 'goal_reached', 'friend_request']);
+export const notificationTypeEnum = pgEnum('notification_type', ['contribution', 'comment', 'goal_reached', 'friend_request', 'pool_invite']);
+export const inviteStatusEnum = pgEnum('invite_status', ['pending', 'accepted', 'declined']);
+export const inviteMethodEnum = pgEnum('invite_method', ['email', 'sms', 'push', 'link']);
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -16,6 +18,10 @@ export const users = pgTable("users", {
   avatar: text("avatar"),
   bio: text("bio"),
   location: text("location"),
+  phone: text("phone"),
+  notifyEmail: boolean("notify_email").notNull().default(true),
+  notifySMS: boolean("notify_sms").notNull().default(true),
+  notifyPush: boolean("notify_push").notNull().default(true),
   balance: decimal("balance", { precision: 10, scale: 2 }).notNull().default('1240.50'),
   poolsCreated: integer("pools_created").notNull().default(0),
   totalContributed: decimal("total_contributed", { precision: 10, scale: 2 }).notNull().default('0'),
@@ -112,6 +118,18 @@ export const follows = pgTable("follows", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const invites = pgTable("invites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  poolId: varchar("pool_id").references(() => pools.id).notNull(),
+  inviterId: varchar("inviter_id").references(() => users.id).notNull(),
+  inviteeId: varchar("invitee_id").references(() => users.id),
+  inviteeEmail: text("invitee_email"),
+  inviteePhone: text("invitee_phone"),
+  status: inviteStatusEnum("status").notNull().default('pending'),
+  method: inviteMethodEnum("method").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, poolsCreated: true, totalContributed: true, balance: true, rating: true });
 export const insertPoolSchema = createInsertSchema(pools).omit({ id: true, createdAt: true, updatedAt: true, currentAmount: true, status: true });
@@ -120,6 +138,7 @@ export const insertCommentSchema = createInsertSchema(comments).omit({ id: true,
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, read: true });
 export const insertVirtualCardSchema = createInsertSchema(virtualCards).omit({ id: true, createdAt: true, isActive: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true, status: true });
+export const insertInviteSchema = createInsertSchema(invites).omit({ id: true, createdAt: true, status: true });
 
 // Login/Register Schemas
 export const loginSchema = z.object({
@@ -148,3 +167,5 @@ export type VirtualCard = typeof virtualCards.$inferSelect;
 export type InsertVirtualCard = z.infer<typeof insertVirtualCardSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+export type Invite = typeof invites.$inferSelect;
+export type InsertInvite = z.infer<typeof insertInviteSchema>;

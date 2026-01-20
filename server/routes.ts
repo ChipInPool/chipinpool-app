@@ -644,6 +644,127 @@ export async function registerRoutes(
     }
   });
 
+  // Invite routes
+  app.post("/api/pools/:id/invite", requireAuth, async (req, res, next) => {
+    try {
+      const poolId = req.params.id;
+      const inviterId = req.session.userId!;
+      const { method, recipients } = z.object({
+        method: z.enum(['email', 'sms', 'push']),
+        recipients: z.array(z.string()).min(1),
+      }).parse(req.body);
+
+      const pool = await storage.getPool(poolId);
+      if (!pool) {
+        return res.status(404).json({ message: "Pool not found" });
+      }
+
+      const inviter = await storage.getUser(inviterId);
+      if (!inviter) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const invites = [];
+      const notifications = [];
+
+      for (const recipient of recipients) {
+        if (method === 'push') {
+          const inviteeUser = await storage.getUser(recipient);
+          if (inviteeUser) {
+            const invite = await storage.createInvite({
+              poolId,
+              inviterId,
+              inviteeId: inviteeUser.id,
+              method: 'push',
+            });
+            invites.push(invite);
+
+            const notification = await storage.createNotification({
+              userId: inviteeUser.id,
+              type: 'pool_invite',
+              title: 'Pool Invitation',
+              message: `${inviter.name} invited you to join "${pool.title}"`,
+              link: `/pool/${poolId}`,
+            });
+            notifications.push(notification);
+          }
+        } else if (method === 'email') {
+          const existingUser = await storage.getUserByEmail(recipient);
+          const invite = await storage.createInvite({
+            poolId,
+            inviterId,
+            inviteeId: existingUser?.id || null,
+            inviteeEmail: recipient,
+            method: 'email',
+          });
+          invites.push(invite);
+
+          if (existingUser) {
+            const notification = await storage.createNotification({
+              userId: existingUser.id,
+              type: 'pool_invite',
+              title: 'Pool Invitation',
+              message: `${inviter.name} invited you to join "${pool.title}"`,
+              link: `/pool/${poolId}`,
+            });
+            notifications.push(notification);
+          }
+        } else if (method === 'sms') {
+          const existingUser = await storage.getUserByPhone(recipient);
+          const invite = await storage.createInvite({
+            poolId,
+            inviterId,
+            inviteeId: existingUser?.id || null,
+            inviteePhone: recipient,
+            method: 'sms',
+          });
+          invites.push(invite);
+
+          if (existingUser) {
+            const notification = await storage.createNotification({
+              userId: existingUser.id,
+              type: 'pool_invite',
+              title: 'Pool Invitation',
+              message: `${inviter.name} invited you to join "${pool.title}"`,
+              link: `/pool/${poolId}`,
+            });
+            notifications.push(notification);
+          }
+        }
+      }
+
+      res.json({ 
+        message: `${invites.length} invite(s) sent successfully`,
+        invites,
+        notifications: notifications.length,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/pools/:id/invites", requireAuth, async (req, res, next) => {
+    try {
+      const invites = await storage.getPoolInvites(req.params.id);
+      res.json({ invites });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/my-followers", requireAuth, async (req, res, next) => {
+    try {
+      const followers = await storage.getFollowersWithDetails(req.session.userId!);
+      const followersWithoutPassword = followers.map(f => {
+        const { password, ...rest } = f;
+        return rest;
+      });
+      res.json({ followers: followersWithoutPassword });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Stripe routes
   app.get("/api/stripe/config", async (req, res, next) => {
     try {

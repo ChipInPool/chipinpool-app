@@ -56,7 +56,13 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ amount }),
       }),
+    invite: (id: string, method: 'email' | 'sms' | 'push', recipients: string[]) =>
+      fetchApi(`/api/pools/${id}/invite`, {
+        method: "POST",
+        body: JSON.stringify({ method, recipients }),
+      }),
   },
+  myFollowers: () => fetchApi("/api/my-followers"),
   stripe: {
     getConfig: () => fetchApi("/api/stripe/config"),
   },
@@ -112,6 +118,7 @@ export const queryKeys = {
   cardTransactions: (cardId: string) => ["cardTransactions", cardId] as const,
   following: (userId: string) => ["following", userId] as const,
   followers: (userId: string) => ["followers", userId] as const,
+  myFollowers: ["myFollowers"] as const,
 };
 
 export const userQueryOptions = queryOptions({

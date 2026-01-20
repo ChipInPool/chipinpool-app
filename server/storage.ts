@@ -1,9 +1,10 @@
 import { db } from "./db";
 import { 
-  users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges,
+  users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites,
   type User, type InsertUser, type Pool, type InsertPool, type Contribution, type InsertContribution,
   type Comment, type InsertComment, type Notification, type InsertNotification,
-  type VirtualCard, type InsertVirtualCard, type Transaction, type InsertTransaction
+  type VirtualCard, type InsertVirtualCard, type Transaction, type InsertTransaction,
+  type Invite, type InsertInvite
 } from "@shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 
@@ -61,6 +62,13 @@ export interface IStorage {
   getFollowing(userId: string): Promise<string[]>;
   getFollowers(userId: string): Promise<string[]>;
   isFollowing(followerId: string, followingId: string): Promise<boolean>;
+  
+  // Invite operations
+  createInvite(invite: InsertInvite): Promise<Invite>;
+  getPoolInvites(poolId: string): Promise<Invite[]>;
+  updateInviteStatus(id: string, status: 'pending' | 'accepted' | 'declined'): Promise<void>;
+  getUserByPhone(phone: string): Promise<User | undefined>;
+  getFollowersWithDetails(userId: string): Promise<User[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -287,6 +295,33 @@ export class DatabaseStorage implements IStorage {
       )
     );
     return !!result;
+  }
+
+  async createInvite(insertInvite: InsertInvite): Promise<Invite> {
+    const [invite] = await db.insert(invites).values(insertInvite).returning();
+    return invite;
+  }
+
+  async getPoolInvites(poolId: string): Promise<Invite[]> {
+    return await db.select().from(invites).where(eq(invites.poolId, poolId)).orderBy(desc(invites.createdAt));
+  }
+
+  async updateInviteStatus(id: string, status: 'pending' | 'accepted' | 'declined'): Promise<void> {
+    await db.update(invites).set({ status }).where(eq(invites.id, id));
+  }
+
+  async getUserByPhone(phone: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.phone, phone));
+    return user;
+  }
+
+  async getFollowersWithDetails(userId: string): Promise<User[]> {
+    const result = await db
+      .select({ user: users })
+      .from(follows)
+      .innerJoin(users, eq(follows.followerId, users.id))
+      .where(eq(follows.followingId, userId));
+    return result.map(r => r.user);
   }
 }
 
