@@ -1,18 +1,148 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, boolean, varchar, decimal, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const poolCategoryEnum = pgEnum('pool_category', ['Trip', 'Gift', 'Purchase', 'Event', 'Other', 'Recurring']);
+export const poolStatusEnum = pgEnum('pool_status', ['active', 'completed', 'expired']);
+export const frequencyEnum = pgEnum('frequency', ['weekly', 'monthly', 'quarterly']);
+export const notificationTypeEnum = pgEnum('notification_type', ['contribution', 'comment', 'goal_reached', 'friend_request']);
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  avatar: text("avatar"),
+  bio: text("bio"),
+  location: text("location"),
+  balance: decimal("balance", { precision: 10, scale: 2 }).notNull().default('1240.50'),
+  poolsCreated: integer("pools_created").notNull().default(0),
+  totalContributed: decimal("total_contributed", { precision: 10, scale: 2 }).notNull().default('0'),
+  rating: decimal("rating", { precision: 3, scale: 2 }).default('5.0'),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const badges = pgTable("badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  icon: text("icon").notNull(),
+  color: text("color").notNull(),
+  description: text("description"),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
+export const userBadges = pgTable("user_badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  badgeId: varchar("badge_id").references(() => badges.id).notNull(),
+  earnedAt: timestamp("earned_at").notNull().defaultNow(),
+});
+
+export const pools = pgTable("pools", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  targetAmount: decimal("target_amount", { precision: 10, scale: 2 }).notNull(),
+  currentAmount: decimal("current_amount", { precision: 10, scale: 2 }).notNull().default('0'),
+  category: poolCategoryEnum("category").notNull(),
+  creatorId: varchar("creator_id").references(() => users.id).notNull(),
+  deadline: timestamp("deadline").notNull(),
+  status: poolStatusEnum("status").notNull().default('active'),
+  image: text("image"),
+  isRecurring: boolean("is_recurring").default(false),
+  frequency: frequencyEnum("frequency"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const contributions = pgTable("contributions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  poolId: varchar("pool_id").references(() => pools.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const comments = pgTable("comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  poolId: varchar("pool_id").references(() => pools.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  text: text("text").notNull(),
+  likes: integer("likes").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  type: notificationTypeEnum("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  link: text("link"),
+  read: boolean("read").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const virtualCards = pgTable("virtual_cards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  poolId: varchar("pool_id").references(() => pools.id).notNull(),
+  cardNumber: text("card_number").notNull(),
+  expiry: text("expiry").notNull(),
+  cvc: text("cvc").notNull(),
+  balance: decimal("balance", { precision: 10, scale: 2 }).notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const transactions = pgTable("transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  virtualCardId: varchar("virtual_card_id").references(() => virtualCards.id).notNull(),
+  merchant: text("merchant").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default('completed'),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const follows = pgTable("follows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  followerId: varchar("follower_id").references(() => users.id).notNull(),
+  followingId: varchar("following_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Insert Schemas
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, poolsCreated: true, totalContributed: true, balance: true, rating: true });
+export const insertPoolSchema = createInsertSchema(pools).omit({ id: true, createdAt: true, updatedAt: true, currentAmount: true, status: true });
+export const insertContributionSchema = createInsertSchema(contributions).omit({ id: true, createdAt: true });
+export const insertCommentSchema = createInsertSchema(comments).omit({ id: true, createdAt: true, likes: true });
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, read: true });
+export const insertVirtualCardSchema = createInsertSchema(virtualCards).omit({ id: true, createdAt: true, isActive: true });
+export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true, status: true });
+
+// Login/Register Schemas
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
+
+export const registerSchema = insertUserSchema.extend({
+  email: z.string().email(),
+  password: z.string().min(6),
+  name: z.string().min(2),
+});
+
+// Select Types
 export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type Pool = typeof pools.$inferSelect;
+export type InsertPool = z.infer<typeof insertPoolSchema>;
+export type Contribution = typeof contributions.$inferSelect;
+export type InsertContribution = z.infer<typeof insertContributionSchema>;
+export type Comment = typeof comments.$inferSelect;
+export type InsertComment = z.infer<typeof insertCommentSchema>;
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type VirtualCard = typeof virtualCards.$inferSelect;
+export type InsertVirtualCard = z.infer<typeof insertVirtualCardSchema>;
+export type Transaction = typeof transactions.$inferSelect;
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
