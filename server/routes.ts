@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
-import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions } from "@shared/schema";
+import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcrypt";
@@ -2255,6 +2255,524 @@ export async function registerRoutes(
     }
   });
 
+  // ========== CHIPINPAY MERCHANT API ==========
+
+  // Merchant registration
+  app.post("/api/merchant/register", requireAuth, async (req, res, next) => {
+    try {
+      const schema = z.object({
+        companyName: z.string().min(1),
+        website: z.string().url(),
+        businessType: z.string().min(1),
+        description: z.string().optional(),
+        contactEmail: z.string().email(),
+        contactPhone: z.string().optional(),
+        webhookUrl: z.string().url().optional(),
+      });
+
+      const data = schema.parse(req.body);
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Check if user already has a merchant account
+      const existingMerchant = await storage.getMerchantByUserId(user.id);
+      if (existingMerchant) {
+        return res.status(400).json({ error: "You already have a merchant account" });
+      }
+
+      // Create merchant first
+      const merchant = await storage.createMerchant({
+        userId: user.id,
+        companyName: data.companyName,
+        website: data.website,
+        businessType: data.businessType,
+        description: data.description || null,
+        contactEmail: data.contactEmail,
+        contactPhone: data.contactPhone || null,
+        webhookUrl: data.webhookUrl || null,
+        feePercent: '5.00',
+      });
+
+      // Generate and set webhook secret
+      const crypto = await import('crypto');
+      const webhookSecret = `whsec_${crypto.randomBytes(24).toString('hex')}`;
+      await storage.updateMerchant(merchant.id, { webhookSecret });
+
+      res.json({ 
+        merchant: {
+          id: merchant.id,
+          companyName: merchant.companyName,
+          status: merchant.status,
+          feePercent: merchant.feePercent,
+        },
+        message: "Merchant account created. Pending approval.",
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get merchant account
+  app.get("/api/merchant/account", requireAuth, async (req, res, next) => {
+    try {
+      const merchant = await storage.getMerchantByUserId(req.session.userId!);
+      if (!merchant) {
+        return res.status(404).json({ error: "No merchant account found" });
+      }
+
+      res.json({
+        id: merchant.id,
+        companyName: merchant.companyName,
+        website: merchant.website,
+        businessType: merchant.businessType,
+        status: merchant.status,
+        feePercent: merchant.feePercent,
+        totalVolume: merchant.totalVolume,
+        totalFees: merchant.totalFees,
+        pendingBalance: merchant.pendingBalance,
+        webhookUrl: merchant.webhookUrl,
+        createdAt: merchant.createdAt,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Update merchant webhook URL
+  app.put("/api/merchant/webhook", requireAuth, async (req, res, next) => {
+    try {
+      const schema = z.object({
+        webhookUrl: z.string().url(),
+      });
+
+      const data = schema.parse(req.body);
+      const merchant = await storage.getMerchantByUserId(req.session.userId!);
+      if (!merchant) {
+        return res.status(404).json({ error: "No merchant account found" });
+      }
+
+      await storage.updateMerchant(merchant.id, { webhookUrl: data.webhookUrl });
+
+      res.json({ 
+        message: "Webhook URL updated",
+        webhookUrl: data.webhookUrl,
+        webhookSecret: merchant.webhookSecret,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Create API key
+  app.post("/api/merchant/api-keys", requireAuth, async (req, res, next) => {
+    try {
+      const schema = z.object({
+        name: z.string().min(1),
+      });
+
+      const data = schema.parse(req.body);
+      const merchant = await storage.getMerchantByUserId(req.session.userId!);
+      if (!merchant) {
+        return res.status(404).json({ error: "No merchant account found" });
+      }
+
+      if (merchant.status !== 'approved') {
+        return res.status(403).json({ error: "Merchant account must be approved to create API keys" });
+      }
+
+      const crypto = await import('crypto');
+      const keyPrefix = `cpay_${crypto.randomBytes(4).toString('hex')}`;
+      const keySecret = crypto.randomBytes(24).toString('hex');
+      const fullKey = `${keyPrefix}_${keySecret}`;
+      const keyHash = crypto.createHash('sha256').update(fullKey).digest('hex');
+
+      await storage.createMerchantApiKey({
+        merchantId: merchant.id,
+        name: data.name,
+        keyPrefix,
+        keyHash,
+      });
+
+      res.json({
+        name: data.name,
+        key: fullKey,
+        prefix: keyPrefix,
+        message: "Store this key securely. You won't be able to see it again.",
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // List API keys
+  app.get("/api/merchant/api-keys", requireAuth, async (req, res, next) => {
+    try {
+      const merchant = await storage.getMerchantByUserId(req.session.userId!);
+      if (!merchant) {
+        return res.status(404).json({ error: "No merchant account found" });
+      }
+
+      const keys = await storage.getMerchantApiKeys(merchant.id);
+      res.json(keys.map(k => ({
+        id: k.id,
+        name: k.name,
+        prefix: k.keyPrefix,
+        lastUsedAt: k.lastUsedAt,
+        isActive: k.isActive,
+        createdAt: k.createdAt,
+      })));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Revoke API key
+  app.delete("/api/merchant/api-keys/:id", requireAuth, async (req, res, next) => {
+    try {
+      const merchant = await storage.getMerchantByUserId(req.session.userId!);
+      if (!merchant) {
+        return res.status(404).json({ error: "No merchant account found" });
+      }
+
+      await storage.deactivateApiKey(req.params.id);
+      res.json({ message: "API key revoked" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get merchant transactions/sessions
+  app.get("/api/merchant/sessions", requireAuth, async (req, res, next) => {
+    try {
+      const merchant = await storage.getMerchantByUserId(req.session.userId!);
+      if (!merchant) {
+        return res.status(404).json({ error: "No merchant account found" });
+      }
+
+      const sessions = await storage.getMerchantCheckoutSessions(merchant.id);
+      res.json(sessions);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get merchant payouts
+  app.get("/api/merchant/payouts", requireAuth, async (req, res, next) => {
+    try {
+      const merchant = await storage.getMerchantByUserId(req.session.userId!);
+      if (!merchant) {
+        return res.status(404).json({ error: "No merchant account found" });
+      }
+
+      const payouts = await storage.getMerchantPayouts(merchant.id);
+      res.json(payouts);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ========== CHIPINPAY PUBLIC API (for merchants) ==========
+
+  // Middleware to authenticate merchant API requests
+  const authenticateMerchantApi = async (req: any, res: any, next: any) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: "Missing or invalid API key" });
+    }
+
+    const apiKey = authHeader.substring(7);
+    const [prefix] = apiKey.split('_').slice(0, 2).join('_').split('_');
+    const fullPrefix = apiKey.split('_').slice(0, 2).join('_');
+    
+    const crypto = await import('crypto');
+    const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
+
+    const keyRecord = await storage.getMerchantApiKeyByPrefix(fullPrefix);
+    if (!keyRecord || keyRecord.keyHash !== keyHash) {
+      return res.status(401).json({ error: "Invalid API key" });
+    }
+
+    const merchant = await storage.getMerchant(keyRecord.merchantId);
+    if (!merchant || merchant.status !== 'approved') {
+      return res.status(403).json({ error: "Merchant account not active" });
+    }
+
+    // Update last used timestamp
+    await storage.updateApiKeyLastUsed(keyRecord.id);
+
+    req.merchant = merchant;
+    next();
+  };
+
+  // Create a ChipInPay checkout session (merchant API)
+  app.post("/api/v1/merchant/checkout", authenticateMerchantApi, async (req: any, res, next) => {
+    try {
+      const schema = z.object({
+        orderId: z.string().min(1),
+        amount: z.number().positive().max(50000),
+        productTitle: z.string().min(1),
+        productDescription: z.string().optional(),
+        productImage: z.string().url().optional(),
+        collectionDeadlineHours: z.number().min(1).max(720).default(72),
+        customerEmail: z.string().email().optional(),
+        successUrl: z.string().url().optional(),
+        cancelUrl: z.string().url().optional(),
+        metadata: z.record(z.string()).optional(),
+      });
+
+      const data = schema.parse(req.body);
+      const merchant = req.merchant;
+
+      // Check for existing session with same order ID
+      const existingSession = await storage.getMerchantCheckoutSessionByOrderId(merchant.id, data.orderId);
+      if (existingSession && existingSession.status !== 'cancelled' && existingSession.status !== 'expired') {
+        return res.status(400).json({ error: "Order already has an active checkout session" });
+      }
+
+      // Calculate fees (5%)
+      const feePercent = parseFloat(merchant.feePercent);
+      const feeAmount = (data.amount * feePercent / 100).toFixed(2);
+      const netAmount = (data.amount - parseFloat(feeAmount)).toFixed(2);
+
+      // Calculate deadline
+      const collectionDeadline = new Date(Date.now() + data.collectionDeadlineHours * 60 * 60 * 1000);
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes to start the session
+
+      const session = await storage.createMerchantCheckoutSession({
+        merchantId: merchant.id,
+        externalOrderId: data.orderId,
+        amount: data.amount.toFixed(2),
+        feeAmount,
+        netAmount,
+        productTitle: data.productTitle,
+        productDescription: data.productDescription || null,
+        productImage: data.productImage || null,
+        collectionDeadline,
+        successUrl: data.successUrl || null,
+        cancelUrl: data.cancelUrl || null,
+        customerEmail: data.customerEmail || null,
+        metadata: data.metadata ? JSON.stringify(data.metadata) : null,
+        expiresAt,
+      });
+
+      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+
+      res.json({
+        sessionId: session.id,
+        checkoutUrl: `${baseUrl}/chipinpay/checkout/${session.id}`,
+        amount: data.amount,
+        feeAmount: parseFloat(feeAmount),
+        netAmount: parseFloat(netAmount),
+        collectionDeadline: collectionDeadline.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+        status: 'pending',
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get checkout session status (merchant API)
+  app.get("/api/v1/merchant/checkout/:sessionId", authenticateMerchantApi, async (req: any, res, next) => {
+    try {
+      const session = await storage.getMerchantCheckoutSession(req.params.sessionId);
+      if (!session || session.merchantId !== req.merchant.id) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      let pool = null;
+      if (session.poolId) {
+        pool = await storage.getPool(session.poolId);
+      }
+
+      res.json({
+        sessionId: session.id,
+        orderId: session.externalOrderId,
+        status: session.status,
+        amount: session.amount,
+        collectedAmount: session.collectedAmount,
+        percentComplete: pool ? Math.min(100, Math.round((parseFloat(pool.currentAmount) / parseFloat(pool.targetAmount)) * 100)) : 0,
+        feeAmount: session.feeAmount,
+        netAmount: session.netAmount,
+        collectionDeadline: session.collectionDeadline,
+        completedAt: session.completedAt,
+        poolId: session.poolId,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Cancel checkout session (merchant API)
+  app.post("/api/v1/merchant/checkout/:sessionId/cancel", authenticateMerchantApi, async (req: any, res, next) => {
+    try {
+      const session = await storage.getMerchantCheckoutSession(req.params.sessionId);
+      if (!session || session.merchantId !== req.merchant.id) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      if (session.status === 'completed') {
+        return res.status(400).json({ error: "Cannot cancel completed session" });
+      }
+
+      await storage.updateCheckoutSessionStatus(session.id, 'cancelled');
+
+      // TODO: Refund any collected contributions
+
+      res.json({ message: "Session cancelled", status: 'cancelled' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ========== CHIPINPAY CUSTOMER CHECKOUT FLOW ==========
+
+  // Get checkout session details (public, for customer view)
+  app.get("/api/chipinpay/checkout/:sessionId", async (req, res, next) => {
+    try {
+      const session = await storage.getMerchantCheckoutSession(req.params.sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "Checkout session not found" });
+      }
+
+      if (session.status === 'expired' || new Date() > session.expiresAt) {
+        if (session.status !== 'expired') {
+          await storage.updateCheckoutSessionStatus(session.id, 'expired');
+        }
+        return res.status(410).json({ error: "Checkout session has expired" });
+      }
+
+      const merchant = await storage.getMerchant(session.merchantId);
+      let pool = null;
+      let contributions: any[] = [];
+
+      if (session.poolId) {
+        pool = await storage.getPool(session.poolId);
+        contributions = await storage.getContributionsByPool(session.poolId);
+      }
+
+      res.json({
+        sessionId: session.id,
+        status: session.status,
+        merchant: {
+          name: merchant?.companyName,
+          logo: merchant?.logo,
+        },
+        product: {
+          title: session.productTitle,
+          description: session.productDescription,
+          image: session.productImage,
+        },
+        amount: session.amount,
+        collectedAmount: session.collectedAmount,
+        percentComplete: pool ? Math.min(100, Math.round((parseFloat(pool.currentAmount) / parseFloat(pool.targetAmount)) * 100)) : 0,
+        collectionDeadline: session.collectionDeadline,
+        poolId: session.poolId,
+        contributorCount: contributions.length,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Start ChipInPay checkout - create pool for the session
+  app.post("/api/chipinpay/checkout/:sessionId/start", requireAuth, async (req, res, next) => {
+    try {
+      const session = await storage.getMerchantCheckoutSession(req.params.sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "Checkout session not found" });
+      }
+
+      if (session.status !== 'pending') {
+        return res.status(400).json({ error: "Session already started or completed" });
+      }
+
+      if (new Date() > session.expiresAt) {
+        await storage.updateCheckoutSessionStatus(session.id, 'expired');
+        return res.status(410).json({ error: "Checkout session has expired" });
+      }
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Create a pool for this checkout
+      const pool = await storage.createPool({
+        title: session.productTitle,
+        description: session.productDescription || `ChipInPay checkout for ${session.productTitle}`,
+        targetAmount: session.amount,
+        category: 'Purchase',
+        creatorId: user.id,
+        deadline: session.collectionDeadline,
+        image: session.productImage || null,
+      });
+
+      // Update session with pool ID and set to collecting
+      await storage.updateCheckoutSessionPool(session.id, pool.id);
+      await storage.updateCheckoutSessionStatus(session.id, 'collecting');
+
+      // Send webhook to merchant
+      const merchant = await storage.getMerchant(session.merchantId);
+      if (merchant?.webhookUrl) {
+        sendMerchantWebhook(merchant, session.id, 'session.collecting', {
+          sessionId: session.id,
+          orderId: session.externalOrderId,
+          status: 'collecting',
+          poolId: pool.id,
+          customerId: user.id,
+          customerEmail: user.email,
+        });
+      }
+
+      res.json({
+        poolId: pool.id,
+        status: 'collecting',
+        message: "Pool created. Invite friends to contribute!",
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Helper function to send webhooks to merchants
+  async function sendMerchantWebhook(merchant: any, sessionId: string, event: string, payload: any) {
+    if (!merchant.webhookUrl) return;
+
+    try {
+      const crypto = await import('crypto');
+      const timestamp = Math.floor(Date.now() / 1000);
+      const payloadStr = JSON.stringify(payload);
+      const signature = crypto.createHmac('sha256', merchant.webhookSecret || '')
+        .update(`${timestamp}.${payloadStr}`)
+        .digest('hex');
+
+      const delivery = await storage.createWebhookDelivery({
+        merchantId: merchant.id,
+        sessionId,
+        event: event as any,
+        payload: payloadStr,
+      });
+
+      const response = await fetch(merchant.webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-ChipInPay-Signature': `t=${timestamp},v1=${signature}`,
+          'X-ChipInPay-Event': event,
+        },
+        body: payloadStr,
+      });
+
+      await storage.updateWebhookDelivery(
+        delivery.id,
+        response.status,
+        await response.text().catch(() => ''),
+        response.ok
+      );
+    } catch (error) {
+      console.error('[ChipInPay Webhook] Failed to deliver:', error);
+    }
+  }
+
   // ========== ADMIN ROUTES ==========
   
   // Admin middleware - requires admin role
@@ -2743,6 +3261,70 @@ export async function registerRoutes(
         balance: user?.balance || "0",
         message: synced > 0 ? `Found and added ${synced} deposit(s) to your wallet` : "Wallet is up to date"
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ========== ADMIN MERCHANT MANAGEMENT ==========
+
+  // List all merchants (admin)
+  app.get("/api/admin/merchants", requireAdmin, async (req, res, next) => {
+    try {
+      const allMerchants = await db.select().from(merchants).orderBy(desc(merchants.createdAt));
+      res.json(allMerchants);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Approve merchant (admin)
+  app.post("/api/admin/merchants/:id/approve", requireAdmin, async (req: any, res, next) => {
+    try {
+      const merchant = await storage.getMerchant(req.params.id);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+
+      await storage.updateMerchant(merchant.id, { status: 'approved' });
+
+      // Log audit
+      await db.insert(adminAuditLogs).values({
+        adminId: req.adminUser.id,
+        action: 'approve_merchant',
+        targetType: 'merchant',
+        targetId: merchant.id,
+        details: `Approved merchant: ${merchant.companyName}`,
+        ipAddress: req.ip,
+      });
+
+      res.json({ message: "Merchant approved", status: 'approved' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Suspend merchant (admin)
+  app.post("/api/admin/merchants/:id/suspend", requireAdmin, async (req: any, res, next) => {
+    try {
+      const merchant = await storage.getMerchant(req.params.id);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+
+      await storage.updateMerchant(merchant.id, { status: 'suspended' });
+
+      // Log audit
+      await db.insert(adminAuditLogs).values({
+        adminId: req.adminUser.id,
+        action: 'suspend_merchant',
+        targetType: 'merchant',
+        targetId: merchant.id,
+        details: `Suspended merchant: ${merchant.companyName}`,
+        ipAddress: req.ip,
+      });
+
+      res.json({ message: "Merchant suspended", status: 'suspended' });
     } catch (error) {
       next(error);
     }

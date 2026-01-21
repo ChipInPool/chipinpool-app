@@ -62,6 +62,11 @@ Preferred communication style: Simple, everyday language.
 - `adminAuditLogs`: Audit trail for all admin actions (suspend, unsuspend, etc.)
 - `walletDeposits`: Wallet deposit history from Stripe payments
 - `walletWithdrawals`: Wallet withdrawal history to bank accounts
+- `merchants`: ChipInPay merchant accounts for 3rd party integrations
+- `merchantApiKeys`: API keys for merchants with hashed secrets
+- `merchantCheckoutSessions`: Checkout sessions with reservation/hold logic
+- `merchantWebhookDeliveries`: Webhook delivery logs for merchants
+- `merchantPayouts`: Merchant payout history
 
 ## Recent Changes (January 2026)
 
@@ -86,6 +91,19 @@ Preferred communication style: Simple, everyday language.
     - Transaction monitoring
     - Admin audit logging for all actions
     - Role-based access control (requires `role: 'admin'` in users table)
+14. **ChipInPay Merchant Integration** - 3rd party checkout API for businesses:
+    - Merchant registration and approval workflow (`/merchant`)
+    - API key management with secure hashing
+    - Checkout session creation with reservation/hold logic
+    - 5% fee calculation and tracking
+    - Webhook system for real-time status updates
+    - Customer checkout flow (`/chipinpay/checkout/:sessionId`)
+    - Admin merchant management (approve/suspend)
+
+### ChipInPay Merchant API:
+- `POST /api/v1/merchant/checkout` - Create checkout session
+- `GET /api/v1/merchant/checkout/:sessionId` - Get session status
+- `POST /api/v1/merchant/checkout/:sessionId/cancel` - Cancel session
 
 ### Theme System:
 - Custom ThemeProvider in `client/src/components/theme-provider.tsx`

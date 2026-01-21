@@ -1,11 +1,16 @@
 import { db } from "./db";
 import { 
   users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites, walletDeposits, walletWithdrawals, verificationCodes, bankAccounts, recurringContributions, apiAccessRequests,
+  merchants, merchantApiKeys, merchantCheckoutSessions, merchantWebhookDeliveries, merchantPayouts,
   type User, type InsertUser, type Pool, type InsertPool, type Contribution, type InsertContribution,
   type Comment, type InsertComment, type Notification, type InsertNotification,
   type VirtualCard, type InsertVirtualCard, type Transaction, type InsertTransaction,
   type Invite, type InsertInvite, type RecurringContribution, type InsertRecurringContribution,
-  type ApiAccessRequest, type InsertApiAccessRequest
+  type ApiAccessRequest, type InsertApiAccessRequest,
+  type Merchant, type InsertMerchant, type MerchantApiKey, type InsertMerchantApiKey,
+  type MerchantCheckoutSession, type InsertMerchantCheckoutSession,
+  type MerchantWebhookDelivery, type InsertMerchantWebhookDelivery,
+  type MerchantPayout, type InsertMerchantPayout
 } from "@shared/schema";
 import { eq, desc, and, sql, gt, inArray } from "drizzle-orm";
 
@@ -84,6 +89,38 @@ export interface IStorage {
   
   // User transaction history
   getUserTransactionHistory(userId: string): Promise<any[]>;
+
+  // Merchant operations
+  createMerchant(merchant: InsertMerchant): Promise<Merchant>;
+  getMerchant(id: string): Promise<Merchant | undefined>;
+  getMerchantByUserId(userId: string): Promise<Merchant | undefined>;
+  getMerchantByApiKey(keyHash: string): Promise<Merchant | undefined>;
+  updateMerchant(id: string, data: Partial<Merchant>): Promise<Merchant | undefined>;
+  updateMerchantStats(id: string, volume: string, fees: string): Promise<void>;
+  
+  // Merchant API key operations
+  createMerchantApiKey(apiKey: InsertMerchantApiKey): Promise<MerchantApiKey>;
+  getMerchantApiKeys(merchantId: string): Promise<MerchantApiKey[]>;
+  getMerchantApiKeyByPrefix(prefix: string): Promise<MerchantApiKey | undefined>;
+  updateApiKeyLastUsed(id: string): Promise<void>;
+  deactivateApiKey(id: string): Promise<void>;
+  
+  // Merchant checkout session operations
+  createMerchantCheckoutSession(session: InsertMerchantCheckoutSession): Promise<MerchantCheckoutSession>;
+  getMerchantCheckoutSession(id: string): Promise<MerchantCheckoutSession | undefined>;
+  getMerchantCheckoutSessionByOrderId(merchantId: string, orderId: string): Promise<MerchantCheckoutSession | undefined>;
+  getMerchantCheckoutSessions(merchantId: string): Promise<MerchantCheckoutSession[]>;
+  updateCheckoutSessionStatus(id: string, status: string, collectedAmount?: string): Promise<void>;
+  updateCheckoutSessionPool(id: string, poolId: string): Promise<void>;
+  getExpiredCheckoutSessions(): Promise<MerchantCheckoutSession[]>;
+  
+  // Merchant webhook operations
+  createWebhookDelivery(delivery: InsertMerchantWebhookDelivery): Promise<MerchantWebhookDelivery>;
+  updateWebhookDelivery(id: string, responseStatus: number, responseBody: string, delivered: boolean): Promise<void>;
+  
+  // Merchant payout operations
+  createMerchantPayout(payout: InsertMerchantPayout): Promise<MerchantPayout>;
+  getMerchantPayouts(merchantId: string): Promise<MerchantPayout[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -474,6 +511,135 @@ export class DatabaseStorage implements IStorage {
       poolId: cardPoolMap.get(t.virtualCardId),
       poolTitle: poolTitleMap.get(cardPoolMap.get(t.virtualCardId) || ''),
     }));
+  }
+
+  // Merchant operations
+  async createMerchant(merchant: InsertMerchant): Promise<Merchant> {
+    const [result] = await db.insert(merchants).values(merchant).returning();
+    return result;
+  }
+
+  async getMerchant(id: string): Promise<Merchant | undefined> {
+    const [result] = await db.select().from(merchants).where(eq(merchants.id, id));
+    return result;
+  }
+
+  async getMerchantByUserId(userId: string): Promise<Merchant | undefined> {
+    const [result] = await db.select().from(merchants).where(eq(merchants.userId, userId));
+    return result;
+  }
+
+  async getMerchantByApiKey(keyHash: string): Promise<Merchant | undefined> {
+    const [apiKey] = await db.select().from(merchantApiKeys)
+      .where(and(eq(merchantApiKeys.keyHash, keyHash), eq(merchantApiKeys.isActive, true)));
+    if (!apiKey) return undefined;
+    return this.getMerchant(apiKey.merchantId);
+  }
+
+  async updateMerchant(id: string, data: Partial<Merchant>): Promise<Merchant | undefined> {
+    const [result] = await db.update(merchants).set(data).where(eq(merchants.id, id)).returning();
+    return result;
+  }
+
+  async updateMerchantStats(id: string, volume: string, fees: string): Promise<void> {
+    await db.update(merchants).set({
+      totalVolume: sql`${merchants.totalVolume} + ${volume}`,
+      totalFees: sql`${merchants.totalFees} + ${fees}`,
+      pendingBalance: sql`${merchants.pendingBalance} + ${sql`${volume}::decimal - ${fees}::decimal`}`,
+    }).where(eq(merchants.id, id));
+  }
+
+  // Merchant API key operations
+  async createMerchantApiKey(apiKey: InsertMerchantApiKey): Promise<MerchantApiKey> {
+    const [result] = await db.insert(merchantApiKeys).values(apiKey).returning();
+    return result;
+  }
+
+  async getMerchantApiKeys(merchantId: string): Promise<MerchantApiKey[]> {
+    return db.select().from(merchantApiKeys).where(eq(merchantApiKeys.merchantId, merchantId)).orderBy(desc(merchantApiKeys.createdAt));
+  }
+
+  async getMerchantApiKeyByPrefix(prefix: string): Promise<MerchantApiKey | undefined> {
+    const [result] = await db.select().from(merchantApiKeys)
+      .where(and(eq(merchantApiKeys.keyPrefix, prefix), eq(merchantApiKeys.isActive, true)));
+    return result;
+  }
+
+  async updateApiKeyLastUsed(id: string): Promise<void> {
+    await db.update(merchantApiKeys).set({ lastUsedAt: new Date() }).where(eq(merchantApiKeys.id, id));
+  }
+
+  async deactivateApiKey(id: string): Promise<void> {
+    await db.update(merchantApiKeys).set({ isActive: false }).where(eq(merchantApiKeys.id, id));
+  }
+
+  // Merchant checkout session operations
+  async createMerchantCheckoutSession(session: InsertMerchantCheckoutSession): Promise<MerchantCheckoutSession> {
+    const [result] = await db.insert(merchantCheckoutSessions).values(session).returning();
+    return result;
+  }
+
+  async getMerchantCheckoutSession(id: string): Promise<MerchantCheckoutSession | undefined> {
+    const [result] = await db.select().from(merchantCheckoutSessions).where(eq(merchantCheckoutSessions.id, id));
+    return result;
+  }
+
+  async getMerchantCheckoutSessionByOrderId(merchantId: string, orderId: string): Promise<MerchantCheckoutSession | undefined> {
+    const [result] = await db.select().from(merchantCheckoutSessions)
+      .where(and(eq(merchantCheckoutSessions.merchantId, merchantId), eq(merchantCheckoutSessions.externalOrderId, orderId)));
+    return result;
+  }
+
+  async getMerchantCheckoutSessions(merchantId: string): Promise<MerchantCheckoutSession[]> {
+    return db.select().from(merchantCheckoutSessions)
+      .where(eq(merchantCheckoutSessions.merchantId, merchantId))
+      .orderBy(desc(merchantCheckoutSessions.createdAt));
+  }
+
+  async updateCheckoutSessionStatus(id: string, status: string, collectedAmount?: string): Promise<void> {
+    const updateData: any = { status };
+    if (collectedAmount) updateData.collectedAmount = collectedAmount;
+    if (status === 'completed') updateData.completedAt = new Date();
+    await db.update(merchantCheckoutSessions).set(updateData).where(eq(merchantCheckoutSessions.id, id));
+  }
+
+  async updateCheckoutSessionPool(id: string, poolId: string): Promise<void> {
+    await db.update(merchantCheckoutSessions).set({ poolId }).where(eq(merchantCheckoutSessions.id, id));
+  }
+
+  async getExpiredCheckoutSessions(): Promise<MerchantCheckoutSession[]> {
+    return db.select().from(merchantCheckoutSessions)
+      .where(and(
+        eq(merchantCheckoutSessions.status, 'collecting'),
+        sql`${merchantCheckoutSessions.collectionDeadline} < NOW()`
+      ));
+  }
+
+  // Merchant webhook operations
+  async createWebhookDelivery(delivery: InsertMerchantWebhookDelivery): Promise<MerchantWebhookDelivery> {
+    const [result] = await db.insert(merchantWebhookDeliveries).values(delivery).returning();
+    return result;
+  }
+
+  async updateWebhookDelivery(id: string, responseStatus: number, responseBody: string, delivered: boolean): Promise<void> {
+    await db.update(merchantWebhookDeliveries).set({
+      responseStatus,
+      responseBody,
+      delivered,
+      attempts: sql`${merchantWebhookDeliveries.attempts} + 1`,
+    }).where(eq(merchantWebhookDeliveries.id, id));
+  }
+
+  // Merchant payout operations
+  async createMerchantPayout(payout: InsertMerchantPayout): Promise<MerchantPayout> {
+    const [result] = await db.insert(merchantPayouts).values(payout).returning();
+    return result;
+  }
+
+  async getMerchantPayouts(merchantId: string): Promise<MerchantPayout[]> {
+    return db.select().from(merchantPayouts)
+      .where(eq(merchantPayouts.merchantId, merchantId))
+      .orderBy(desc(merchantPayouts.createdAt));
   }
 }
 
