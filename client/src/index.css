@@ -38,40 +38,40 @@
 
 .dark {
   /* Dark Theme - Deep Navy Finance Theme */
-  --background: 210 100% 8%;
+  --background: 210 100% 6%;
   --foreground: 0 0% 98%;
 
   /* Card: Slightly lighter navy */
-  --card: 210 80% 12%;
+  --card: 210 80% 10%;
   --card-foreground: 0 0% 98%;
 
   /* Popover */
-  --popover: 210 100% 8%;
+  --popover: 210 100% 6%;
   --popover-foreground: 0 0% 98%;
 
-  /* Primary: Deep Navy Blue (#001F3F) */
+  /* Primary: Mint Green (#7FFFD4) - for visibility on dark */
   --primary: 160 100% 75%;
-  --primary-foreground: 210 100% 12%;
+  --primary-foreground: 210 100% 8%;
 
-  /* Secondary: Slate Gray */
-  --secondary: 210 13% 30%;
+  /* Secondary: Lighter Navy */
+  --secondary: 210 50% 18%;
   --secondary-foreground: 0 0% 98%;
 
   /* Muted */
-  --muted: 210 20% 20%;
+  --muted: 210 30% 15%;
   --muted-foreground: 210 13% 60%;
 
   /* Accent: Mint Green (#7FFFD4) */
   --accent: 160 100% 75%;
-  --accent-foreground: 210 100% 12%;
+  --accent-foreground: 210 100% 8%;
 
   /* Destructive */
   --destructive: 0 63% 45%;
   --destructive-foreground: 0 0% 98%;
 
   /* Borders */
-  --border: 210 20% 20%;
-  --input: 210 20% 20%;
+  --border: 210 30% 18%;
+  --input: 210 30% 18%;
   --ring: 160 100% 75%;
 }
 

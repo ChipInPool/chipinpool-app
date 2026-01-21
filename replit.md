@@ -16,8 +16,8 @@ Preferred communication style: Simple, everyday language.
 - **Routing**: Wouter (lightweight alternative to React Router)
 - **State Management**: TanStack React Query for server state, React Context for auth state
 - **UI Components**: shadcn/ui component library built on Radix UI primitives
-- **Styling**: Tailwind CSS v4 with custom theme (dark fintech theme with electric lime primary color)
-- **Fonts**: Plus Jakarta Sans (headings), Inter (UI text)
+- **Styling**: Tailwind CSS v4 with minimalist theme (navy blue #001F3F primary, mint green #7FFFD4 accent, slate gray #708090 text, white backgrounds)
+- **Fonts**: Poppins bold (headings), Inter 400-600 (body text)
 - **Animations**: Framer Motion for interactive elements
 
 **Key Design Decisions**:
