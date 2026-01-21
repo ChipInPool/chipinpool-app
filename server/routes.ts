@@ -125,6 +125,62 @@ export async function registerRoutes(
     }
   });
 
+  // Check if username is available
+  app.post("/api/auth/check-username", async (req, res, next) => {
+    try {
+      const { username } = req.body;
+      if (!username || typeof username !== 'string') {
+        return res.status(400).json({ available: false, message: "Username is required" });
+      }
+      
+      const existing = await storage.getUserByUsername(username.toLowerCase());
+      res.json({ 
+        available: !existing,
+        message: existing ? "Username is already taken" : "Username is available"
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Check if email is available
+  app.post("/api/auth/check-email", async (req, res, next) => {
+    try {
+      const { email } = req.body;
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ available: false, message: "Email is required" });
+      }
+      
+      const existing = await storage.getUserByEmail(email.toLowerCase());
+      res.json({ 
+        available: !existing,
+        message: existing ? "This email is already registered. Would you like to sign in instead?" : "Email is available",
+        exists: !!existing
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Check if phone is available
+  app.post("/api/auth/check-phone", async (req, res, next) => {
+    try {
+      const { phone } = req.body;
+      if (!phone || typeof phone !== 'string') {
+        return res.status(400).json({ available: false, message: "Phone is required" });
+      }
+      
+      const existing = await storage.getUserByPhone(phone);
+      res.json({ 
+        available: !existing,
+        message: existing ? "This phone number is already registered. Would you like to sign in instead?" : "Phone is available",
+        exists: !!existing
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Auth routes
   app.post("/api/auth/register", async (req, res, next) => {
     try {

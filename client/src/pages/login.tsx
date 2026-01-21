@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
-import { Loader2, Shield, CheckCircle2, ArrowRight, Phone, Mail, Calendar, User } from "lucide-react";
+import { Loader2, Shield, CheckCircle2, ArrowRight, Phone, Mail, Calendar, User, AlertCircle, Check } from "lucide-react";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -35,6 +35,98 @@ export default function Login() {
   const [showKycPrompt, setShowKycPrompt] = useState(false);
   const [kycLoading, setKycLoading] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const [activeTab, setActiveTab] = useState("login");
+  
+  const [fieldErrors, setFieldErrors] = useState<{
+    username?: { message: string; exists?: boolean };
+    email?: { message: string; exists?: boolean };
+    phone?: { message: string; exists?: boolean };
+  }>({});
+  const [fieldValid, setFieldValid] = useState<{
+    username?: boolean;
+    email?: boolean;
+    phone?: boolean;
+  }>({});
+  const [checkingField, setCheckingField] = useState<string | null>(null);
+
+  const checkUsername = useCallback(async (username: string) => {
+    if (!username || username.length < 3) return;
+    setCheckingField('username');
+    try {
+      const res = await fetch('/api/auth/check-username', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username.toLowerCase() }),
+      });
+      const data = await res.json();
+      if (!data.available) {
+        setFieldErrors(prev => ({ ...prev, username: { message: data.message } }));
+        setFieldValid(prev => ({ ...prev, username: false }));
+      } else {
+        setFieldErrors(prev => ({ ...prev, username: undefined }));
+        setFieldValid(prev => ({ ...prev, username: true }));
+      }
+    } catch (e) {
+      console.error('Error checking username:', e);
+    } finally {
+      setCheckingField(null);
+    }
+  }, []);
+
+  const checkEmail = useCallback(async (email: string) => {
+    if (!email || !email.includes('@')) return;
+    setCheckingField('email');
+    try {
+      const res = await fetch('/api/auth/check-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.toLowerCase() }),
+      });
+      const data = await res.json();
+      if (!data.available) {
+        setFieldErrors(prev => ({ ...prev, email: { message: data.message, exists: data.exists } }));
+        setFieldValid(prev => ({ ...prev, email: false }));
+      } else {
+        setFieldErrors(prev => ({ ...prev, email: undefined }));
+        setFieldValid(prev => ({ ...prev, email: true }));
+      }
+    } catch (e) {
+      console.error('Error checking email:', e);
+    } finally {
+      setCheckingField(null);
+    }
+  }, []);
+
+  const checkPhone = useCallback(async (phone: string) => {
+    if (!phone || phone.length < 10) return;
+    setCheckingField('phone');
+    try {
+      const res = await fetch('/api/auth/check-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      });
+      const data = await res.json();
+      if (!data.available) {
+        setFieldErrors(prev => ({ ...prev, phone: { message: data.message, exists: data.exists } }));
+        setFieldValid(prev => ({ ...prev, phone: false }));
+      } else {
+        setFieldErrors(prev => ({ ...prev, phone: undefined }));
+        setFieldValid(prev => ({ ...prev, phone: true }));
+      }
+    } catch (e) {
+      console.error('Error checking phone:', e);
+    } finally {
+      setCheckingField(null);
+    }
+  }, []);
+
+  const switchToLogin = (email?: string) => {
+    if (email) {
+      setLoginForm(prev => ({ ...prev, email }));
+    }
+    setActiveTab("login");
+  };
 
   useEffect(() => {
     if (!authLoading && isAuthenticated && !showKycPrompt) {
@@ -93,6 +185,11 @@ export default function Login() {
 
     if (!validateAge(registerForm.dateOfBirth)) {
       toast({ description: "You must be at least 18 years old to sign up", variant: "destructive" });
+      return;
+    }
+
+    if (fieldErrors.username || fieldErrors.email || fieldErrors.phone) {
+      toast({ description: "Please fix the errors above before continuing", variant: "destructive" });
       return;
     }
 
@@ -283,7 +380,7 @@ export default function Login() {
         </div>
 
         <Card className="border-white/10 bg-card/50 backdrop-blur">
-          <Tabs defaultValue="login">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <CardHeader>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="login" data-testid="tab-login">Sign In</TabsTrigger>
@@ -402,39 +499,117 @@ export default function Login() {
                           id="register-username"
                           type="text"
                           placeholder="johndoe"
-                          className="pl-8"
+                          className={`pl-8 ${fieldErrors.username ? 'border-red-500' : fieldValid.username ? 'border-green-500' : ''}`}
                           value={registerForm.username}
-                          onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
+                          onChange={(e) => {
+                            setRegisterForm({ ...registerForm, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') });
+                            setFieldErrors(prev => ({ ...prev, username: undefined }));
+                            setFieldValid(prev => ({ ...prev, username: undefined }));
+                          }}
+                          onBlur={() => checkUsername(registerForm.username)}
                           required
                           data-testid="input-register-username"
                         />
+                        {checkingField === 'username' && (
+                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                        )}
+                        {fieldValid.username && !checkingField && (
+                          <Check className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+                        )}
                       </div>
+                      {fieldErrors.username && (
+                        <p className="text-xs text-red-500 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> {fieldErrors.username.message}
+                        </p>
+                      )}
                     </div>
                     
                     <div className="space-y-2">
                       <Label htmlFor="register-email">Email</Label>
-                      <Input
-                        id="register-email"
-                        type="email"
-                        placeholder="you@example.com"
-                        value={registerForm.email}
-                        onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                        required
-                        data-testid="input-register-email"
-                      />
+                      <div className="relative">
+                        <Input
+                          id="register-email"
+                          type="email"
+                          placeholder="you@example.com"
+                          className={fieldErrors.email ? 'border-red-500' : fieldValid.email ? 'border-green-500' : ''}
+                          value={registerForm.email}
+                          onChange={(e) => {
+                            setRegisterForm({ ...registerForm, email: e.target.value });
+                            setFieldErrors(prev => ({ ...prev, email: undefined }));
+                            setFieldValid(prev => ({ ...prev, email: undefined }));
+                          }}
+                          onBlur={() => checkEmail(registerForm.email)}
+                          required
+                          data-testid="input-register-email"
+                        />
+                        {checkingField === 'email' && (
+                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                        )}
+                        {fieldValid.email && !checkingField && (
+                          <Check className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+                        )}
+                      </div>
+                      {fieldErrors.email && (
+                        <div className="text-xs text-red-500">
+                          <p className="flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" /> {fieldErrors.email.message}
+                          </p>
+                          {fieldErrors.email.exists && (
+                            <Button 
+                              type="button" 
+                              variant="link" 
+                              className="text-xs p-0 h-auto text-primary"
+                              onClick={() => switchToLogin(registerForm.email)}
+                            >
+                              Sign in instead
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                     
                     <div className="space-y-2">
                       <Label htmlFor="register-phone">Phone Number</Label>
-                      <Input
-                        id="register-phone"
-                        type="tel"
-                        placeholder="+1 234 567 8900"
-                        value={registerForm.phone}
-                        onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
-                        required
-                        data-testid="input-register-phone"
-                      />
+                      <div className="relative">
+                        <Input
+                          id="register-phone"
+                          type="tel"
+                          placeholder="+1 234 567 8900"
+                          className={fieldErrors.phone ? 'border-red-500' : fieldValid.phone ? 'border-green-500' : ''}
+                          value={registerForm.phone}
+                          onChange={(e) => {
+                            setRegisterForm({ ...registerForm, phone: e.target.value });
+                            setFieldErrors(prev => ({ ...prev, phone: undefined }));
+                            setFieldValid(prev => ({ ...prev, phone: undefined }));
+                          }}
+                          onBlur={() => checkPhone(registerForm.phone)}
+                          required
+                          data-testid="input-register-phone"
+                        />
+                        {checkingField === 'phone' && (
+                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                        )}
+                        {fieldValid.phone && !checkingField && (
+                          <Check className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+                        )}
+                      </div>
+                      {fieldErrors.phone && (
+                        <div className="text-xs text-red-500">
+                          <p className="flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" /> {fieldErrors.phone.message}
+                          </p>
+                          {fieldErrors.phone.exists && (
+                            <Button 
+                              type="button" 
+                              variant="link" 
+                              className="text-xs p-0 h-auto text-primary"
+                              onClick={() => switchToLogin()}
+                            >
+                              Sign in instead
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                     
                     <div className="space-y-2">
