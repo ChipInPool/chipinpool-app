@@ -339,15 +339,15 @@ export default function Landing() {
               <div className="space-y-2 text-sm text-muted-foreground">
                 <a href="#" className="block hover:text-primary transition-colors">About</a>
                 <a href="#" className="block hover:text-primary transition-colors">Careers</a>
-                <a href="mailto:support@chipinpay.com" className="block hover:text-primary transition-colors">Contact</a>
+                <a href="mailto:mail@chipinpool.com" className="block hover:text-primary transition-colors">Contact</a>
               </div>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Legal</h4>
               <div className="space-y-2 text-sm text-muted-foreground">
-                <a href="#" className="block hover:text-primary transition-colors">Privacy Policy</a>
-                <a href="#" className="block hover:text-primary transition-colors">Terms of Service</a>
-                <a href="#" className="block hover:text-primary transition-colors">Cookie Policy</a>
+                <a href="/privacy" className="block hover:text-primary transition-colors">Privacy Policy</a>
+                <a href="/terms" className="block hover:text-primary transition-colors">Terms of Service</a>
+                <a href="/privacy" className="block hover:text-primary transition-colors">Cookie Policy</a>
               </div>
             </div>
           </div>
