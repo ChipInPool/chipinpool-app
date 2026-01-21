@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -155,6 +155,12 @@ export default function MerchantDashboard() {
     toast({ description: "Copied to clipboard" });
   };
 
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      setLocation("/login");
+    }
+  }, [authLoading, isAuthenticated, setLocation]);
+
   if (authLoading || merchantLoading) {
     return (
       <Layout>
@@ -167,7 +173,6 @@ export default function MerchantDashboard() {
   }
 
   if (!isAuthenticated) {
-    setLocation("/login");
     return null;
   }
 
