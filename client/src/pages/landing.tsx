@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Sparkles, Zap, ShieldCheck, Users, CreditCard, Code, ArrowRight, CheckCircle, Star, RefreshCw, Bell, Globe } from "lucide-react";
+import { Sparkles, Zap, ShieldCheck, Users, CreditCard, Code, ArrowRight, CheckCircle, Star, RefreshCw, Bell, Globe, Sun, Moon } from "lucide-react";
 import heroImage from "@assets/generated_images/futuristic_fintech_3d_visualization_of_digital_currency_pooling.png";
+import { useTheme } from "@/components/theme-provider";
 
 const stats = [
   { label: "Active Users", value: "50K+" },
@@ -35,12 +36,14 @@ const testimonials = [
 ];
 
 export default function Landing() {
+  const { theme, setTheme } = useTheme();
+  
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
-      <nav className="border-b border-white/5 bg-background/80 backdrop-blur-xl sticky top-0 z-50">
+      <nav className="border-b border-border bg-background/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-background font-bold text-lg shadow-lg shadow-primary/30">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground font-bold text-lg">
               C
             </div>
             <span className="font-display font-bold text-xl tracking-tight">ChipInPool</span>
@@ -54,10 +57,19 @@ export default function Landing() {
           </div>
 
           <div className="flex items-center gap-3">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="h-9 w-9"
+              data-testid="button-theme-toggle"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </Button>
             <Button variant="ghost" size="sm" className="font-medium" asChild data-testid="button-signin">
               <Link href="/login">Sign In</Link>
             </Button>
-            <Button size="sm" className="font-semibold shadow-lg shadow-primary/20" asChild data-testid="button-get-started">
+            <Button size="sm" className="font-semibold" asChild data-testid="button-get-started">
               <Link href="/login">Get Started</Link>
             </Button>
           </div>
