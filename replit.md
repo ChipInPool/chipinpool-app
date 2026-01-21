@@ -60,6 +60,8 @@ Preferred communication style: Simple, everyday language.
 - `follows`: Social follow relationships between users
 - `apiAccessRequests`: Developer API access requests
 - `adminAuditLogs`: Audit trail for all admin actions (suspend, unsuspend, etc.)
+- `walletDeposits`: Wallet deposit history from Stripe payments
+- `walletWithdrawals`: Wallet withdrawal history to bank accounts
 
 ## Recent Changes (January 2026)
 
@@ -70,7 +72,7 @@ Preferred communication style: Simple, everyday language.
 4. **Settings Page** (`/settings`) - Notification preferences and theme toggle
 5. **Split Calculator** (`/split-calculator`) - Easy bill splitting tool with per-person breakdown and quick pool creation
 6. **Pool Templates** - Quick templates for common pool types (birthday, trip, wedding, etc.)
-7. **Transaction History** (`/transactions`) - View all card spending with search/filter
+7. **Transaction History** (`/transactions`) - Tabbed view with Card/Pool transactions and Wallet activity (deposits/withdrawals)
 8. **Receipt Attachments** - Transactions support receipt URLs and notes
 9. **Dark/Light Theme Toggle** - User can switch themes from navbar dropdown (desktop & mobile)
 10. **KYC Verification Flow** - Identity verification prompted after signup, required to create pools
