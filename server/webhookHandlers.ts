@@ -26,6 +26,10 @@ export class WebhookHandlers {
         
         if (event.type === 'checkout.session.completed') {
           await WebhookHandlers.handleCheckoutCompleted(event.data.object);
+        } else if (event.type === 'identity.verification_session.verified') {
+          await WebhookHandlers.handleIdentityVerified(event.data.object);
+        } else if (event.type === 'identity.verification_session.requires_input') {
+          await WebhookHandlers.handleIdentityFailed(event.data.object);
         }
       }
     } catch (err: any) {
@@ -87,6 +91,38 @@ export class WebhookHandlers {
       }
     } catch (err: any) {
       console.error('Error processing checkout completion:', err.message);
+    }
+  }
+
+  static async handleIdentityVerified(session: any): Promise<void> {
+    const userId = session.metadata?.userId;
+    
+    if (!userId) {
+      console.log('Identity verification missing userId metadata');
+      return;
+    }
+
+    try {
+      await storage.updateUser(userId, { kycStatus: 'verified' });
+      console.log(`KYC verified for user ${userId}`);
+    } catch (err: any) {
+      console.error('Error updating KYC status to verified:', err.message);
+    }
+  }
+
+  static async handleIdentityFailed(session: any): Promise<void> {
+    const userId = session.metadata?.userId;
+    
+    if (!userId) {
+      console.log('Identity verification missing userId metadata');
+      return;
+    }
+
+    try {
+      await storage.updateUser(userId, { kycStatus: 'failed' });
+      console.log(`KYC failed for user ${userId}`);
+    } catch (err: any) {
+      console.error('Error updating KYC status to failed:', err.message);
     }
   }
 }
