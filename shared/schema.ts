@@ -12,6 +12,7 @@ export const inviteMethodEnum = pgEnum('invite_method', ['email', 'sms', 'push',
 export const kycStatusEnum = pgEnum('kyc_status', ['not_started', 'pending', 'verified', 'failed']);
 
 export const authProviderEnum = pgEnum('auth_provider', ['email', 'google', 'apple']);
+export const userRoleEnum = pgEnum('user_role', ['user', 'admin']);
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -48,6 +49,10 @@ export const users = pgTable("users", {
   plaidAccountId: text("plaid_account_id"),
   termsAcceptedAt: timestamp("terms_accepted_at"),
   privacyAcceptedAt: timestamp("privacy_accepted_at"),
+  role: userRoleEnum("role").notNull().default('user'),
+  suspended: boolean("suspended").notNull().default(false),
+  suspendedAt: timestamp("suspended_at"),
+  suspendedReason: text("suspended_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -289,6 +294,20 @@ export const verifyPhoneCodeSchema = z.object({
   code: z.string().length(6, "Verification code must be 6 digits"),
 });
 
+// Admin audit logs
+export const adminAuditLogs = pgTable("admin_audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  adminId: varchar("admin_id").references(() => users.id).notNull(),
+  action: text("action").notNull(),
+  targetType: text("target_type").notNull(),
+  targetId: varchar("target_id"),
+  details: text("details"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertAdminAuditLogSchema = createInsertSchema(adminAuditLogs).omit({ id: true, createdAt: true });
+
 // Select Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -310,3 +329,5 @@ export type RecurringContribution = typeof recurringContributions.$inferSelect;
 export type InsertRecurringContribution = z.infer<typeof insertRecurringContributionSchema>;
 export type ApiAccessRequest = typeof apiAccessRequests.$inferSelect;
 export type InsertApiAccessRequest = z.infer<typeof insertApiAccessRequestSchema>;
+export type AdminAuditLog = typeof adminAuditLogs.$inferSelect;
+export type InsertAdminAuditLog = z.infer<typeof insertAdminAuditLogSchema>;
