@@ -11,15 +11,23 @@ export const inviteStatusEnum = pgEnum('invite_status', ['pending', 'accepted', 
 export const inviteMethodEnum = pgEnum('invite_method', ['email', 'sms', 'push', 'link']);
 export const kycStatusEnum = pgEnum('kyc_status', ['not_started', 'pending', 'verified', 'failed']);
 
+export const authProviderEnum = pgEnum('auth_provider', ['email', 'google', 'apple']);
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
-  password: text("password").notNull(),
+  password: text("password"),
+  phone: text("phone").notNull(),
+  dateOfBirth: timestamp("date_of_birth").notNull(),
+  authProvider: authProviderEnum("auth_provider").notNull().default('email'),
+  googleId: text("google_id").unique(),
+  appleId: text("apple_id").unique(),
   avatar: text("avatar"),
   bio: text("bio"),
   location: text("location"),
-  phone: text("phone"),
   notifyEmail: boolean("notify_email").notNull().default(true),
   notifySMS: boolean("notify_sms").notNull().default(true),
   notifyPush: boolean("notify_push").notNull().default(true),
@@ -38,6 +46,15 @@ export const users = pgTable("users", {
   stripeCardholderId: text("stripe_cardholder_id"),
   plaidAccessToken: text("plaid_access_token"),
   plaidAccountId: text("plaid_account_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const phoneVerificationCodes = pgTable("phone_verification_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  phone: text("phone").notNull(),
+  code: text("code").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  verified: boolean("verified").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -230,16 +247,43 @@ export const insertInviteSchema = createInsertSchema(invites).omit({ id: true, c
 export const insertRecurringContributionSchema = createInsertSchema(recurringContributions).omit({ id: true, createdAt: true, status: true });
 export const insertApiAccessRequestSchema = createInsertSchema(apiAccessRequests).omit({ id: true, createdAt: true, status: true });
 
+// Phone verification schemas
+export const insertPhoneVerificationSchema = createInsertSchema(phoneVerificationCodes).omit({ id: true, createdAt: true, verified: true });
+export type PhoneVerificationCode = typeof phoneVerificationCodes.$inferSelect;
+
 // Login/Register Schemas
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
 });
 
-export const registerSchema = insertUserSchema.extend({
-  email: z.string().email(),
-  password: z.string().min(6),
-  name: z.string().min(2),
+export const registerSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  username: z.string().min(3, "Username must be at least 3 characters").regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  phone: z.string().min(10, "Valid phone number required"),
+  dateOfBirth: z.string().refine((date) => {
+    const birthDate = new Date(date);
+    const today = new Date();
+    const age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      return age - 1 >= 18;
+    }
+    return age >= 18;
+  }, "You must be at least 18 years old"),
+  phoneVerificationCode: z.string().length(6, "Verification code must be 6 digits"),
+});
+
+export const sendPhoneCodeSchema = z.object({
+  phone: z.string().min(10, "Valid phone number required"),
+});
+
+export const verifyPhoneCodeSchema = z.object({
+  phone: z.string().min(10, "Valid phone number required"),
+  code: z.string().length(6, "Verification code must be 6 digits"),
 });
 
 // Select Types

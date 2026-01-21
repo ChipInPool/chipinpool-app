@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
-import { registerSchema, loginSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions } from "@shared/schema";
+import { registerSchema, loginSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, sendPhoneCodeSchema, verifyPhoneCodeSchema } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcrypt";
@@ -59,26 +59,120 @@ export async function registerRoutes(
     next();
   };
 
+  // Phone verification routes
+  app.post("/api/auth/send-phone-code", async (req, res, next) => {
+    try {
+      const { phone } = sendPhoneCodeSchema.parse(req.body);
+      
+      // Generate 6-digit code
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+      
+      // Delete any existing codes for this phone
+      await db.delete(phoneVerificationCodes).where(eq(phoneVerificationCodes.phone, phone));
+      
+      // Save new code
+      await db.insert(phoneVerificationCodes).values({
+        phone,
+        code,
+        expiresAt,
+      });
+      
+      // Send SMS via ClickSend
+      try {
+        await sendVerificationSMS(phone, code);
+      } catch (smsError) {
+        console.error('[SMS] Failed to send verification code:', smsError);
+        return res.status(500).json({ message: "Failed to send verification code. Please try again." });
+      }
+      
+      res.json({ message: "Verification code sent" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/auth/verify-phone-code", async (req, res, next) => {
+    try {
+      const { phone, code } = verifyPhoneCodeSchema.parse(req.body);
+      
+      const [verification] = await db.select()
+        .from(phoneVerificationCodes)
+        .where(eq(phoneVerificationCodes.phone, phone))
+        .limit(1);
+      
+      if (!verification) {
+        return res.status(400).json({ message: "No verification code found. Please request a new code." });
+      }
+      
+      if (verification.code !== code) {
+        return res.status(400).json({ message: "Invalid verification code" });
+      }
+      
+      if (new Date() > verification.expiresAt) {
+        return res.status(400).json({ message: "Verification code expired. Please request a new code." });
+      }
+      
+      // Mark as verified
+      await db.update(phoneVerificationCodes)
+        .set({ verified: true })
+        .where(eq(phoneVerificationCodes.id, verification.id));
+      
+      res.json({ message: "Phone verified successfully", verified: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Auth routes
   app.post("/api/auth/register", async (req, res, next) => {
     try {
       const data = registerSchema.parse(req.body);
       
-      const existing = await storage.getUserByEmail(data.email);
-      if (existing) {
+      // Check if email already exists
+      const existingEmail = await storage.getUserByEmail(data.email);
+      if (existingEmail) {
         return res.status(400).json({ message: "Email already registered" });
+      }
+      
+      // Check if username already exists
+      const existingUsername = await storage.getUserByUsername(data.username);
+      if (existingUsername) {
+        return res.status(400).json({ message: "Username already taken" });
+      }
+      
+      // Verify phone code was validated
+      const [phoneVerification] = await db.select()
+        .from(phoneVerificationCodes)
+        .where(eq(phoneVerificationCodes.phone, data.phone))
+        .limit(1);
+      
+      if (!phoneVerification || !phoneVerification.verified || phoneVerification.code !== data.phoneVerificationCode) {
+        return res.status(400).json({ message: "Phone verification required" });
       }
 
       const hashedPassword = await bcrypt.hash(data.password, 10);
       const user = await storage.createUser({
-        ...data,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        username: data.username,
+        email: data.email,
+        phone: data.phone,
+        dateOfBirth: new Date(data.dateOfBirth),
         password: hashedPassword,
+        authProvider: 'email',
       });
+      
+      // Mark phone as verified
+      await db.update(users).set({ phoneVerified: true }).where(eq(users.id, user.id));
+      
+      // Clean up verification code
+      await db.delete(phoneVerificationCodes).where(eq(phoneVerificationCodes.phone, data.phone));
 
       req.session.userId = user.id;
       
       // Send welcome email asynchronously
-      sendWelcomeEmail(user.email, user.name).catch(err => 
+      sendWelcomeEmail(user.email, `${user.firstName} ${user.lastName}`).catch(err => 
         console.error('[Notification] Welcome email failed:', err)
       );
 
@@ -96,6 +190,11 @@ export async function registerRoutes(
       const user = await storage.getUserByEmail(data.email);
       if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Check if user has a password (social login users won't have one)
+      if (!user.password) {
+        return res.status(401).json({ message: "Please sign in with Google or Apple" });
       }
 
       const validPassword = await bcrypt.compare(data.password, user.password);
@@ -329,7 +428,7 @@ export async function registerRoutes(
           sendPoolCompletedNotification(
             poolCreator.email,
             poolCreator.phone,
-            poolCreator.name,
+            `${poolCreator.firstName} ${poolCreator.lastName}`,
             pool.id,
             pool.title,
             pool.targetAmount,
@@ -344,7 +443,7 @@ export async function registerRoutes(
         userId: pool.creatorId,
         type: 'contribution',
         title: 'New Contribution',
-        message: `${user.name} chipped in $${amount} to ${pool.title}`,
+        message: `${user.firstName} ${user.lastName} chipped in $${amount} to ${pool.title}`,
         link: `/pool/${pool.id}`,
       });
 
@@ -353,8 +452,8 @@ export async function registerRoutes(
         sendPoolContributionNotification(
           poolCreator.email,
           poolCreator.phone,
-          poolCreator.name,
-          user.name,
+          `${poolCreator.firstName} ${poolCreator.lastName}`,
+          `${user.firstName} ${user.lastName}`,
           pool.id,
           pool.title,
           amount,
@@ -557,7 +656,7 @@ export async function registerRoutes(
         let cardholderId = user.stripeCardholderId;
         if (!cardholderId) {
           const cardholder = await stripe.issuing.cardholders.create({
-            name: user.name,
+            name: `${user.firstName} ${user.lastName}`,
             email: user.email,
             phone_number: user.phone || undefined,
             type: 'individual',
@@ -883,7 +982,7 @@ export async function registerRoutes(
               userId: inviteeUser.id,
               type: 'pool_invite',
               title: 'Pool Invitation',
-              message: `${inviter.name} invited you to join "${pool.title}"`,
+              message: `${inviter.firstName} ${inviter.lastName} invited you to join "${pool.title}"`,
               link: `/pool/${poolId}`,
             });
             notifications.push(notification);
@@ -901,14 +1000,14 @@ export async function registerRoutes(
 
           // Send actual email via Resend
           const poolUrl = `${req.protocol}://${req.get('host')}/pool/${poolId}`;
-          await sendPoolInviteEmail(recipient, inviter.name, pool.title, poolUrl);
+          await sendPoolInviteEmail(recipient, `${inviter.firstName} ${inviter.lastName}`, pool.title, poolUrl);
 
           if (existingUser) {
             const notification = await storage.createNotification({
               userId: existingUser.id,
               type: 'pool_invite',
               title: 'Pool Invitation',
-              message: `${inviter.name} invited you to join "${pool.title}"`,
+              message: `${inviter.firstName} ${inviter.lastName} invited you to join "${pool.title}"`,
               link: `/pool/${poolId}`,
             });
             notifications.push(notification);
@@ -926,14 +1025,14 @@ export async function registerRoutes(
 
           // Send actual SMS via ClickSend
           const poolUrl = `${req.protocol}://${req.get('host')}/pool/${poolId}`;
-          await sendPoolInviteSMS(recipient, inviter.name, pool.title, poolUrl);
+          await sendPoolInviteSMS(recipient, `${inviter.firstName} ${inviter.lastName}`, pool.title, poolUrl);
 
           if (existingUser) {
             const notification = await storage.createNotification({
               userId: existingUser.id,
               type: 'pool_invite',
               title: 'Pool Invitation',
-              message: `${inviter.name} invited you to join "${pool.title}"`,
+              message: `${inviter.firstName} ${inviter.lastName} invited you to join "${pool.title}"`,
               link: `/pool/${poolId}`,
             });
             notifications.push(notification);
@@ -1722,7 +1821,7 @@ export async function registerRoutes(
             id: `contrib-${c.id}`,
             type: 'contribution' as const,
             userId: c.userId || '',
-            userName: user?.name || 'Anonymous',
+            userName: user ? `${user.firstName} ${user.lastName}` : 'Anonymous',
             userAvatar: user?.avatar || undefined,
             poolId: c.poolId,
             poolTitle: pool?.title || 'Unknown Pool',
