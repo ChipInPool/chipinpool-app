@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Search, CheckCircle, Clock, XCircle, ExternalLink, Store, Plus, ArrowLeft, BarChart3, Key, DollarSign, Activity } from "lucide-react";
+import { Loader2, Search, CheckCircle, Clock, XCircle, ExternalLink, Store, Plus, ArrowLeft, BarChart3, Key, DollarSign, Activity, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -21,7 +21,7 @@ interface Merchant {
   description: string | null;
   contactEmail: string;
   contactPhone: string | null;
-  status: 'pending' | 'approved' | 'suspended';
+  status: 'pending' | 'approved' | 'suspended' | 'rejected';
   feePercent: string;
   totalVolume: string;
   totalFees: string;
@@ -134,6 +134,55 @@ export default function AdminMerchants() {
     },
   });
 
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    feePercent: "",
+    companyName: "",
+    website: "",
+    businessType: "",
+    contactEmail: "",
+    contactPhone: "",
+    description: "",
+  });
+
+  const updateMerchantMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await fetch(`/api/admin/merchants/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to update merchant");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "merchants"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "merchant", selectedMerchantId] });
+      toast({ description: "Merchant updated successfully" });
+      setEditDialogOpen(false);
+    },
+    onError: (err: any) => {
+      toast({ description: err.message || "Failed to update merchant", variant: "destructive" });
+    },
+  });
+
+  const openEditDialog = (merchant: Merchant) => {
+    setEditForm({
+      feePercent: merchant.feePercent,
+      companyName: merchant.companyName,
+      website: merchant.website,
+      businessType: merchant.businessType,
+      contactEmail: merchant.contactEmail,
+      contactPhone: merchant.contactPhone || "",
+      description: merchant.description || "",
+    });
+    setEditDialogOpen(true);
+  };
+
   const createMerchantMutation = useMutation({
     mutationFn: async (data: typeof createForm) => {
       const res = await fetch("/api/admin/merchants", {
@@ -178,6 +227,8 @@ export default function AdminMerchants() {
         return <Badge variant="outline" className="text-green-600 border-green-600"><CheckCircle className="w-3 h-3 mr-1" /> Approved</Badge>;
       case 'suspended':
         return <Badge variant="outline" className="text-red-600 border-red-600"><XCircle className="w-3 h-3 mr-1" /> Suspended</Badge>;
+      case 'rejected':
+        return <Badge variant="outline" className="text-red-600 border-red-600"><XCircle className="w-3 h-3 mr-1" /> Rejected</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -262,12 +313,21 @@ export default function AdminMerchants() {
             </div>
             <div className="flex gap-2">
               {merchant.status === 'pending' && (
-                <Button
-                  onClick={() => updateStatusMutation.mutate({ id: merchant.id, status: 'approved' })}
-                  disabled={updateStatusMutation.isPending}
-                >
-                  Approve
-                </Button>
+                <>
+                  <Button
+                    onClick={() => updateStatusMutation.mutate({ id: merchant.id, status: 'approved' })}
+                    disabled={updateStatusMutation.isPending}
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => updateStatusMutation.mutate({ id: merchant.id, status: 'rejected' })}
+                    disabled={updateStatusMutation.isPending}
+                  >
+                    Reject
+                  </Button>
+                </>
               )}
               {merchant.status === 'approved' && (
                 <Button
@@ -287,9 +347,120 @@ export default function AdminMerchants() {
                   Unsuspend
                 </Button>
               )}
+              {merchant.status === 'rejected' && (
+                <Button
+                  variant="outline"
+                  onClick={() => updateStatusMutation.mutate({ id: merchant.id, status: 'approved' })}
+                  disabled={updateStatusMutation.isPending}
+                >
+                  Approve
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => openEditDialog(merchant)}
+              >
+                <Settings className="w-4 h-4 mr-2" /> Edit Settings
+              </Button>
             </div>
           </div>
         </div>
+
+        {/* Edit Merchant Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Merchant Settings</DialogTitle>
+            </DialogHeader>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                updateMerchantMutation.mutate({ id: merchant.id, data: editForm });
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <Label htmlFor="editFeePercent">Fee Percentage (%)</Label>
+                <Input
+                  id="editFeePercent"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={editForm.feePercent}
+                  onChange={(e) => setEditForm({ ...editForm, feePercent: e.target.value })}
+                  data-testid="input-edit-fee-percent"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editCompanyName">Company Name</Label>
+                <Input
+                  id="editCompanyName"
+                  value={editForm.companyName}
+                  onChange={(e) => setEditForm({ ...editForm, companyName: e.target.value })}
+                  data-testid="input-edit-company-name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editWebsite">Website URL</Label>
+                <Input
+                  id="editWebsite"
+                  type="url"
+                  value={editForm.website}
+                  onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
+                  data-testid="input-edit-website"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editBusinessType">Business Type</Label>
+                <Input
+                  id="editBusinessType"
+                  value={editForm.businessType}
+                  onChange={(e) => setEditForm({ ...editForm, businessType: e.target.value })}
+                  data-testid="input-edit-business-type"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editContactEmail">Contact Email</Label>
+                <Input
+                  id="editContactEmail"
+                  type="email"
+                  value={editForm.contactEmail}
+                  onChange={(e) => setEditForm({ ...editForm, contactEmail: e.target.value })}
+                  data-testid="input-edit-contact-email"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editContactPhone">Contact Phone</Label>
+                <Input
+                  id="editContactPhone"
+                  value={editForm.contactPhone}
+                  onChange={(e) => setEditForm({ ...editForm, contactPhone: e.target.value })}
+                  data-testid="input-edit-contact-phone"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editDescription">Description</Label>
+                <Textarea
+                  id="editDescription"
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  rows={2}
+                  data-testid="input-edit-description"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={updateMerchantMutation.isPending}
+                data-testid="button-submit-edit"
+              >
+                {updateMerchantMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Save Changes
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Analytics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -707,6 +878,7 @@ export default function AdminMerchants() {
                 <option value="pending">Pending</option>
                 <option value="approved">Approved</option>
                 <option value="suspended">Suspended</option>
+                <option value="rejected">Rejected</option>
               </select>
             </div>
           </div>

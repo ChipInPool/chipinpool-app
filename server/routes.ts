@@ -3337,7 +3337,7 @@ export async function registerRoutes(
         contactEmail: z.string().email(),
         contactPhone: z.string().optional().transform(v => v === '' ? undefined : v),
         webhookUrl: z.string().url().optional().or(z.literal('')).transform(v => v === '' ? undefined : v),
-        status: z.enum(['pending', 'approved', 'suspended']).optional().default('approved'),
+        status: z.enum(['pending', 'approved', 'suspended', 'rejected']).optional().default('approved'),
       });
 
       const data = schema.parse(req.body);
@@ -3425,7 +3425,7 @@ export async function registerRoutes(
   app.put("/api/admin/merchants/:id/status", requireAdmin, async (req: any, res, next) => {
     try {
       const { status } = req.body;
-      if (!['pending', 'approved', 'suspended'].includes(status)) {
+      if (!['pending', 'approved', 'suspended', 'rejected'].includes(status)) {
         return res.status(400).json({ error: "Invalid status" });
       }
 
@@ -3448,6 +3448,60 @@ export async function registerRoutes(
 
       res.json({ message: `Merchant ${status}`, status });
     } catch (error) {
+      next(error);
+    }
+  });
+
+  // Update merchant settings (admin) - fee percentage, webhook, etc.
+  app.put("/api/admin/merchants/:id", requireAdmin, async (req: any, res, next) => {
+    try {
+      const schema = z.object({
+        feePercent: z.string().optional(),
+        webhookUrl: z.string().url().optional().or(z.literal('')).transform(v => v === '' ? null : v),
+        companyName: z.string().min(1).optional(),
+        website: z.string().url().optional(),
+        businessType: z.string().min(1).optional(),
+        description: z.string().optional().transform(v => v === '' ? null : v),
+        contactEmail: z.string().email().optional(),
+        contactPhone: z.string().optional().transform(v => v === '' ? null : v),
+      });
+
+      const data = schema.parse(req.body);
+      const merchant = await storage.getMerchant(req.params.id);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+
+      // Build update object with only provided fields
+      const updates: any = {};
+      if (data.feePercent !== undefined) updates.feePercent = data.feePercent;
+      if (data.webhookUrl !== undefined) updates.webhookUrl = data.webhookUrl;
+      if (data.companyName !== undefined) updates.companyName = data.companyName;
+      if (data.website !== undefined) updates.website = data.website;
+      if (data.businessType !== undefined) updates.businessType = data.businessType;
+      if (data.description !== undefined) updates.description = data.description;
+      if (data.contactEmail !== undefined) updates.contactEmail = data.contactEmail;
+      if (data.contactPhone !== undefined) updates.contactPhone = data.contactPhone;
+
+      await storage.updateMerchant(merchant.id, updates);
+
+      // Log audit
+      await db.insert(adminAuditLogs).values({
+        adminId: req.adminUser.id,
+        action: 'update_merchant',
+        targetType: 'merchant',
+        targetId: merchant.id,
+        details: `Updated merchant settings: ${Object.keys(updates).join(', ')}`,
+        ipAddress: req.ip,
+      });
+
+      const updatedMerchant = await storage.getMerchant(merchant.id);
+      res.json({ merchant: updatedMerchant, message: "Merchant updated successfully" });
+    } catch (error: any) {
+      console.error('Admin update merchant error:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      }
       next(error);
     }
   });

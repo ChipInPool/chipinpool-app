@@ -355,7 +355,7 @@ export const insertAdminAuditLogSchema = createInsertSchema(adminAuditLogs).omit
 // ChipInPay Merchant Integration Schema
 // ============================================
 
-export const merchantStatusEnum = pgEnum('merchant_status', ['pending', 'approved', 'suspended']);
+export const merchantStatusEnum = pgEnum('merchant_status', ['pending', 'approved', 'suspended', 'rejected']);
 export const checkoutSessionStatusEnum = pgEnum('checkout_session_status', ['pending', 'collecting', 'completed', 'expired', 'cancelled', 'refunded']);
 export const webhookEventEnum = pgEnum('webhook_event', ['session.created', 'session.collecting', 'session.completed', 'session.expired', 'session.cancelled', 'contribution.received']);
 
