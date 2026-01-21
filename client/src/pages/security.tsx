@@ -191,13 +191,34 @@ export default function Security() {
     },
   });
 
+  const [showKYCModal, setShowKYCModal] = useState(false);
+  const [kycClientSecret, setKycClientSecret] = useState<string | null>(null);
+
   const startKYCMutation = useMutation({
     mutationFn: api.security.startKYC,
-    onSuccess: (data: any) => {
-      if (data.url) {
-        window.open(data.url, '_blank', 'width=600,height=700');
+    onSuccess: async (data: any) => {
+      if (data.clientSecret) {
+        setKycClientSecret(data.clientSecret);
+        setShowKYCModal(true);
+        
+        const stripe = await import('@stripe/stripe-js').then(m => 
+          m.loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '')
+        );
+        
+        if (stripe && data.clientSecret) {
+          const { error } = await stripe.verifyIdentity(data.clientSecret);
+          setShowKYCModal(false);
+          
+          if (error) {
+            toast({ description: error.message || "Verification failed", variant: "destructive" });
+          } else {
+            queryClient.invalidateQueries({ queryKey: ["securityStatus"] });
+            toast({ description: "Identity verification submitted! We'll notify you once verified." });
+          }
+        }
+      } else if (data.url) {
+        window.location.href = data.url;
       }
-      toast({ description: "KYC verification started. Please complete it in the new window." });
     },
     onError: (error: any) => {
       toast({ description: error.message, variant: "destructive" });

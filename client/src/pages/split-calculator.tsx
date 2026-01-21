@@ -259,20 +259,42 @@ export default function SplitCalculator() {
             </div>
 
             {total > 0 && (
-              <Button
-                className="w-full mt-4"
-                onClick={() => {
-                  const params = new URLSearchParams({
-                    title: `Split: $${totalWithTip.toFixed(2)}`,
-                    amount: totalWithTip.toFixed(2),
-                    participants: people.length.toString(),
-                  });
-                  setLocation(`/create?${params.toString()}`);
-                }}
-                data-testid="button-create-pool"
-              >
-                <Wallet className="w-4 h-4 mr-2" /> Create Pool from Split
-              </Button>
+              <>
+                <div className="mt-4 pt-4 border-t border-white/10">
+                  <h4 className="text-sm font-medium mb-2">Individual Amounts</h4>
+                  <div className="space-y-1">
+                    {people.map((person, i) => {
+                      const amount = splitType === 'equal' ? equalSplit : person.amount;
+                      return (
+                        <div key={person.id} className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">{person.name || `Person ${i + 1}`}</span>
+                          <span className="font-semibold text-primary">${amount.toFixed(2)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <Button
+                  className="w-full mt-4"
+                  onClick={() => {
+                    const breakdown = people.map((p, i) => {
+                      const amt = splitType === 'equal' ? equalSplit : p.amount;
+                      return `${p.name || `Person ${i + 1}`}: $${amt.toFixed(2)}`;
+                    }).join('\n');
+                    
+                    const params = new URLSearchParams({
+                      title: `Split: $${totalWithTip.toFixed(2)}`,
+                      amount: totalWithTip.toFixed(2),
+                      participants: people.length.toString(),
+                      description: `Bill split breakdown:\n${breakdown}`,
+                    });
+                    setLocation(`/create?${params.toString()}`);
+                  }}
+                  data-testid="button-create-pool"
+                >
+                  <Wallet className="w-4 h-4 mr-2" /> Create Pool from Split
+                </Button>
+              </>
             )}
           </div>
         </div>

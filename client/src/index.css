@@ -33,12 +33,15 @@
 }
 
 :root {
+  --radius: 0.75rem;
+}
+
+.dark {
   /* Neo-Fintech Dark Theme Base */
-  /* Deep Navy Background: #0B0E14 (approx 220 30% 6%) */
   --background: 222 47% 11%;
   --foreground: 210 40% 98%;
 
-  /* Card: Slightly lighter navy #151A23 */
+  /* Card: Slightly lighter navy */
   --card: 217 33% 17%;
   --card-foreground: 210 40% 98%;
 
@@ -46,9 +49,9 @@
   --popover: 222 47% 11%;
   --popover-foreground: 210 40% 98%;
 
-  /* Primary: Electric Lime #CCFF00 or similar vibrant green */
-  --primary: 84 100% 59%;
-  --primary-foreground: 222 47% 11%; /* Dark text on neon button */
+  /* Primary: Electric Lime */
+  --primary: 84 100% 45%;
+  --primary-foreground: 222 47% 11%;
 
   /* Secondary: Soft Blue-Grey */
   --secondary: 217 19% 27%;
@@ -58,7 +61,7 @@
   --muted: 217 19% 27%;
   --muted-foreground: 215 20% 65%;
 
-  /* Accent: Electric Blue for variety */
+  /* Accent: Electric Blue */
   --accent: 190 100% 50%;
   --accent-foreground: 222 47% 11%;
 
@@ -69,9 +72,46 @@
   /* Borders */
   --border: 217 19% 27%;
   --input: 217 19% 27%;
-  --ring: 84 100% 59%;
+  --ring: 84 100% 45%;
+}
 
-  --radius: 0.75rem;
+.light {
+  /* Light Theme - Clean and Modern */
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+
+  /* Card: Light gray */
+  --card: 0 0% 98%;
+  --card-foreground: 222 47% 11%;
+
+  /* Popover */
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+
+  /* Primary: Deeper Green for visibility */
+  --primary: 84 100% 35%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Secondary */
+  --secondary: 210 20% 93%;
+  --secondary-foreground: 222 47% 11%;
+
+  /* Muted */
+  --muted: 210 20% 93%;
+  --muted-foreground: 215 16% 47%;
+
+  /* Accent */
+  --accent: 190 100% 40%;
+  --accent-foreground: 0 0% 100%;
+
+  /* Destructive */
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* Borders */
+  --border: 214 20% 85%;
+  --input: 214 20% 85%;
+  --ring: 84 100% 35%;
 }
 
 @layer base {

@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Gift, Plane, ShoppingBag, Calendar, ImagePlus, RefreshCw, Loader2, Sparkles, PartyPopper, Home, GraduationCap, Heart, Coffee } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
@@ -14,14 +14,21 @@ import { useAuth } from "@/lib/auth-context";
 
 export default function CreatePool() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   
-  const [title, setTitle] = useState("");
+  const params = new URLSearchParams(search);
+  const prefillTitle = params.get('title') || "";
+  const prefillAmount = params.get('amount') || "";
+  const prefillDescription = params.get('description') || "";
+  const prefillParticipants = params.get('participants') || "";
+  
+  const [title, setTitle] = useState(prefillTitle);
   const [category, setCategory] = useState("");
-  const [targetAmount, setTargetAmount] = useState("");
-  const [description, setDescription] = useState("");
+  const [targetAmount, setTargetAmount] = useState(prefillAmount);
+  const [description, setDescription] = useState(prefillDescription || (prefillParticipants ? `Split between ${prefillParticipants} people` : ""));
   const [deadline, setDeadline] = useState("");
   const [isRecurring, setIsRecurring] = useState(false);
   const [frequency, setFrequency] = useState("monthly");
