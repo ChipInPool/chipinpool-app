@@ -2264,10 +2264,10 @@ export async function registerRoutes(
         companyName: z.string().min(1),
         website: z.string().url(),
         businessType: z.string().min(1),
-        description: z.string().optional(),
+        description: z.string().optional().transform(v => v === '' ? undefined : v),
         contactEmail: z.string().email(),
-        contactPhone: z.string().optional(),
-        webhookUrl: z.string().url().optional(),
+        contactPhone: z.string().optional().transform(v => v === '' ? undefined : v),
+        webhookUrl: z.string().url().optional().or(z.literal('')).transform(v => v === '' ? undefined : v),
       });
 
       const data = schema.parse(req.body);
@@ -3277,6 +3277,120 @@ export async function registerRoutes(
       const allMerchants = await db.select().from(merchants).orderBy(desc(merchants.createdAt));
       res.json(allMerchants);
     } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get single merchant with analytics (admin)
+  app.get("/api/admin/merchants/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const merchant = await storage.getMerchant(req.params.id);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+
+      // Get checkout sessions for analytics
+      const sessions = await storage.getMerchantCheckoutSessions(merchant.id);
+      const apiKeys = await storage.getMerchantApiKeys(merchant.id);
+      const payouts = await storage.getMerchantPayouts(merchant.id);
+
+      // Get user info
+      const user = await storage.getUser(merchant.userId);
+
+      // Calculate analytics
+      const completedSessions = sessions.filter(s => s.status === 'completed');
+      const pendingSessions = sessions.filter(s => s.status === 'pending' || s.status === 'collecting');
+      const cancelledSessions = sessions.filter(s => s.status === 'cancelled' || s.status === 'expired');
+
+      res.json({
+        merchant,
+        user: user ? { id: user.id, username: user.username, email: user.email, firstName: user.firstName, lastName: user.lastName } : null,
+        analytics: {
+          totalSessions: sessions.length,
+          completedSessions: completedSessions.length,
+          pendingSessions: pendingSessions.length,
+          cancelledSessions: cancelledSessions.length,
+          totalVolume: merchant.totalVolume,
+          totalFees: merchant.totalFees,
+          totalPayouts: merchant.totalPayouts,
+          pendingBalance: merchant.pendingBalance,
+          conversionRate: sessions.length > 0 ? ((completedSessions.length / sessions.length) * 100).toFixed(1) : '0.0',
+        },
+        recentSessions: sessions.slice(0, 10),
+        apiKeys: apiKeys.map(k => ({ id: k.id, name: k.name, keyPrefix: k.keyPrefix, isActive: k.isActive, createdAt: k.createdAt, lastUsedAt: k.lastUsedAt })),
+        payouts: payouts.slice(0, 10),
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Create merchant as admin
+  app.post("/api/admin/merchants", requireAdmin, async (req: any, res, next) => {
+    try {
+      const schema = z.object({
+        userId: z.string().min(1, "User ID is required"),
+        companyName: z.string().min(1),
+        website: z.string().url(),
+        businessType: z.string().min(1),
+        description: z.string().optional().transform(v => v === '' ? undefined : v),
+        contactEmail: z.string().email(),
+        contactPhone: z.string().optional().transform(v => v === '' ? undefined : v),
+        webhookUrl: z.string().url().optional().or(z.literal('')).transform(v => v === '' ? undefined : v),
+        status: z.enum(['pending', 'approved', 'suspended']).optional().default('approved'),
+      });
+
+      const data = schema.parse(req.body);
+
+      // Verify target user exists
+      const targetUser = await storage.getUser(data.userId);
+      if (!targetUser) {
+        return res.status(400).json({ error: "Selected user not found" });
+      }
+
+      const targetUserId = data.userId;
+
+      // Check if user already has a merchant account
+      const existingMerchant = await storage.getMerchantByUserId(targetUserId);
+      if (existingMerchant) {
+        return res.status(400).json({ error: "This user already has a merchant account" });
+      }
+
+      const crypto = await import('crypto');
+      const webhookSecret = `whsec_${crypto.randomBytes(24).toString('hex')}`;
+
+      const merchant = await storage.createMerchant({
+        userId: targetUserId,
+        companyName: data.companyName,
+        website: data.website,
+        businessType: data.businessType,
+        description: data.description ?? null,
+        contactEmail: data.contactEmail,
+        contactPhone: data.contactPhone ?? null,
+        webhookUrl: data.webhookUrl ?? null,
+      });
+
+      await storage.updateMerchant(merchant.id, { 
+        webhookSecret,
+        status: data.status,
+      });
+
+      // Log audit
+      await db.insert(adminAuditLogs).values({
+        adminId: req.adminUser.id,
+        action: 'create_merchant',
+        targetType: 'merchant',
+        targetId: merchant.id,
+        details: `Created merchant: ${data.companyName} with status ${data.status}`,
+        ipAddress: req.ip,
+      });
+
+      res.json({ merchant, message: "Merchant created successfully" });
+    } catch (error: any) {
+      console.error('Admin create merchant error:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      }
       next(error);
     }
   });
