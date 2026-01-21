@@ -2306,7 +2306,11 @@ export async function registerRoutes(
         },
         message: "Merchant account created. Pending approval.",
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Merchant registration error:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      }
       next(error);
     }
   });
