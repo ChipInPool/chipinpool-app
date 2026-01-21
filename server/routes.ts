@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
-import { registerSchema, loginSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions } from "@shared/schema";
+import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcrypt";
@@ -277,6 +277,178 @@ export async function registerRoutes(
       req.session.userId = user.id;
       const { password, ...userWithoutPassword } = user;
       res.json({ user: userWithoutPassword });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Login with username and password
+  app.post("/api/auth/login-username", async (req, res, next) => {
+    try {
+      const data = loginWithUsernameSchema.parse(req.body);
+      const username = data.username.toLowerCase().replace(/^@/, '');
+      
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      if (!user.password) {
+        return res.status(401).json({ message: "Please sign in with Google or Apple" });
+      }
+
+      const validPassword = await bcrypt.compare(data.password, user.password);
+      if (!validPassword) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      req.session.userId = user.id;
+      const { password, ...userWithoutPassword } = user;
+      res.json({ user: userWithoutPassword });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Send OTP for phone login
+  app.post("/api/auth/phone-login/send", async (req, res, next) => {
+    try {
+      const data = phoneLoginSchema.parse(req.body);
+      
+      // Check if user exists with this phone
+      const user = await storage.getUserByPhone(data.phone);
+      if (!user) {
+        return res.status(404).json({ message: "No account found with this phone number" });
+      }
+
+      const code = generateOTP();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min expiry
+
+      await db.delete(phoneVerificationCodes).where(eq(phoneVerificationCodes.phone, data.phone));
+      await db.insert(phoneVerificationCodes).values({
+        phone: data.phone,
+        code,
+        expiresAt,
+      });
+
+      await sendVerificationSMS(data.phone, code);
+      res.json({ message: "Login code sent to your phone" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Verify OTP and login
+  app.post("/api/auth/phone-login/verify", async (req, res, next) => {
+    try {
+      const data = verifyPhoneLoginSchema.parse(req.body);
+      
+      const [verification] = await db.select()
+        .from(phoneVerificationCodes)
+        .where(eq(phoneVerificationCodes.phone, data.phone))
+        .orderBy(desc(phoneVerificationCodes.createdAt))
+        .limit(1);
+
+      if (!verification) {
+        return res.status(400).json({ message: "No verification code found. Please request a new code." });
+      }
+
+      if (verification.code !== data.code) {
+        return res.status(400).json({ message: "Invalid verification code" });
+      }
+
+      if (new Date() > verification.expiresAt) {
+        return res.status(400).json({ message: "Code expired. Please request a new code." });
+      }
+
+      const user = await storage.getUserByPhone(data.phone);
+      if (!user) {
+        return res.status(404).json({ message: "No account found with this phone number" });
+      }
+
+      req.session.userId = user.id;
+      const { password, ...userWithoutPassword } = user;
+      res.json({ user: userWithoutPassword });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Forgot password - send reset link
+  app.post("/api/auth/forgot-password", async (req, res, next) => {
+    try {
+      const data = forgotPasswordSchema.parse(req.body);
+      
+      let user;
+      if (data.method === 'email' && data.email) {
+        user = await storage.getUserByEmail(data.email);
+      } else if (data.method === 'phone' && data.phone) {
+        user = await storage.getUserByPhone(data.phone);
+      }
+
+      if (!user) {
+        // Don't reveal if account exists
+        return res.json({ message: "If an account exists, you will receive a reset link" });
+      }
+
+      // Generate reset token
+      const crypto = await import('crypto');
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min expiry
+
+      await db.insert(passwordResetTokens).values({
+        userId: user.id,
+        token,
+        expiresAt,
+      });
+
+      // Send reset link via chosen method
+      const resetLink = `${process.env.NODE_ENV === 'production' ? 'https://' + req.get('host') : 'http://localhost:5000'}/reset-password?token=${token}`;
+      
+      if (data.method === 'email' && user.email) {
+        await sendVerificationEmail(user.email, `Your password reset link: ${resetLink}`, 'Password Reset - ChipInPay');
+      } else if (data.method === 'phone' && user.phone) {
+        await sendVerificationSMS(user.phone, `Your ChipInPay password reset code: ${token.slice(0, 6).toUpperCase()}. Or use link: ${resetLink}`);
+      }
+
+      res.json({ message: "If an account exists, you will receive a reset link" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Reset password with token
+  app.post("/api/auth/reset-password", async (req, res, next) => {
+    try {
+      const data = resetPasswordSchema.parse(req.body);
+      
+      const [resetToken] = await db.select()
+        .from(passwordResetTokens)
+        .where(eq(passwordResetTokens.token, data.token))
+        .limit(1);
+
+      if (!resetToken) {
+        return res.status(400).json({ message: "Invalid or expired reset token" });
+      }
+
+      if (resetToken.used) {
+        return res.status(400).json({ message: "This reset link has already been used" });
+      }
+
+      if (new Date() > resetToken.expiresAt) {
+        return res.status(400).json({ message: "Reset link has expired. Please request a new one." });
+      }
+
+      // Hash new password and update user
+      const hashedPassword = await bcrypt.hash(data.newPassword, 10);
+      await storage.updateUser(resetToken.userId, { password: hashedPassword });
+
+      // Mark token as used
+      await db.update(passwordResetTokens)
+        .set({ used: true })
+        .where(eq(passwordResetTokens.id, resetToken.id));
+
+      res.json({ message: "Password reset successfully. You can now log in." });
     } catch (error) {
       next(error);
     }

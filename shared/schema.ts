@@ -65,6 +65,15 @@ export const phoneVerificationCodes = pgTable("phone_verification_codes", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  token: text("token").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const badges = pgTable("badges", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -262,6 +271,31 @@ export type PhoneVerificationCode = typeof phoneVerificationCodes.$inferSelect;
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
+});
+
+export const loginWithUsernameSchema = z.object({
+  username: z.string().min(3),
+  password: z.string().min(6),
+});
+
+export const phoneLoginSchema = z.object({
+  phone: z.string().min(10),
+});
+
+export const verifyPhoneLoginSchema = z.object({
+  phone: z.string().min(10),
+  code: z.string().length(6),
+});
+
+export const forgotPasswordSchema = z.object({
+  method: z.enum(["email", "phone"]),
+  email: z.string().email().optional(),
+  phone: z.string().min(10).optional(),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string(),
+  newPassword: z.string().min(6),
 });
 
 export const registerSchema = z.object({
