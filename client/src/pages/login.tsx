@@ -145,7 +145,7 @@ export default function Login() {
       await register({
         ...registerForm,
         phoneVerificationCode: verificationCode,
-        acceptTerms: true,
+        acceptTerms: acceptTerms,
       });
       toast({ description: "Account created! Welcome to ChipIn." });
       setShowKycPrompt(true);
