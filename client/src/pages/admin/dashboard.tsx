@@ -1,10 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/admin-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Users, Layers, DollarSign, Clock, AlertTriangle, UserPlus, RefreshCw } from "lucide-react";
+import { Users, Layers, DollarSign, Clock, AlertTriangle, UserPlus, CreditCard, CheckCircle } from "lucide-react";
 import { Loader2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 
 interface AdminStats {
   totalUsers: number;
@@ -16,6 +14,37 @@ interface AdminStats {
   recentSignups: number;
 }
 
+interface StripeData {
+  payments: Array<{
+    id: string;
+    amount: number;
+    type: string;
+    userId: string | null;
+    poolId: string | null;
+    customerEmail: string | null;
+    created: string;
+  }>;
+  identity: Array<{
+    id: string;
+    status: string;
+    userId: string | null;
+    created: string;
+  }>;
+  balance: {
+    available: Array<{ amount: number; currency: string }>;
+    pending: Array<{ amount: number; currency: string }>;
+  };
+  summary: {
+    totalPayments: number;
+    totalAmount: number;
+    walletDeposits: number;
+    poolContributions: number;
+    verifiedKyc: number;
+    pendingKyc: number;
+  };
+  synced: number;
+}
+
 async function fetchAdminStats(): Promise<AdminStats> {
   const response = await fetch("/api/admin/stats", { credentials: "include" });
   if (!response.ok) {
@@ -24,38 +53,27 @@ async function fetchAdminStats(): Promise<AdminStats> {
   return response.json();
 }
 
-async function syncStripeDeposits(): Promise<{ synced: number; skipped: number; message: string }> {
-  const response = await fetch("/api/admin/sync-stripe-deposits", { 
-    method: "POST",
-    credentials: "include" 
-  });
+async function fetchStripeData(): Promise<StripeData> {
+  const response = await fetch("/api/admin/stripe/all?days=7", { credentials: "include" });
   if (!response.ok) {
-    throw new Error("Failed to sync Stripe deposits");
+    throw new Error("Failed to fetch Stripe data");
   }
   return response.json();
 }
 
 export default function AdminDashboard() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  
-  const { data: stats, isLoading, error } = useQuery({
+  const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
     queryKey: ["admin", "stats"],
     queryFn: fetchAdminStats,
   });
 
-  const syncMutation = useMutation({
-    mutationFn: syncStripeDeposits,
-    onSuccess: (data) => {
-      toast({ description: data.message });
-      queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
-    },
-    onError: (err: any) => {
-      toast({ description: err.message || "Sync failed", variant: "destructive" });
-    },
+  const { data: stripeData, isLoading: stripeLoading } = useQuery({
+    queryKey: ["admin", "stripe", "all"],
+    queryFn: fetchStripeData,
+    refetchInterval: 30000, // Refresh every 30 seconds
   });
 
-  if (isLoading) {
+  if (statsLoading) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center h-64">
@@ -65,7 +83,7 @@ export default function AdminDashboard() {
     );
   }
 
-  if (error) {
+  if (statsError) {
     return (
       <AdminLayout>
         <div className="text-center py-12">
@@ -88,24 +106,9 @@ export default function AdminDashboard() {
 
   return (
     <AdminLayout>
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-display font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Overview of ChipIn platform metrics</p>
-        </div>
-        <Button 
-          onClick={() => syncMutation.mutate()} 
-          disabled={syncMutation.isPending}
-          variant="outline"
-          data-testid="button-sync-stripe"
-        >
-          {syncMutation.isPending ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <RefreshCw className="w-4 h-4 mr-2" />
-          )}
-          Sync Stripe
-        </Button>
+      <div className="mb-8">
+        <h1 className="text-3xl font-display font-bold">Dashboard</h1>
+        <p className="text-muted-foreground">Overview of ChipIn platform metrics</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -122,6 +125,117 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Real-time Stripe Data */}
+      <div className="mt-8">
+        <h2 className="text-xl font-display font-bold mb-4 flex items-center gap-2">
+          <CreditCard className="w-5 h-5" />
+          Live Stripe Data (Last 7 Days)
+          {stripeLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+        </h2>
+        
+        {stripeData && (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Stripe Balance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-500">
+                  ${stripeData.balance.available.reduce((sum, b) => sum + b.amount, 0).toFixed(2)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  +${stripeData.balance.pending.reduce((sum, b) => sum + b.amount, 0).toFixed(2)} pending
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/50 border-white/10">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Payments</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stripeData.summary.totalPayments}</div>
+                <p className="text-xs text-muted-foreground">
+                  ${stripeData.summary.totalAmount.toFixed(2)} total
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/50 border-white/10">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Wallet Deposits</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stripeData.summary.walletDeposits}</div>
+                <p className="text-xs text-muted-foreground">
+                  {stripeData.summary.poolContributions} pool contributions
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/50 border-white/10">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  KYC Verified
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stripeData.summary.verifiedKyc}</div>
+                <p className="text-xs text-muted-foreground">
+                  {stripeData.summary.pendingKyc} pending
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Recent Payments Table */}
+        {stripeData && stripeData.payments.length > 0 && (
+          <Card className="mt-6 bg-card/50 border-white/10">
+            <CardHeader>
+              <CardTitle className="text-lg">Recent Payments</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="text-left py-2 px-2">Date</th>
+                      <th className="text-left py-2 px-2">Type</th>
+                      <th className="text-left py-2 px-2">Amount</th>
+                      <th className="text-left py-2 px-2">Customer</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stripeData.payments.slice(0, 10).map((payment) => (
+                      <tr key={payment.id} className="border-b border-white/5">
+                        <td className="py-2 px-2 text-muted-foreground">
+                          {new Date(payment.created).toLocaleDateString()}
+                        </td>
+                        <td className="py-2 px-2">
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            payment.type === 'wallet_deposit' 
+                              ? 'bg-blue-500/20 text-blue-400' 
+                              : 'bg-green-500/20 text-green-400'
+                          }`}>
+                            {payment.type === 'wallet_deposit' ? 'Wallet' : 'Pool'}
+                          </span>
+                        </td>
+                        <td className="py-2 px-2 font-medium">${payment.amount.toFixed(2)}</td>
+                        <td className="py-2 px-2 text-muted-foreground">
+                          {payment.customerEmail || payment.userId || 'Guest'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {stats?.suspendedUsers ? (

@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PoolCard } from "@/components/pool-card";
-import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus, Clock, Users, UserPlus, ChevronDown, ChevronUp, Building, AlertCircle, Receipt, RefreshCw } from "lucide-react";
+import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus, Clock, Users, UserPlus, ChevronDown, ChevronUp, Building, AlertCircle, Receipt, RefreshCw, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -28,16 +28,49 @@ export default function Profile() {
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [followersOpen, setFollowersOpen] = useState(false);
   const [followingOpen, setFollowingOpen] = useState(false);
   const [followersDialogOpen, setFollowersDialogOpen] = useState(false);
   const [followingDialogOpen, setFollowingDialogOpen] = useState(false);
 
+  const handleSyncWallet = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch("/api/wallet/sync", { 
+        method: "POST", 
+        credentials: "include" 
+      });
+      const data = await response.json();
+      if (data.synced > 0) {
+        toast({ description: data.message });
+        queryClient.invalidateQueries({ queryKey: queryKeys.user });
+      } else {
+        toast({ description: "Wallet is up to date" });
+      }
+    } catch (error: any) {
+      toast({ description: "Failed to sync wallet", variant: "destructive" });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(searchString);
     if (params.get('deposit') === 'success') {
-      toast({ description: "Deposit successful! Your balance will be updated shortly." });
-      queryClient.invalidateQueries({ queryKey: queryKeys.user });
+      toast({ description: "Deposit successful! Syncing your balance..." });
+      // Auto-sync wallet from Stripe after successful deposit
+      fetch("/api/wallet/sync", { method: "POST", credentials: "include" })
+        .then(res => res.json())
+        .then(data => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.user });
+          if (data.synced > 0) {
+            toast({ description: `Added $${data.balance} to your wallet` });
+          }
+        })
+        .catch(() => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.user });
+        });
       window.history.replaceState({}, '', '/profile');
     }
   }, [searchString, toast, queryClient]);
@@ -331,6 +364,20 @@ export default function Profile() {
                 <h3 className="font-bold flex items-center gap-2">
                   <Wallet className="w-4 h-4 text-green-500" /> Wallet
                 </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSyncWallet}
+                  disabled={isSyncing}
+                  data-testid="button-sync-wallet"
+                  title="Sync wallet with Stripe"
+                >
+                  {isSyncing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                </Button>
               </div>
               <div className="text-center mb-4">
                 <div className="text-3xl font-bold font-display text-green-500" data-testid="text-balance">

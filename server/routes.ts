@@ -2322,123 +2322,204 @@ export async function registerRoutes(
     }
   });
 
-  // Admin: Sync all Stripe data (deposits, contributions, KYC)
-  app.post("/api/admin/sync-stripe-deposits", requireAdmin, async (req: any, res, next) => {
+  // Admin: Get real-time Stripe data (no sync, direct API queries)
+  app.get("/api/admin/stripe/payments", requireAdmin, async (req: any, res, next) => {
     try {
       const stripe = await getUncachableStripeClient();
+      const days = parseInt(req.query.days as string) || 7;
       
-      let syncedDeposits = 0;
-      let syncedContributions = 0;
-      let syncedKyc = 0;
-      let skipped = 0;
-      let errors: string[] = [];
-
-      // 1. Sync checkout sessions (deposits and contributions) from last 7 days
       const sessions = await stripe.checkout.sessions.list({
         limit: 100,
         created: {
-          gte: Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60),
+          gte: Math.floor(Date.now() / 1000) - (days * 24 * 60 * 60),
+        },
+        expand: ['data.payment_intent'],
+      });
+
+      const payments = sessions.data
+        .filter(s => s.payment_status === 'paid')
+        .map(session => ({
+          id: session.id,
+          amount: session.amount_total ? session.amount_total / 100 : 0,
+          currency: session.currency,
+          status: session.payment_status,
+          type: session.metadata?.type || 'pool_contribution',
+          userId: session.metadata?.userId || null,
+          poolId: session.metadata?.poolId || null,
+          customerEmail: session.customer_email,
+          created: new Date(session.created * 1000).toISOString(),
+        }));
+
+      res.json({ payments, count: payments.length });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin: Get real-time identity verification sessions from Stripe
+  app.get("/api/admin/stripe/identity", requireAdmin, async (req: any, res, next) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const days = parseInt(req.query.days as string) || 7;
+      
+      const verificationSessions = await stripe.identity.verificationSessions.list({
+        limit: 100,
+        created: {
+          gte: Math.floor(Date.now() / 1000) - (days * 24 * 60 * 60),
         },
       });
 
-      for (const session of sessions.data) {
-        if (session.payment_status !== 'paid') {
-          skipped++;
-          continue;
-        }
+      const sessions = verificationSessions.data.map(vs => ({
+        id: vs.id,
+        status: vs.status,
+        userId: vs.metadata?.userId || null,
+        type: vs.type,
+        created: new Date(vs.created * 1000).toISOString(),
+        lastError: vs.last_error?.reason || null,
+      }));
 
+      res.json({ sessions, count: sessions.length });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin: Get real-time balance and payouts from Stripe
+  app.get("/api/admin/stripe/balance", requireAdmin, async (req: any, res, next) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      
+      const balance = await stripe.balance.retrieve();
+      
+      res.json({
+        available: balance.available.map(b => ({ amount: b.amount / 100, currency: b.currency })),
+        pending: balance.pending.map(b => ({ amount: b.amount / 100, currency: b.currency })),
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin: Get all Stripe data in one call for dashboard - also syncs to database automatically
+  app.get("/api/admin/stripe/all", requireAdmin, async (req: any, res, next) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const days = parseInt(req.query.days as string) || 7;
+      const since = Math.floor(Date.now() / 1000) - (days * 24 * 60 * 60);
+
+      // Fetch all data in parallel
+      const [sessionsResult, identityResult, balanceResult] = await Promise.all([
+        stripe.checkout.sessions.list({ limit: 100, created: { gte: since } }),
+        stripe.identity.verificationSessions.list({ limit: 100, created: { gte: since } }).catch(() => ({ data: [] })),
+        stripe.balance.retrieve(),
+      ]);
+
+      // Auto-sync wallet deposits and contributions to database
+      let synced = 0;
+      for (const session of sessionsResult.data) {
+        if (session.payment_status !== 'paid') continue;
         const { type, userId, amount, poolId } = session.metadata || {};
         
-        // Sync wallet deposits
         if (type === 'wallet_deposit' && userId && amount) {
-          try {
-            const success = await storage.createWalletDeposit(userId, amount, session.id);
-            if (success) {
-              syncedDeposits++;
-              console.log(`Synced wallet deposit: $${amount} for user ${userId}`);
-            } else {
-              skipped++;
-            }
-          } catch (err: any) {
-            errors.push(`Deposit ${session.id}: ${err.message}`);
-          }
+          const success = await storage.createWalletDeposit(userId, amount, session.id);
+          if (success) synced++;
         }
         
-        // Sync pool contributions
         if (poolId && amount && !type) {
-          try {
-            const guestEmail = session.customer_email || null;
-            const contribution = await storage.createStripeContribution(
-              poolId,
-              amount,
-              session.id,
-              userId || null,
-              guestEmail
-            );
-            if (contribution) {
-              syncedContributions++;
-              console.log(`Synced contribution: $${amount} to pool ${poolId}`);
-            } else {
-              skipped++;
-            }
-          } catch (err: any) {
-            errors.push(`Contribution ${session.id}: ${err.message}`);
+          const guestEmail = session.customer_email || null;
+          const contribution = await storage.createStripeContribution(poolId, amount, session.id, userId || null, guestEmail);
+          if (contribution) synced++;
+        }
+      }
+
+      // Auto-sync KYC status
+      for (const vs of identityResult.data) {
+        const userId = vs.metadata?.userId;
+        if (!userId) continue;
+        const user = await storage.getUser(userId);
+        if (!user) continue;
+        if (vs.status === 'verified' && user.kycStatus !== 'verified') {
+          await storage.updateUser(userId, { kycStatus: 'verified' });
+          synced++;
+        }
+      }
+
+      const payments = sessionsResult.data
+        .filter(s => s.payment_status === 'paid')
+        .map(session => ({
+          id: session.id,
+          amount: session.amount_total ? session.amount_total / 100 : 0,
+          currency: session.currency,
+          type: session.metadata?.type || 'pool_contribution',
+          userId: session.metadata?.userId || null,
+          poolId: session.metadata?.poolId || null,
+          customerEmail: session.customer_email,
+          created: new Date(session.created * 1000).toISOString(),
+        }));
+
+      const identity = identityResult.data.map(vs => ({
+        id: vs.id,
+        status: vs.status,
+        userId: vs.metadata?.userId || null,
+        created: new Date(vs.created * 1000).toISOString(),
+      }));
+
+      res.json({
+        payments,
+        identity,
+        balance: {
+          available: balanceResult.available.map(b => ({ amount: b.amount / 100, currency: b.currency })),
+          pending: balanceResult.pending.map(b => ({ amount: b.amount / 100, currency: b.currency })),
+        },
+        summary: {
+          totalPayments: payments.length,
+          totalAmount: payments.reduce((sum, p) => sum + p.amount, 0),
+          walletDeposits: payments.filter(p => p.type === 'wallet_deposit').length,
+          poolContributions: payments.filter(p => p.type === 'pool_contribution').length,
+          verifiedKyc: identity.filter(i => i.status === 'verified').length,
+          pendingKyc: identity.filter(i => i.status === 'requires_input').length,
+        },
+        synced,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // User endpoint: Sync my wallet from Stripe (pulls real-time payment data)
+  app.post("/api/wallet/sync", requireAuth, async (req: any, res, next) => {
+    try {
+      const userId = req.session.userId;
+      const stripe = await getUncachableStripeClient();
+      
+      // Get all paid checkout sessions for this user
+      const sessions = await stripe.checkout.sessions.list({
+        limit: 100,
+        created: { gte: Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60) }, // Last 30 days
+      });
+
+      let synced = 0;
+      for (const session of sessions.data) {
+        if (session.payment_status !== 'paid') continue;
+        const { type, userId: sessionUserId, amount } = session.metadata || {};
+        
+        if (type === 'wallet_deposit' && sessionUserId === userId && amount) {
+          const success = await storage.createWalletDeposit(userId, amount, session.id);
+          if (success) {
+            synced++;
+            console.log(`Synced wallet deposit for user ${userId}: $${amount}`);
           }
         }
       }
 
-      // 2. Sync identity verification sessions from last 7 days
-      try {
-        const verificationSessions = await stripe.identity.verificationSessions.list({
-          limit: 100,
-          created: {
-            gte: Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60),
-          },
-        });
-
-        for (const vs of verificationSessions.data) {
-          const userId = vs.metadata?.userId;
-          if (!userId) continue;
-
-          try {
-            const user = await storage.getUser(userId);
-            if (!user) continue;
-
-            if (vs.status === 'verified' && user.kycStatus !== 'verified') {
-              await storage.updateUser(userId, { kycStatus: 'verified' });
-              syncedKyc++;
-              console.log(`Synced KYC verified for user ${userId}`);
-            } else if (vs.status === 'requires_input' && user.kycStatus === 'pending') {
-              await storage.updateUser(userId, { kycStatus: 'failed' });
-              syncedKyc++;
-              console.log(`Synced KYC failed for user ${userId}`);
-            }
-          } catch (err: any) {
-            errors.push(`KYC ${vs.id}: ${err.message}`);
-          }
-        }
-      } catch (err: any) {
-        console.log('Could not sync identity sessions:', err.message);
-      }
-
-      await logAdminAction(
-        req.session.userId!,
-        'sync_stripe_all',
-        'system',
-        undefined,
-        `Deposits: ${syncedDeposits}, Contributions: ${syncedContributions}, KYC: ${syncedKyc}, Skipped: ${skipped}`,
-        req.ip
-      );
-
-      const totalSynced = syncedDeposits + syncedContributions + syncedKyc;
+      // Get updated user balance
+      const user = await storage.getUser(userId);
+      
       res.json({ 
         success: true, 
-        syncedDeposits,
-        syncedContributions,
-        syncedKyc,
-        skipped, 
-        errors: errors.length > 0 ? errors : undefined,
-        message: `Synced ${totalSynced} items from Stripe (${syncedDeposits} deposits, ${syncedContributions} contributions, ${syncedKyc} KYC)`
+        synced, 
+        balance: user?.balance || "0",
+        message: synced > 0 ? `Found and added ${synced} deposit(s) to your wallet` : "Wallet is up to date"
       });
     } catch (error) {
       next(error);
