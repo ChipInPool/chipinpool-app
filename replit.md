@@ -67,11 +67,19 @@ Preferred communication style: Simple, everyday language.
 2. **Pool Analytics** (`/pool/:id/analytics`) - Detailed insights on contribution trends and patterns
 3. **Activity Feed** (`/activity`) - See what people you follow are doing
 4. **Settings Page** (`/settings`) - Notification preferences and theme toggle
-5. **Split Calculator** (`/split-calculator`) - Easy bill splitting tool
+5. **Split Calculator** (`/split-calculator`) - Easy bill splitting tool with per-person breakdown and quick pool creation
 6. **Pool Templates** - Quick templates for common pool types (birthday, trip, wedding, etc.)
 7. **Transaction History** (`/transactions`) - View all card spending with search/filter
 8. **Receipt Attachments** - Transactions support receipt URLs and notes
-9. **Dark/Light Theme Toggle** - User can switch between themes
+9. **Dark/Light Theme Toggle** - User can switch themes from navbar dropdown (desktop & mobile)
+10. **KYC Verification Flow** - Identity verification prompted after signup, required to create pools
+    - Uses Stripe Identity when configured, falls back to demo verification for prototype
+
+### Theme System:
+- Custom ThemeProvider in `client/src/components/theme-provider.tsx`
+- Light theme: Clean fintech palette with teal primary, blue-gray accents
+- Dark theme: Neo-fintech with deep navy and electric lime
+- Theme toggle in both desktop navbar and mobile menu
 
 ### Authentication
 
