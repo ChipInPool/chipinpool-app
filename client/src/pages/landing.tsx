@@ -227,7 +227,7 @@ export default function Landing() {
                   </Link>
                 </Button>
                 <Button variant="outline" size="lg" className="px-8 h-12 border-white/10 bg-white/5" asChild>
-                  <a href="mailto:developers@chipinpay.com?subject=ChipInPay%20API%20Access%20Request">
+                  <a href="mailto:mail@chipinpool.com?subject=ChipInPay%20API%20Access%20Request">
                     Contact Sales
                   </a>
                 </Button>

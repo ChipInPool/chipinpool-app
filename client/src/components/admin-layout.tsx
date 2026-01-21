@@ -8,7 +8,8 @@ import {
   CreditCard, 
   Settings,
   LogOut,
-  Shield
+  Shield,
+  Store
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -21,6 +22,7 @@ const navItems = [
   { href: "/admin/users", icon: Users, label: "Users" },
   { href: "/admin/pools", icon: Layers, label: "Pools" },
   { href: "/admin/transactions", icon: CreditCard, label: "Transactions" },
+  { href: "/admin/merchants", icon: Store, label: "Merchants" },
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {

@@ -35,6 +35,7 @@ import AdminUsers from "@/pages/admin/users";
 import AdminUserDetail from "@/pages/admin/user-detail";
 import AdminPools from "@/pages/admin/pools";
 import AdminTransactions from "@/pages/admin/transactions";
+import AdminMerchants from "@/pages/admin/merchants";
 import ResetPassword from "@/pages/reset-password";
 import MerchantDashboard from "@/pages/merchant-dashboard";
 import ChipInPayCheckout from "@/pages/chipinpay-checkout";
@@ -72,6 +73,7 @@ function Router() {
       <Route path="/admin/users/:id" component={AdminUserDetail} />
       <Route path="/admin/pools" component={AdminPools} />
       <Route path="/admin/transactions" component={AdminTransactions} />
+      <Route path="/admin/merchants" component={AdminMerchants} />
       <Route path="/merchant" component={MerchantDashboard} />
       <Route path="/chipinpay/checkout/:sessionId" component={ChipInPayCheckout} />
       <Route component={NotFound} />

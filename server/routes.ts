@@ -2280,17 +2280,16 @@ export async function registerRoutes(
         return res.status(400).json({ error: "You already have a merchant account" });
       }
 
-      // Create merchant first
+      // Create merchant
       const merchant = await storage.createMerchant({
         userId: user.id,
         companyName: data.companyName,
         website: data.website,
         businessType: data.businessType,
-        description: data.description || null,
+        description: data.description ?? null,
         contactEmail: data.contactEmail,
-        contactPhone: data.contactPhone || null,
-        webhookUrl: data.webhookUrl || null,
-        feePercent: '5.00',
+        contactPhone: data.contactPhone ?? null,
+        webhookUrl: data.webhookUrl ?? null,
       });
 
       // Generate and set webhook secret
@@ -3299,6 +3298,37 @@ export async function registerRoutes(
       });
 
       res.json({ message: "Merchant approved", status: 'approved' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Update merchant status (admin) - unified endpoint
+  app.put("/api/admin/merchants/:id/status", requireAdmin, async (req: any, res, next) => {
+    try {
+      const { status } = req.body;
+      if (!['pending', 'approved', 'suspended'].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+
+      const merchant = await storage.getMerchant(req.params.id);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+
+      await storage.updateMerchant(merchant.id, { status });
+
+      // Log audit
+      await db.insert(adminAuditLogs).values({
+        adminId: req.adminUser.id,
+        action: `${status}_merchant`,
+        targetType: 'merchant',
+        targetId: merchant.id,
+        details: `Updated merchant status to ${status}: ${merchant.companyName}`,
+        ipAddress: req.ip,
+      });
+
+      res.json({ message: `Merchant ${status}`, status });
     } catch (error) {
       next(error);
     }
