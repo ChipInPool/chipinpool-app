@@ -351,6 +351,137 @@ export const adminAuditLogs = pgTable("admin_audit_logs", {
 
 export const insertAdminAuditLogSchema = createInsertSchema(adminAuditLogs).omit({ id: true, createdAt: true });
 
+// ============================================
+// ChipInPay Merchant Integration Schema
+// ============================================
+
+export const merchantStatusEnum = pgEnum('merchant_status', ['pending', 'approved', 'suspended']);
+export const checkoutSessionStatusEnum = pgEnum('checkout_session_status', ['pending', 'collecting', 'completed', 'expired', 'cancelled', 'refunded']);
+export const webhookEventEnum = pgEnum('webhook_event', ['session.created', 'session.collecting', 'session.completed', 'session.expired', 'session.cancelled', 'contribution.received']);
+
+export const merchants = pgTable("merchants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  companyName: text("company_name").notNull(),
+  website: text("website").notNull(),
+  businessType: text("business_type").notNull(),
+  description: text("description"),
+  logo: text("logo"),
+  contactEmail: text("contact_email").notNull(),
+  contactPhone: text("contact_phone"),
+  status: merchantStatusEnum("status").notNull().default('pending'),
+  feePercent: decimal("fee_percent", { precision: 5, scale: 2 }).notNull().default('5.00'),
+  totalVolume: decimal("total_volume", { precision: 12, scale: 2 }).notNull().default('0.00'),
+  totalFees: decimal("total_fees", { precision: 12, scale: 2 }).notNull().default('0.00'),
+  totalPayouts: decimal("total_payouts", { precision: 12, scale: 2 }).notNull().default('0.00'),
+  pendingBalance: decimal("pending_balance", { precision: 12, scale: 2 }).notNull().default('0.00'),
+  stripeConnectId: text("stripe_connect_id"),
+  webhookUrl: text("webhook_url"),
+  webhookSecret: text("webhook_secret"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const merchantApiKeys = pgTable("merchant_api_keys", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  merchantId: varchar("merchant_id").references(() => merchants.id).notNull(),
+  name: text("name").notNull(),
+  keyPrefix: text("key_prefix").notNull(),
+  keyHash: text("key_hash").notNull(),
+  lastUsedAt: timestamp("last_used_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const merchantCheckoutSessions = pgTable("merchant_checkout_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  merchantId: varchar("merchant_id").references(() => merchants.id).notNull(),
+  poolId: varchar("pool_id").references(() => pools.id),
+  externalOrderId: text("external_order_id").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  feeAmount: decimal("fee_amount", { precision: 10, scale: 2 }).notNull(),
+  netAmount: decimal("net_amount", { precision: 10, scale: 2 }).notNull(),
+  collectedAmount: decimal("collected_amount", { precision: 10, scale: 2 }).notNull().default('0.00'),
+  productTitle: text("product_title").notNull(),
+  productDescription: text("product_description"),
+  productImage: text("product_image"),
+  status: checkoutSessionStatusEnum("status").notNull().default('pending'),
+  collectionDeadline: timestamp("collection_deadline").notNull(),
+  successUrl: text("success_url"),
+  cancelUrl: text("cancel_url"),
+  successWebhook: text("success_webhook"),
+  customerId: varchar("customer_id").references(() => users.id),
+  customerEmail: text("customer_email"),
+  metadata: text("metadata"),
+  expiresAt: timestamp("expires_at").notNull(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const merchantWebhookDeliveries = pgTable("merchant_webhook_deliveries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  merchantId: varchar("merchant_id").references(() => merchants.id).notNull(),
+  sessionId: varchar("session_id").references(() => merchantCheckoutSessions.id),
+  event: webhookEventEnum("event").notNull(),
+  payload: text("payload").notNull(),
+  responseStatus: integer("response_status"),
+  responseBody: text("response_body"),
+  attempts: integer("attempts").notNull().default(1),
+  delivered: boolean("delivered").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const merchantPayouts = pgTable("merchant_payouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  merchantId: varchar("merchant_id").references(() => merchants.id).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default('pending'),
+  stripeTransferId: text("stripe_transfer_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Merchant Insert Schemas
+export const insertMerchantSchema = createInsertSchema(merchants).omit({ 
+  id: true, 
+  createdAt: true, 
+  status: true,
+  totalVolume: true,
+  totalFees: true,
+  totalPayouts: true,
+  pendingBalance: true,
+  webhookSecret: true,
+});
+
+export const insertMerchantApiKeySchema = createInsertSchema(merchantApiKeys).omit({ 
+  id: true, 
+  createdAt: true, 
+  lastUsedAt: true,
+  isActive: true,
+});
+
+export const insertMerchantCheckoutSessionSchema = createInsertSchema(merchantCheckoutSessions).omit({ 
+  id: true, 
+  createdAt: true, 
+  status: true,
+  collectedAmount: true,
+  completedAt: true,
+});
+
+export const insertMerchantWebhookDeliverySchema = createInsertSchema(merchantWebhookDeliveries).omit({ 
+  id: true, 
+  createdAt: true, 
+  responseStatus: true,
+  responseBody: true,
+  attempts: true,
+  delivered: true,
+});
+
+export const insertMerchantPayoutSchema = createInsertSchema(merchantPayouts).omit({ 
+  id: true, 
+  createdAt: true, 
+  status: true,
+  stripeTransferId: true,
+});
+
 // Select Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -374,3 +505,15 @@ export type ApiAccessRequest = typeof apiAccessRequests.$inferSelect;
 export type InsertApiAccessRequest = z.infer<typeof insertApiAccessRequestSchema>;
 export type AdminAuditLog = typeof adminAuditLogs.$inferSelect;
 export type InsertAdminAuditLog = z.infer<typeof insertAdminAuditLogSchema>;
+
+// Merchant Types
+export type Merchant = typeof merchants.$inferSelect;
+export type InsertMerchant = z.infer<typeof insertMerchantSchema>;
+export type MerchantApiKey = typeof merchantApiKeys.$inferSelect;
+export type InsertMerchantApiKey = z.infer<typeof insertMerchantApiKeySchema>;
+export type MerchantCheckoutSession = typeof merchantCheckoutSessions.$inferSelect;
+export type InsertMerchantCheckoutSession = z.infer<typeof insertMerchantCheckoutSessionSchema>;
+export type MerchantWebhookDelivery = typeof merchantWebhookDeliveries.$inferSelect;
+export type InsertMerchantWebhookDelivery = z.infer<typeof insertMerchantWebhookDeliverySchema>;
+export type MerchantPayout = typeof merchantPayouts.$inferSelect;
+export type InsertMerchantPayout = z.infer<typeof insertMerchantPayoutSchema>;
