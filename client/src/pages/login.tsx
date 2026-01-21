@@ -270,25 +270,7 @@ export default function Login() {
         return;
       }
       
-      if (data.clientSecret) {
-        const stripeKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
-        if (!stripeKey) {
-          toast({ description: "Stripe is not configured. Please contact support.", variant: "destructive" });
-          return;
-        }
-        
-        const stripe = await import('@stripe/stripe-js').then(m => m.loadStripe(stripeKey));
-        
-        if (stripe && data.clientSecret) {
-          const { error } = await stripe.verifyIdentity(data.clientSecret);
-          if (error) {
-            toast({ description: error.message || "Verification failed", variant: "destructive" });
-          } else {
-            toast({ description: "Identity verification submitted!" });
-          }
-        }
-      }
-      window.location.href = "/";
+      toast({ description: "Unable to start verification. Please try again.", variant: "destructive" });
     } catch (error: any) {
       toast({ description: error.message || "Failed to start verification", variant: "destructive" });
     } finally {

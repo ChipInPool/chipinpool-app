@@ -202,30 +202,7 @@ export default function Security() {
         return;
       }
       
-      if (data.clientSecret) {
-        const stripeKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
-        if (!stripeKey) {
-          toast({ description: "Stripe is not configured. Please contact support.", variant: "destructive" });
-          return;
-        }
-        
-        setKycClientSecret(data.clientSecret);
-        setShowKYCModal(true);
-        
-        const stripe = await import('@stripe/stripe-js').then(m => m.loadStripe(stripeKey));
-        
-        if (stripe && data.clientSecret) {
-          const { error } = await stripe.verifyIdentity(data.clientSecret);
-          setShowKYCModal(false);
-          
-          if (error) {
-            toast({ description: error.message || "Verification failed", variant: "destructive" });
-          } else {
-            queryClient.invalidateQueries({ queryKey: ["securityStatus"] });
-            toast({ description: "Identity verification submitted! We'll notify you once verified." });
-          }
-        }
-      }
+      toast({ description: "Unable to start verification. Please try again.", variant: "destructive" });
     },
     onError: (error: any) => {
       toast({ description: error.message, variant: "destructive" });
