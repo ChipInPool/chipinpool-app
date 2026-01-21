@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { 
-  users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites, walletDeposits, verificationCodes, bankAccounts, recurringContributions, apiAccessRequests,
+  users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites, walletDeposits, walletWithdrawals, verificationCodes, bankAccounts, recurringContributions, apiAccessRequests,
   type User, type InsertUser, type Pool, type InsertPool, type Contribution, type InsertContribution,
   type Comment, type InsertComment, type Notification, type InsertNotification,
   type VirtualCard, type InsertVirtualCard, type Transaction, type InsertTransaction,
@@ -364,6 +364,32 @@ export class DatabaseStorage implements IStorage {
 
       return true;
     });
+  }
+
+  async createWalletWithdrawal(userId: string, amount: string, bankAccountId?: string): Promise<{ id: string }> {
+    const [withdrawal] = await db.insert(walletWithdrawals).values({
+      userId,
+      amount,
+      bankAccountId: bankAccountId || null,
+      status: "pending",
+    }).returning();
+    return withdrawal;
+  }
+
+  async updateWalletWithdrawalStatus(id: string, status: string): Promise<void> {
+    await db.update(walletWithdrawals).set({ status }).where(eq(walletWithdrawals.id, id));
+  }
+
+  async getWalletHistory(userId: string): Promise<{ deposits: any[]; withdrawals: any[] }> {
+    const deposits = await db.select().from(walletDeposits)
+      .where(eq(walletDeposits.userId, userId))
+      .orderBy(desc(walletDeposits.createdAt));
+    
+    const withdrawals = await db.select().from(walletWithdrawals)
+      .where(eq(walletWithdrawals.userId, userId))
+      .orderBy(desc(walletWithdrawals.createdAt));
+    
+    return { deposits, withdrawals };
   }
 
   async updateUser(id: string, data: Partial<User>): Promise<User | undefined> {

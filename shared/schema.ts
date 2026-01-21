@@ -200,6 +200,15 @@ export const walletDeposits = pgTable("wallet_deposits", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const walletWithdrawals = pgTable("wallet_withdrawals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  bankAccountId: varchar("bank_account_id"),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  status: varchar("status", { length: 50 }).notNull().default("pending"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const verificationCodes = pgTable("verification_codes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
