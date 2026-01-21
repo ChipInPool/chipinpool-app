@@ -30,6 +30,10 @@ import About from "@/pages/about";
 import Careers from "@/pages/careers";
 import Contact from "@/pages/contact";
 import FAQ from "@/pages/faq";
+import AdminDashboard from "@/pages/admin/dashboard";
+import AdminUsers from "@/pages/admin/users";
+import AdminPools from "@/pages/admin/pools";
+import AdminTransactions from "@/pages/admin/transactions";
 
 function Router() {
   return (
@@ -58,6 +62,10 @@ function Router() {
       <Route path="/careers" component={Careers} />
       <Route path="/contact" component={Contact} />
       <Route path="/faq" component={FAQ} />
+      <Route path="/admin" component={AdminDashboard} />
+      <Route path="/admin/users" component={AdminUsers} />
+      <Route path="/admin/pools" component={AdminPools} />
+      <Route path="/admin/transactions" component={AdminTransactions} />
       <Route component={NotFound} />
     </Switch>
   );
