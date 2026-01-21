@@ -337,11 +337,11 @@ export default function PoolDetails() {
                       >
                         <Avatar>
                           <AvatarImage src={c.user?.avatar} />
-                          <AvatarFallback>{c.user?.name?.[0] || '?'}</AvatarFallback>
+                          <AvatarFallback>{c.user?.firstName?.[0] || '?'}</AvatarFallback>
                         </Avatar>
                         <div>
                           <p className="font-medium flex items-center gap-1 hover:text-primary transition-colors">
-                            {c.user?.name || 'Anonymous'}
+                            {c.user?.firstName ? `${c.user.firstName} ${c.user.lastName || ''}`.trim() : 'Anonymous'}
                             {c.user?.badges?.map((b: any) => <span key={b.id} className="text-xs" title={b.name}>{b.icon}</span>)}
                           </p>
                           <p className="text-xs text-muted-foreground">{new Date(c.date).toLocaleDateString()}</p>

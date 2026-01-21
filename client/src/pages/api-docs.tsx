@@ -40,7 +40,7 @@ export default function ApiDocs() {
       await apiRequest("POST", "/api/developer/request-access", {
         ...formData,
         email: user?.email,
-        name: user?.name,
+        name: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : undefined,
       });
       setSubmitted(true);
       toast({

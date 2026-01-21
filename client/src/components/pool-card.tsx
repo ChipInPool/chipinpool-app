@@ -70,7 +70,7 @@ export function PoolCard({ pool }: PoolCardProps) {
                   {contributors.slice(0, 3).map((c: any, i: number) => (
                     <Avatar key={i} className="w-6 h-6 border-2 border-card">
                       <AvatarImage src={c.user?.avatar} />
-                      <AvatarFallback>{c.user?.name?.[0] || '?'}</AvatarFallback>
+                      <AvatarFallback>{c.user?.firstName?.[0] || '?'}</AvatarFallback>
                     </Avatar>
                   ))}
                   {contributors.length > 3 && (

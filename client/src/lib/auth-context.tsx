@@ -4,8 +4,12 @@ import { api, queryKeys } from "./api";
 
 interface User {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
+  username: string;
   email: string;
+  phone: string;
+  dateOfBirth: string;
   avatar?: string;
   bio?: string;
   location?: string;
@@ -14,7 +18,20 @@ interface User {
   totalContributed: string;
   rating?: string;
   createdAt?: string;
+  kycStatus?: string;
+  phoneVerified?: boolean;
   badges?: Array<{ id: string; name: string; icon: string; color: string; description?: string }>;
+}
+
+interface RegisterData {
+  firstName: string;
+  lastName: string;
+  username: string;
+  email: string;
+  password: string;
+  phone: string;
+  dateOfBirth: string;
+  phoneVerificationCode: string;
 }
 
 interface AuthContextType {
@@ -22,7 +39,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -47,8 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const registerMutation = useMutation({
-    mutationFn: ({ name, email, password }: { name: string; email: string; password: string }) =>
-      api.auth.register(name, email, password),
+    mutationFn: (data: RegisterData) =>
+      api.auth.register(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.user });
     },
@@ -65,8 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await loginMutation.mutateAsync({ email, password });
   };
 
-  const register = async (name: string, email: string, password: string) => {
-    await registerMutation.mutateAsync({ name, email, password });
+  const register = async (data: RegisterData) => {
+    await registerMutation.mutateAsync(data);
   };
 
   const logout = async () => {

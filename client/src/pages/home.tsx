@@ -71,7 +71,7 @@ export default function Home() {
     <Layout>
       <div className="mb-8">
         <h1 className="text-3xl font-display font-bold mb-2">
-          Welcome back, {user?.name?.split(' ')[0]}!
+          Welcome back, {user?.firstName}!
         </h1>
         <p className="text-muted-foreground">Here's what's happening with your pools and wallet.</p>
       </div>

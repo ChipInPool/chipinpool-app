@@ -173,7 +173,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <DropdownMenuTrigger asChild>
                     <Avatar className="w-8 h-8 border border-white/10 cursor-pointer hover:border-primary/50 transition-colors" data-testid="avatar-user">
                       <AvatarImage src={user.avatar || undefined} />
-                      <AvatarFallback>{user.name?.slice(0, 2).toUpperCase()}</AvatarFallback>
+                      <AvatarFallback>{(user.firstName?.[0] || '') + (user.lastName?.[0] || '')}</AvatarFallback>
                     </Avatar>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-card border-white/10">
@@ -224,10 +224,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/5">
                       <Avatar className="w-10 h-10">
                         <AvatarImage src={user.avatar || undefined} />
-                        <AvatarFallback>{user.name?.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback>{(user.firstName?.[0] || '') + (user.lastName?.[0] || '')}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">{user.name}</p>
+                        <p className="font-medium">{user.firstName} {user.lastName}</p>
                         <p className="text-xs text-muted-foreground">${parseFloat(user.balance).toLocaleString()} Available</p>
                       </div>
                     </div>

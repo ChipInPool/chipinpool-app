@@ -25,10 +25,29 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ email, password }),
       }),
-    register: (name: string, email: string, password: string) =>
+    register: (data: {
+      firstName: string;
+      lastName: string;
+      username: string;
+      email: string;
+      password: string;
+      phone: string;
+      dateOfBirth: string;
+      phoneVerificationCode: string;
+    }) =>
       fetchApi("/api/auth/register", {
         method: "POST",
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify(data),
+      }),
+    sendPhoneCode: (phone: string) =>
+      fetchApi("/api/auth/send-phone-code", {
+        method: "POST",
+        body: JSON.stringify({ phone }),
+      }),
+    verifyPhoneCode: (phone: string, code: string) =>
+      fetchApi("/api/auth/verify-phone-code", {
+        method: "POST",
+        body: JSON.stringify({ phone, code }),
       }),
     logout: () => fetchApi("/api/auth/logout", { method: "POST" }),
     me: () => fetchApi("/api/auth/me"),

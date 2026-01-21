@@ -181,13 +181,13 @@ export default function Profile() {
               <div className="relative">
                 <Avatar className="w-32 h-32 border-4 border-background shadow-xl">
                   <AvatarImage src={user.avatar || undefined} />
-                  <AvatarFallback>{user.name?.[0] || 'U'}</AvatarFallback>
+                  <AvatarFallback>{user.firstName?.[0] || 'U'}</AvatarFallback>
                 </Avatar>
                 <div className="absolute bottom-2 right-2 w-6 h-6 bg-green-500 border-2 border-background rounded-full" title="Online" />
               </div>
               <div className="pb-2 mb-2">
                 <div className="flex items-center gap-2 mb-1">
-                  <h1 className="text-3xl font-display font-bold">{user.name}</h1>
+                  <h1 className="text-3xl font-display font-bold">{user.firstName} {user.lastName}</h1>
                   <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">Pro Member</Badge>
                 </div>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">

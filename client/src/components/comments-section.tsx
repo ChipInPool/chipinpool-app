@@ -59,7 +59,7 @@ export function CommentsSection({ comments: initialComments, poolId }: CommentsS
       <form onSubmit={handleSubmit} className="mb-8 flex gap-4">
         <Avatar className="w-10 h-10">
           <AvatarImage src={user?.avatar || undefined} />
-          <AvatarFallback>{user?.name?.[0] || 'U'}</AvatarFallback>
+          <AvatarFallback>{user?.firstName?.[0] || 'U'}</AvatarFallback>
         </Avatar>
         <div className="flex-1 relative">
           <Textarea 
@@ -90,7 +90,7 @@ export function CommentsSection({ comments: initialComments, poolId }: CommentsS
               <Link href={comment.userId === user?.id ? '/profile' : `/user/${comment.userId}`} data-testid={`link-comment-user-${comment.userId}`}>
                 <Avatar className="w-10 h-10 mt-1 cursor-pointer hover:opacity-80 transition-opacity">
                   <AvatarImage src={comment.user?.avatar} />
-                  <AvatarFallback>{comment.user?.name?.[0] || '?'}</AvatarFallback>
+                  <AvatarFallback>{comment.user?.firstName?.[0] || '?'}</AvatarFallback>
                 </Avatar>
               </Link>
               <div className="flex-1 space-y-2">
@@ -101,7 +101,7 @@ export function CommentsSection({ comments: initialComments, poolId }: CommentsS
                       className="font-semibold text-sm hover:text-primary transition-colors"
                       data-testid={`link-comment-username-${comment.userId}`}
                     >
-                      {comment.user?.name || 'Anonymous'}
+                      {comment.user?.firstName ? `${comment.user.firstName} ${comment.user.lastName || ''}`.trim() : 'Anonymous'}
                     </Link>
                     {comment.user?.badges?.map((b: any) => (
                       <span key={b.id} title={b.name} className="text-xs cursor-help">{b.icon}</span>
