@@ -59,6 +59,7 @@ Preferred communication style: Simple, everyday language.
 - `recurringContributions`: Scheduled recurring payments
 - `follows`: Social follow relationships between users
 - `apiAccessRequests`: Developer API access requests
+- `adminAuditLogs`: Audit trail for all admin actions (suspend, unsuspend, etc.)
 
 ## Recent Changes (January 2026)
 
@@ -76,6 +77,13 @@ Preferred communication style: Simple, everyday language.
     - Uses Stripe Identity (real identity verification, no demo fallback)
 11. **Virtual Cards** - Real Stripe Issuing virtual cards with secure ephemeral key-based card detail retrieval
 12. **Production Mode** - All APIs use live/production mode (no demo data, no mock fallbacks)
+13. **Admin Portal** (`/admin`) - Complete administrative interface with:
+    - Dashboard with platform metrics (users, pools, contributions, KYC status)
+    - User management with search, suspend/unsuspend actions
+    - Pool management with status filtering
+    - Transaction monitoring
+    - Admin audit logging for all actions
+    - Role-based access control (requires `role: 'admin'` in users table)
 
 ### Theme System:
 - Custom ThemeProvider in `client/src/components/theme-provider.tsx`

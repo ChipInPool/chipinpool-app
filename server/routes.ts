@@ -2108,22 +2108,31 @@ export async function registerRoutes(
   // Admin suspend user
   app.post("/api/admin/users/:id/suspend", requireAdmin, async (req: any, res, next) => {
     try {
-      const { reason } = req.body;
+      const adminId = req.session?.userId;
+      if (!adminId) {
+        return res.status(401).json({ message: "Admin not authenticated" });
+      }
+
+      const { reason } = req.body || {};
       const userId = req.params.id;
-      const adminId = req.session.userId;
+      const sanitizedReason = typeof reason === 'string' ? reason.slice(0, 500) : 'Suspended by admin';
 
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
+      if (user.role === 'admin') {
+        return res.status(403).json({ message: "Cannot suspend admin users" });
+      }
+
       await db.update(users).set({
         suspended: true,
         suspendedAt: new Date(),
-        suspendedReason: reason || 'Suspended by admin',
+        suspendedReason: sanitizedReason,
       }).where(eq(users.id, userId));
 
-      await logAdminAction(adminId, 'suspend_user', 'user', userId, reason);
+      await logAdminAction(adminId, 'suspend_user', 'user', userId, sanitizedReason);
 
       res.json({ message: "User suspended successfully" });
     } catch (error) {
@@ -2134,8 +2143,17 @@ export async function registerRoutes(
   // Admin unsuspend user
   app.post("/api/admin/users/:id/unsuspend", requireAdmin, async (req: any, res, next) => {
     try {
+      const adminId = req.session?.userId;
+      if (!adminId) {
+        return res.status(401).json({ message: "Admin not authenticated" });
+      }
+
       const userId = req.params.id;
-      const adminId = req.session.userId;
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
 
       await db.update(users).set({
         suspended: false,
