@@ -1811,6 +1811,12 @@ export async function registerRoutes(
         return_url: `${baseUrl}/`,
       });
 
+      console.log('Stripe verification session created:', {
+        id: verificationSession.id,
+        url: verificationSession.url,
+        status: verificationSession.status,
+      });
+
       await storage.updateUser(userId, { kycStatus: 'pending' });
 
       res.json({ 
