@@ -84,7 +84,7 @@ export default function Terms() {
             <section>
               <h2 className="text-xl font-semibold mb-3">11. Contact</h2>
               <p className="text-muted-foreground leading-relaxed">
-                If you have questions about these Terms of Service, please contact us through the app or at support@chipin.com.
+                If you have questions about these Terms of Service, please contact us through the app or at mail@chipinpool.com.
               </p>
             </section>
           </CardContent>

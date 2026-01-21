@@ -91,7 +91,7 @@ export default function Privacy() {
             <section>
               <h2 className="text-xl font-semibold mb-3">12. Contact Us</h2>
               <p className="text-muted-foreground leading-relaxed">
-                If you have questions about this Privacy Policy or our data practices, please contact us through the app or at privacy@chipin.com.
+                If you have questions about this Privacy Policy or our data practices, please contact us through the app or at mail@chipinpool.com.
               </p>
             </section>
           </CardContent>
