@@ -2322,22 +2322,24 @@ export async function registerRoutes(
     }
   });
 
-  // Admin: Sync Stripe checkout sessions for wallet deposits
+  // Admin: Sync all Stripe data (deposits, contributions, KYC)
   app.post("/api/admin/sync-stripe-deposits", requireAdmin, async (req: any, res, next) => {
     try {
       const stripe = await getUncachableStripeClient();
       
-      // Get recent completed checkout sessions from last 7 days
+      let syncedDeposits = 0;
+      let syncedContributions = 0;
+      let syncedKyc = 0;
+      let skipped = 0;
+      let errors: string[] = [];
+
+      // 1. Sync checkout sessions (deposits and contributions) from last 7 days
       const sessions = await stripe.checkout.sessions.list({
         limit: 100,
         created: {
-          gte: Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60), // Last 7 days
+          gte: Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60),
         },
       });
-
-      let synced = 0;
-      let skipped = 0;
-      let errors: string[] = [];
 
       for (const session of sessions.data) {
         if (session.payment_status !== 'paid') {
@@ -2345,38 +2347,98 @@ export async function registerRoutes(
           continue;
         }
 
-        const { type, userId, amount } = session.metadata || {};
+        const { type, userId, amount, poolId } = session.metadata || {};
         
+        // Sync wallet deposits
         if (type === 'wallet_deposit' && userId && amount) {
           try {
             const success = await storage.createWalletDeposit(userId, amount, session.id);
             if (success) {
-              synced++;
+              syncedDeposits++;
               console.log(`Synced wallet deposit: $${amount} for user ${userId}`);
             } else {
-              skipped++; // Already exists
+              skipped++;
             }
           } catch (err: any) {
-            errors.push(`Session ${session.id}: ${err.message}`);
+            errors.push(`Deposit ${session.id}: ${err.message}`);
+          }
+        }
+        
+        // Sync pool contributions
+        if (poolId && amount && !type) {
+          try {
+            const guestEmail = session.customer_email || null;
+            const contribution = await storage.createStripeContribution(
+              poolId,
+              amount,
+              session.id,
+              userId || null,
+              guestEmail
+            );
+            if (contribution) {
+              syncedContributions++;
+              console.log(`Synced contribution: $${amount} to pool ${poolId}`);
+            } else {
+              skipped++;
+            }
+          } catch (err: any) {
+            errors.push(`Contribution ${session.id}: ${err.message}`);
           }
         }
       }
 
+      // 2. Sync identity verification sessions from last 7 days
+      try {
+        const verificationSessions = await stripe.identity.verificationSessions.list({
+          limit: 100,
+          created: {
+            gte: Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60),
+          },
+        });
+
+        for (const vs of verificationSessions.data) {
+          const userId = vs.metadata?.userId;
+          if (!userId) continue;
+
+          try {
+            const user = await storage.getUser(userId);
+            if (!user) continue;
+
+            if (vs.status === 'verified' && user.kycStatus !== 'verified') {
+              await storage.updateUser(userId, { kycStatus: 'verified' });
+              syncedKyc++;
+              console.log(`Synced KYC verified for user ${userId}`);
+            } else if (vs.status === 'requires_input' && user.kycStatus === 'pending') {
+              await storage.updateUser(userId, { kycStatus: 'failed' });
+              syncedKyc++;
+              console.log(`Synced KYC failed for user ${userId}`);
+            }
+          } catch (err: any) {
+            errors.push(`KYC ${vs.id}: ${err.message}`);
+          }
+        }
+      } catch (err: any) {
+        console.log('Could not sync identity sessions:', err.message);
+      }
+
       await logAdminAction(
         req.session.userId!,
-        'sync_stripe_deposits',
+        'sync_stripe_all',
         'system',
         undefined,
-        `Synced ${synced} deposits, skipped ${skipped}`,
+        `Deposits: ${syncedDeposits}, Contributions: ${syncedContributions}, KYC: ${syncedKyc}, Skipped: ${skipped}`,
         req.ip
       );
 
+      const totalSynced = syncedDeposits + syncedContributions + syncedKyc;
       res.json({ 
         success: true, 
-        synced, 
+        syncedDeposits,
+        syncedContributions,
+        syncedKyc,
         skipped, 
         errors: errors.length > 0 ? errors : undefined,
-        message: `Synced ${synced} wallet deposits from Stripe`
+        message: `Synced ${totalSynced} items from Stripe (${syncedDeposits} deposits, ${syncedContributions} contributions, ${syncedKyc} KYC)`
       });
     } catch (error) {
       next(error);
