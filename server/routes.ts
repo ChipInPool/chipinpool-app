@@ -47,10 +47,14 @@ export async function registerRoutes(
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        sameSite: "lax",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       },
+      proxy: true, // Trust the reverse proxy
     })
   );
+  
+  // Trust proxy for secure cookies behind Replit's proxy
+  app.set('trust proxy', 1);
 
   // Auth middleware
   const requireAuth = (req: any, res: any, next: any) => {
