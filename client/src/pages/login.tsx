@@ -163,6 +163,11 @@ export default function Login() {
     try {
       const data = await api.security.startKYC();
       
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      
       if (data.clientSecret) {
         const stripeKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
         if (!stripeKey) {

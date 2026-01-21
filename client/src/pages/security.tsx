@@ -197,6 +197,11 @@ export default function Security() {
   const startKYCMutation = useMutation({
     mutationFn: api.security.startKYC,
     onSuccess: async (data: any) => {
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      
       if (data.clientSecret) {
         const stripeKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
         if (!stripeKey) {
@@ -220,8 +225,6 @@ export default function Security() {
             toast({ description: "Identity verification submitted! We'll notify you once verified." });
           }
         }
-      } else if (data.url) {
-        window.location.href = data.url;
       }
     },
     onError: (error: any) => {
