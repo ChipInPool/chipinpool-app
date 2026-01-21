@@ -9,7 +9,7 @@ import { Plus, Wallet, Menu, Bell, Moon, Sun, LogOut, Shield, Settings } from "l
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/theme-provider";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -244,8 +244,27 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <Link href="/profile" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>My Profile</Link>
                     <Link href="/settings" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Settings</Link>
                     <Link href="/api-docs" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>For Developers</Link>
+                    
+                    <div className="pt-4 border-t border-white/10 mt-2">
+                      <p className="text-sm text-muted-foreground px-2 mb-2">Theme</p>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => setTheme("light")} 
+                          className="flex-1 p-2 rounded-md hover:bg-white/5 flex items-center justify-center gap-2 text-sm"
+                        >
+                          <Sun className="w-4 h-4" /> Light
+                        </button>
+                        <button 
+                          onClick={() => setTheme("dark")} 
+                          className="flex-1 p-2 rounded-md hover:bg-white/5 flex items-center justify-center gap-2 text-sm"
+                        >
+                          <Moon className="w-4 h-4" /> Dark
+                        </button>
+                      </div>
+                    </div>
+                    
                     {isAuthenticated && (
-                      <button onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors text-left text-red-400">
+                      <button onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors text-left text-red-400 mt-2">
                         Logout
                       </button>
                     )}

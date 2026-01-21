@@ -197,6 +197,18 @@ export default function Security() {
   const startKYCMutation = useMutation({
     mutationFn: api.security.startKYC,
     onSuccess: async (data: any) => {
+      if (data.demoMode) {
+        // Use demo verification flow
+        try {
+          const demoResult = await api.security.demoVerifyKYC();
+          queryClient.invalidateQueries({ queryKey: ["securityStatus"] });
+          toast({ description: demoResult.message || "Identity verified!" });
+        } catch (e: any) {
+          toast({ description: e.message || "Demo verification failed", variant: "destructive" });
+        }
+        return;
+      }
+      
       if (data.clientSecret) {
         setKycClientSecret(data.clientSecret);
         setShowKYCModal(true);

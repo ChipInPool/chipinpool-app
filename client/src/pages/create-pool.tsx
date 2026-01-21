@@ -5,19 +5,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Gift, Plane, ShoppingBag, Calendar, ImagePlus, RefreshCw, Loader2, Sparkles, PartyPopper, Home, GraduationCap, Heart, Coffee } from "lucide-react";
+import { ArrowLeft, Gift, Plane, ShoppingBag, Calendar, ImagePlus, RefreshCw, Loader2, Sparkles, PartyPopper, Home, GraduationCap, Heart, Coffee, Shield, AlertTriangle } from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function CreatePool() {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const { toast } = useToast();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const queryClient = useQueryClient();
+  
+  const { data: securityStatus, isLoading: statusLoading } = useQuery({
+    queryKey: ["securityStatus"],
+    queryFn: api.security.getStatus,
+    enabled: isAuthenticated,
+  });
+  
+  const isKycVerified = securityStatus?.kycVerified;
   
   const params = new URLSearchParams(search);
   const prefillTitle = params.get('title') || "";
@@ -60,6 +69,60 @@ export default function CreatePool() {
 
   if (!authLoading && !isAuthenticated) {
     return null;
+  }
+  
+  if (statusLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+  
+  if (!isKycVerified) {
+    return (
+      <Layout>
+        <div className="max-w-lg mx-auto mt-12">
+          <Card className="border-orange-500/30 bg-orange-500/5">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center mb-4">
+                <AlertTriangle className="w-8 h-8 text-orange-500" />
+              </div>
+              <CardTitle className="text-xl">Identity Verification Required</CardTitle>
+              <CardDescription>
+                To protect our community and comply with regulations, you need to verify your identity before creating pools.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p>Verification helps us:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>Prevent fraud and protect your funds</li>
+                  <li>Ensure secure transactions</li>
+                  <li>Comply with financial regulations</li>
+                </ul>
+              </div>
+              <Button 
+                className="w-full" 
+                onClick={() => setLocation("/security")}
+                data-testid="button-verify-identity"
+              >
+                <Shield className="w-4 h-4 mr-2" /> Verify My Identity
+              </Button>
+              <Button 
+                variant="ghost" 
+                className="w-full" 
+                onClick={() => setLocation("/")}
+              >
+                Back to Dashboard
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
   }
 
   const handleSubmit = (e: React.FormEvent) => {

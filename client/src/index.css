@@ -76,42 +76,59 @@
 }
 
 .light {
-  /* Light Theme - Clean and Modern */
-  --background: 0 0% 100%;
+  /* Light Theme - Clean, Modern Fintech */
+  --background: 210 40% 98%;
   --foreground: 222 47% 11%;
 
-  /* Card: Light gray */
-  --card: 0 0% 98%;
+  /* Card: White with subtle warmth */
+  --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
 
   /* Popover */
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
 
-  /* Primary: Deeper Green for visibility */
-  --primary: 84 100% 35%;
+  /* Primary: Deep Teal Green for fintech trust */
+  --primary: 160 84% 39%;
   --primary-foreground: 0 0% 100%;
 
-  /* Secondary */
-  --secondary: 210 20% 93%;
+  /* Secondary: Soft Blue-Gray */
+  --secondary: 214 32% 91%;
   --secondary-foreground: 222 47% 11%;
 
-  /* Muted */
-  --muted: 210 20% 93%;
+  /* Muted: Light Gray */
+  --muted: 210 40% 96%;
   --muted-foreground: 215 16% 47%;
 
-  /* Accent */
-  --accent: 190 100% 40%;
+  /* Accent: Vibrant Blue */
+  --accent: 199 89% 48%;
   --accent-foreground: 0 0% 100%;
 
   /* Destructive */
-  --destructive: 0 84% 60%;
+  --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
 
-  /* Borders */
-  --border: 214 20% 85%;
-  --input: 214 20% 85%;
-  --ring: 84 100% 35%;
+  /* Borders - more visible */
+  --border: 214 32% 85%;
+  --input: 214 32% 91%;
+  --ring: 160 84% 39%;
+}
+
+/* Light mode specific overrides */
+.light .glass {
+  @apply bg-black/5 backdrop-blur-lg border border-black/10;
+}
+
+.light .glass-card {
+  @apply bg-white/90 backdrop-blur-md border border-black/5 shadow-lg;
+}
+
+.light nav {
+  @apply border-b border-black/10 bg-white/80;
+}
+
+.light footer {
+  @apply border-t border-black/10;
 }
 
 @layer base {

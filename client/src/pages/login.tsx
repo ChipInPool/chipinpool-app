@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { api } from "@/lib/api";
+import { Loader2, Shield, CheckCircle2, ArrowRight } from "lucide-react";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -17,12 +18,15 @@ export default function Login() {
 
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [registerForm, setRegisterForm] = useState({ name: "", email: "", password: "" });
+  const [showKycPrompt, setShowKycPrompt] = useState(false);
+  const [kycLoading, setKycLoading] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
+    // Don't redirect if we're showing KYC prompt
+    if (!authLoading && isAuthenticated && !showKycPrompt) {
       setLocation("/");
     }
-  }, [authLoading, isAuthenticated, setLocation]);
+  }, [authLoading, isAuthenticated, showKycPrompt, setLocation]);
 
   if (authLoading) {
     return (
@@ -32,7 +36,8 @@ export default function Login() {
     );
   }
 
-  if (isAuthenticated) {
+  // Don't redirect if showing KYC prompt
+  if (isAuthenticated && !showKycPrompt) {
     return null;
   }
 
@@ -56,13 +61,119 @@ export default function Login() {
     try {
       await register(registerForm.name, registerForm.email, registerForm.password);
       toast({ description: "Account created! Welcome to ChipIn." });
-      setLocation("/");
+      setShowKycPrompt(true);
     } catch (error: any) {
       toast({ description: error.message || "Registration failed", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
   };
+  
+  const handleStartKyc = async () => {
+    setKycLoading(true);
+    try {
+      const data = await api.security.startKYC();
+      
+      if (data.demoMode) {
+        // Use demo verification flow
+        const demoResult = await api.security.demoVerifyKYC();
+        toast({ description: demoResult.message || "Identity verified!" });
+        // Small delay to let session update
+        await new Promise(r => setTimeout(r, 500));
+        window.location.href = "/";
+        return;
+      }
+      
+      if (data.clientSecret) {
+        const stripe = await import('@stripe/stripe-js').then(m => 
+          m.loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '')
+        );
+        
+        if (stripe && data.clientSecret) {
+          const { error } = await stripe.verifyIdentity(data.clientSecret);
+          if (error) {
+            toast({ description: error.message || "Verification failed", variant: "destructive" });
+          } else {
+            toast({ description: "Identity verification submitted!" });
+          }
+        }
+      }
+      window.location.href = "/";
+    } catch (error: any) {
+      toast({ description: error.message || "Failed to start verification", variant: "destructive" });
+      window.location.href = "/";
+    } finally {
+      setKycLoading(false);
+    }
+  };
+
+  if (showKycPrompt) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-background font-bold text-xl">
+                C
+              </div>
+              <span className="font-display font-bold text-2xl tracking-tight">ChipIn</span>
+            </div>
+          </div>
+          
+          <Card className="border-white/10 bg-card/50 backdrop-blur">
+            <CardHeader className="text-center pb-2">
+              <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <CheckCircle2 className="w-8 h-8 text-primary" />
+              </div>
+              <CardTitle>Account Created!</CardTitle>
+              <CardDescription>
+                Just one more step to unlock all features
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg bg-muted/50 p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <Shield className="w-5 h-5 text-primary mt-0.5" />
+                  <div>
+                    <p className="font-medium text-sm">Verify Your Identity</p>
+                    <p className="text-xs text-muted-foreground">
+                      Quick verification enables pool creation, virtual cards, and higher limits.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <Button 
+                className="w-full" 
+                onClick={handleStartKyc}
+                disabled={kycLoading}
+                data-testid="button-start-kyc"
+              >
+                {kycLoading ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Starting Verification...</>
+                ) : (
+                  <><Shield className="w-4 h-4 mr-2" /> Verify Now</>
+                )}
+              </Button>
+              
+              <Button 
+                variant="ghost" 
+                className="w-full text-muted-foreground" 
+                onClick={() => setLocation("/")}
+                data-testid="button-skip-kyc"
+              >
+                Skip for now <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+              
+              <p className="text-[10px] text-center text-muted-foreground">
+                You can complete verification later in Settings. Some features will be limited until verified.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
