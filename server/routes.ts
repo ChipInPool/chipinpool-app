@@ -801,7 +801,10 @@ export async function registerRoutes(
 
   app.post("/api/user/withdraw", requireAuth, async (req, res, next) => {
     try {
-      const { amount } = z.object({ amount: z.string() }).parse(req.body);
+      const { amount, bankAccountId } = z.object({ 
+        amount: z.string(),
+        bankAccountId: z.string().optional()
+      }).parse(req.body);
       const withdrawAmount = parseFloat(amount);
       
       if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
@@ -820,8 +823,43 @@ export async function registerRoutes(
 
       const newBalance = (currentBalance - withdrawAmount).toFixed(2);
       await storage.updateUserBalance(user.id, newBalance);
+      
+      // Log the withdrawal
+      await storage.createWalletWithdrawal(user.id, amount, bankAccountId);
 
       res.json({ message: "Withdrawal successful", balance: newBalance });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get wallet transaction history (deposits and withdrawals)
+  app.get("/api/user/wallet-history", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const history = await storage.getWalletHistory(userId);
+      
+      // Combine and format for frontend
+      const transactions = [
+        ...history.deposits.map(d => ({
+          id: d.id,
+          type: 'deposit' as const,
+          amount: d.amount,
+          status: 'completed',
+          createdAt: d.createdAt,
+          stripeSessionId: d.stripeSessionId,
+        })),
+        ...history.withdrawals.map(w => ({
+          id: w.id,
+          type: 'withdrawal' as const,
+          amount: w.amount,
+          status: w.status,
+          createdAt: w.createdAt,
+          bankAccountId: w.bankAccountId,
+        })),
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      res.json({ transactions });
     } catch (error) {
       next(error);
     }
@@ -1769,9 +1807,11 @@ export async function registerRoutes(
       }
 
       // In production, this would initiate a real ACH transfer via Plaid Transfer API
-      // For now, we simulate the withdrawal
       const newBalance = (currentBalance - withdrawAmount).toFixed(2);
       await storage.updateUser(userId, { balance: newBalance });
+      
+      // Log the withdrawal
+      await storage.createWalletWithdrawal(userId, amount, user.plaidAccountId);
 
       res.json({ 
         message: `Withdrawal of $${withdrawAmount.toFixed(2)} initiated. Funds will arrive in 1-3 business days.`,
