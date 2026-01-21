@@ -1740,6 +1740,10 @@ export async function registerRoutes(
 
       const stripe = await getUncachableStripeClient();
       
+      const baseUrl = process.env.REPLIT_DOMAINS 
+        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+        : 'http://localhost:5000';
+      
       const verificationSession = await stripe.identity.verificationSessions.create({
         type: 'document',
         metadata: { userId },
@@ -1748,6 +1752,7 @@ export async function registerRoutes(
             require_matching_selfie: true,
           },
         },
+        return_url: `${baseUrl}/`,
       });
 
       await storage.updateUser(userId, { kycStatus: 'pending' });
