@@ -148,6 +148,8 @@ export default function Login() {
         acceptTerms: acceptTerms,
       });
       toast({ description: "Account created! Welcome to ChipIn." });
+      // Small delay to ensure session cookie is properly set before showing KYC
+      await new Promise(resolve => setTimeout(resolve, 500));
       setShowKycPrompt(true);
     } catch (error: any) {
       toast({ description: error.message || "Registration failed", variant: "destructive" });

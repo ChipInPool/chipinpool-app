@@ -47,6 +47,7 @@ export async function registerRoutes(
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        sameSite: "lax",
       },
     })
   );
@@ -173,6 +174,14 @@ export async function registerRoutes(
       await db.delete(phoneVerificationCodes).where(eq(phoneVerificationCodes.phone, data.phone));
 
       req.session.userId = user.id;
+      
+      // Explicitly save session before responding to ensure cookie is set
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err: any) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
       
       // Send welcome email asynchronously
       sendWelcomeEmail(user.email, `${user.firstName} ${user.lastName}`).catch(err => 
