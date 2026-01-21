@@ -444,6 +444,7 @@ export const insertMerchantSchema = createInsertSchema(merchants).omit({
   id: true, 
   createdAt: true, 
   status: true,
+  feePercent: true,
   totalVolume: true,
   totalFees: true,
   totalPayouts: true,
