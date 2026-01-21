@@ -14,7 +14,7 @@ const testimonials = [
   {
     name: "Sarah M.",
     role: "Trip Organizer",
-    content: "ChipInPay made our group trip to Hawaii so much easier. No more chasing people for money!",
+    content: "ChipInPool made our group trip to Hawaii so much easier. No more chasing people for money!",
     avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
     rating: 5,
   },
@@ -43,7 +43,7 @@ export default function Landing() {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-background font-bold text-lg shadow-lg shadow-primary/30">
               C
             </div>
-            <span className="font-display font-bold text-xl tracking-tight">ChipInPay</span>
+            <span className="font-display font-bold text-xl tracking-tight">ChipInPool</span>
           </div>
 
           <div className="hidden md:flex items-center gap-8">
@@ -135,7 +135,7 @@ export default function Landing() {
               <Zap className="w-4 h-4" /> Features
             </div>
             <h2 className="text-3xl md:text-5xl font-display font-bold mb-4">Everything you need for group payments</h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">From splitting dinner to funding a group vacation, ChipInPay makes it easy.</p>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">From splitting dinner to funding a group vacation, ChipInPool makes it easy.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -196,7 +196,7 @@ export default function Landing() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 text-sm font-semibold mb-4">
               <Sparkles className="w-4 h-4" /> Simple Process
             </div>
-            <h2 className="text-3xl md:text-5xl font-display font-bold mb-4">How ChipInPay Works</h2>
+            <h2 className="text-3xl md:text-5xl font-display font-bold mb-4">How ChipInPool Works</h2>
             <p className="text-muted-foreground text-lg">Three simple steps to start pooling funds</p>
           </div>
 
@@ -306,7 +306,7 @@ export default function Landing() {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-5xl font-display font-bold mb-4">Ready to start pooling?</h2>
           <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
-            Join thousands of users who are already splitting costs and pooling funds with ChipInPay.
+            Join thousands of users who are already splitting costs and pooling funds with ChipInPool.
           </p>
           <Button size="lg" className="font-semibold text-lg px-12 h-14 shadow-xl shadow-primary/30" asChild data-testid="button-cta-start">
             <Link href="/login">Get Started Free <ArrowRight className="w-5 h-5 ml-2" /></Link>
@@ -322,7 +322,7 @@ export default function Landing() {
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-background font-bold text-lg shadow-lg shadow-primary/20">
                   C
                 </div>
-                <span className="font-display font-bold text-xl tracking-tight">ChipInPay</span>
+                <span className="font-display font-bold text-xl tracking-tight">ChipInPool</span>
               </div>
               <p className="text-sm text-muted-foreground">Pool funds together. Pay smarter.</p>
             </div>
