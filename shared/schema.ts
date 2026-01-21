@@ -23,7 +23,7 @@ export const users = pgTable("users", {
   notifyEmail: boolean("notify_email").notNull().default(true),
   notifySMS: boolean("notify_sms").notNull().default(true),
   notifyPush: boolean("notify_push").notNull().default(true),
-  balance: decimal("balance", { precision: 10, scale: 2 }).notNull().default('1240.50'),
+  balance: decimal("balance", { precision: 10, scale: 2 }).notNull().default('0.00'),
   poolsCreated: integer("pools_created").notNull().default(0),
   totalContributed: decimal("total_contributed", { precision: 10, scale: 2 }).notNull().default('0'),
   rating: decimal("rating", { precision: 3, scale: 2 }).default('5.0'),

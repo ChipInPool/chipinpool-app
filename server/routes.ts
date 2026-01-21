@@ -542,75 +542,67 @@ export async function registerRoutes(
       // Create virtual card if it doesn't exist
       if (!card) {
         const user = await storage.getUser(req.session.userId!);
-        const stripe = await getUncachableStripeClient();
-        
-        // Try to create real Stripe Issuing card if user is KYC verified
-        let stripeCardId = null;
-        let lastFour = null;
-        let cardNumber = `4922${Math.floor(Math.random() * 1000000000000).toString().padStart(12, '0')}`;
-        let cvc = Math.floor(Math.random() * 900 + 100).toString();
-        let expiry = "05/28";
-
-        if (user && user.kycStatus === 'verified') {
-          try {
-            // Create or get cardholder
-            let cardholderId = user.stripeCardholderId;
-            if (!cardholderId) {
-              const cardholder = await stripe.issuing.cardholders.create({
-                name: user.name,
-                email: user.email,
-                phone_number: user.phone || undefined,
-                type: 'individual',
-                billing: {
-                  address: {
-                    line1: '123 Main Street',
-                    city: 'San Francisco',
-                    state: 'CA',
-                    postal_code: '94111',
-                    country: 'US',
-                  },
-                },
-              });
-              cardholderId = cardholder.id;
-              await storage.updateUser(user.id, { stripeCardholderId: cardholderId });
-            }
-
-            // Create virtual card
-            const stripeCard = await stripe.issuing.cards.create({
-              cardholder: cardholderId,
-              currency: 'usd',
-              type: 'virtual',
-              status: 'active',
-              spending_controls: {
-                spending_limits: [{
-                  amount: Math.round(parseFloat(pool.currentAmount) * 100),
-                  interval: 'all_time',
-                }],
-              },
-              metadata: {
-                poolId: pool.id,
-                poolTitle: pool.title,
-              },
-            });
-
-            stripeCardId = stripeCard.id;
-            lastFour = stripeCard.last4;
-            
-            // Get card details (only available for virtual cards)
-            const cardDetails = await stripe.issuing.cards.retrieve(stripeCard.id, {
-              expand: ['number', 'cvc'],
-            });
-            
-            if (cardDetails.number) cardNumber = cardDetails.number;
-            if (cardDetails.cvc) cvc = cardDetails.cvc;
-            expiry = `${String(stripeCard.exp_month).padStart(2, '0')}/${String(stripeCard.exp_year).slice(-2)}`;
-          } catch (stripeError: any) {
-            console.log('[Stripe Issuing] Card creation failed, using demo card:', stripeError.message);
-          }
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
         }
         
+        // Require KYC verification for virtual cards
+        if (user.kycStatus !== 'verified') {
+          return res.status(403).json({ message: "Identity verification required to create virtual cards" });
+        }
+        
+        const stripe = await getUncachableStripeClient();
+        
+        // Create or get cardholder
+        let cardholderId = user.stripeCardholderId;
+        if (!cardholderId) {
+          const cardholder = await stripe.issuing.cardholders.create({
+            name: user.name,
+            email: user.email,
+            phone_number: user.phone || undefined,
+            type: 'individual',
+            billing: {
+              address: {
+                line1: '123 Main Street',
+                city: 'San Francisco',
+                state: 'CA',
+                postal_code: '94111',
+                country: 'US',
+              },
+            },
+          });
+          cardholderId = cardholder.id;
+          await storage.updateUser(user.id, { stripeCardholderId: cardholderId });
+        }
+
+        // Create virtual card via Stripe Issuing
+        const stripeCard = await stripe.issuing.cards.create({
+          cardholder: cardholderId,
+          currency: 'usd',
+          type: 'virtual',
+          status: 'active',
+          spending_controls: {
+            spending_limits: [{
+              amount: Math.round(parseFloat(pool.currentAmount) * 100),
+              interval: 'all_time',
+            }],
+          },
+          metadata: {
+            poolId: pool.id,
+            poolTitle: pool.title,
+          },
+        });
+
+        // Get card details (only available for virtual cards)
+        const cardDetails = await stripe.issuing.cards.retrieve(stripeCard.id, {
+          expand: ['number', 'cvc'],
+        });
+        
+        const cardNumber = cardDetails.number || '';
+        const cvc = cardDetails.cvc || '';
+        const expiry = `${String(stripeCard.exp_month).padStart(2, '0')}/${String(stripeCard.exp_year).slice(-2)}`;
+        
         // Store only masked data - never store full PAN/CVC
-        // For demo cards, store a placeholder; for real Stripe cards, only store last 4
         const maskedCardNumber = `************${cardNumber.slice(-4)}`;
         const maskedCvc = '***';
         
@@ -620,8 +612,8 @@ export async function registerRoutes(
           expiry,
           cvc: maskedCvc,
           balance: pool.currentAmount,
-          stripeCardId,
-          lastFour: lastFour || cardNumber.slice(-4),
+          stripeCardId: stripeCard.id,
+          lastFour: stripeCard.last4,
         });
       }
 
@@ -1253,8 +1245,11 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Plaid not configured. Bank linking unavailable." });
       }
 
-      // Use development environment (change to sandbox for testing)
-      const plaidEnv = process.env.PLAID_ENV === 'sandbox' ? PlaidEnvironments.sandbox : PlaidEnvironments.development;
+      // Use production environment by default, sandbox for testing
+      const plaidEnvName = process.env.PLAID_ENV || 'production';
+      const plaidEnv = plaidEnvName === 'sandbox' ? PlaidEnvironments.sandbox : 
+                       plaidEnvName === 'development' ? PlaidEnvironments.development : 
+                       PlaidEnvironments.production;
       
       const configuration = new Configuration({
         basePath: plaidEnv,
@@ -1309,7 +1304,10 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Plaid not configured" });
       }
 
-      const plaidEnv = process.env.PLAID_ENV === 'sandbox' ? PlaidEnvironments.sandbox : PlaidEnvironments.development;
+      const plaidEnvName = process.env.PLAID_ENV || 'production';
+      const plaidEnv = plaidEnvName === 'sandbox' ? PlaidEnvironments.sandbox : 
+                       plaidEnvName === 'development' ? PlaidEnvironments.development : 
+                       PlaidEnvironments.production;
       
       const configuration = new Configuration({
         basePath: plaidEnv,
@@ -1590,57 +1588,23 @@ export async function registerRoutes(
       if (!user) return res.status(404).json({ error: "User not found" });
       if (user.kycStatus === 'verified') return res.status(400).json({ error: "Already verified" });
 
-      try {
-        const stripe = await getUncachableStripeClient();
-        
-        const verificationSession = await stripe.identity.verificationSessions.create({
-          type: 'document',
-          metadata: { userId },
-          options: {
-            document: {
-              require_matching_selfie: true,
-            },
+      const stripe = await getUncachableStripeClient();
+      
+      const verificationSession = await stripe.identity.verificationSessions.create({
+        type: 'document',
+        metadata: { userId },
+        options: {
+          document: {
+            require_matching_selfie: true,
           },
-        });
-
-        await storage.updateUser(userId, { kycStatus: 'pending' });
-
-        res.json({ 
-          clientSecret: verificationSession.client_secret,
-          url: verificationSession.url,
-        });
-      } catch (stripeError: any) {
-        // For demo/prototype mode - provide a mock verification flow
-        console.log("Stripe Identity not available, using demo mode:", stripeError.message);
-        res.json({ 
-          demoMode: true,
-          message: "Stripe Identity not configured. Use /api/security/kyc/demo-verify for demo verification."
-        });
-      }
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  // Demo KYC verification (for prototype without Stripe Identity)
-  app.post("/api/security/kyc/demo-verify", requireAuth, async (req, res, next) => {
-    try {
-      const userId = req.session.userId!;
-      const user = await storage.getUser(userId);
-      if (!user) return res.status(404).json({ error: "User not found" });
-      if (user.kycStatus === 'verified') return res.status(400).json({ error: "Already verified" });
-
-      // Simulate verification delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      await storage.updateUser(userId, { 
-        kycStatus: 'verified',
-        kycVerifiedAt: new Date()
+        },
       });
 
+      await storage.updateUser(userId, { kycStatus: 'pending' });
+
       res.json({ 
-        success: true,
-        message: "Identity verified successfully (demo mode)"
+        clientSecret: verificationSession.client_secret,
+        url: verificationSession.url,
       });
     } catch (error) {
       next(error);

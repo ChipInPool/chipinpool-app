@@ -50,4 +50,4 @@ integrations = ["stripe:2.0.0", "resend:1.0.0"]
 [userenv]
 
 [userenv.shared]
-PLAID_ENV = "sandbox"
+PLAID_ENV = "production"

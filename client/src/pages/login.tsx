@@ -74,23 +74,10 @@ export default function Login() {
     try {
       const data = await api.security.startKYC();
       
-      if (data.demoMode) {
-        // Use demo verification flow
-        const demoResult = await api.security.demoVerifyKYC();
-        toast({ description: demoResult.message || "Identity verified!" });
-        await new Promise(r => setTimeout(r, 500));
-        window.location.href = "/";
-        return;
-      }
-      
       if (data.clientSecret) {
         const stripeKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
         if (!stripeKey) {
-          // No Stripe key, use demo flow instead
-          const demoResult = await api.security.demoVerifyKYC();
-          toast({ description: demoResult.message || "Identity verified!" });
-          await new Promise(r => setTimeout(r, 500));
-          window.location.href = "/";
+          toast({ description: "Stripe is not configured. Please contact support.", variant: "destructive" });
           return;
         }
         
@@ -108,7 +95,6 @@ export default function Login() {
       window.location.href = "/";
     } catch (error: any) {
       toast({ description: error.message || "Failed to start verification", variant: "destructive" });
-      window.location.href = "/";
     } finally {
       setKycLoading(false);
     }
@@ -212,7 +198,7 @@ export default function Login() {
                     <Input
                       id="login-email"
                       type="email"
-                      placeholder="demo@chipin.com"
+                      placeholder="you@email.com"
                       value={loginForm.email}
                       onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
                       required
@@ -235,9 +221,6 @@ export default function Login() {
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Sign In
                   </Button>
-                  <p className="text-xs text-center text-muted-foreground">
-                    Demo: demo@chipin.com / password123
-                  </p>
                 </form>
               </TabsContent>
 

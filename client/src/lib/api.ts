@@ -144,8 +144,6 @@ export const api = {
       fetchApi("/api/security/2fa/disable", { method: "POST", body: JSON.stringify({ code }) }),
     startKYC: () =>
       fetchApi("/api/security/kyc/start", { method: "POST" }),
-    demoVerifyKYC: () =>
-      fetchApi("/api/security/kyc/demo-verify", { method: "POST" }),
   },
 };
 
