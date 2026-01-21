@@ -1,39 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Sparkles, Zap, ShieldCheck, Users, CreditCard, Code, ArrowRight, CheckCircle, Star, RefreshCw, Bell, Globe, Sun, Moon } from "lucide-react";
+import { Sparkles, Zap, ShieldCheck, Users, CreditCard, Code, ArrowRight, CheckCircle, RefreshCw, Bell, Globe, Sun, Moon } from "lucide-react";
 import heroImage from "@assets/generated_images/futuristic_fintech_3d_visualization_of_digital_currency_pooling.png";
 import { useTheme } from "@/components/theme-provider";
-
-const stats = [
-  { label: "Active Users", value: "50K+" },
-  { label: "Pools Created", value: "120K+" },
-  { label: "Funds Pooled", value: "$8M+" },
-  { label: "Countries", value: "15+" },
-];
-
-const testimonials = [
-  {
-    name: "Sarah M.",
-    role: "Trip Organizer",
-    content: "ChipInPool made our group trip to Hawaii so much easier. No more chasing people for money!",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
-    rating: 5,
-  },
-  {
-    name: "Mike R.",
-    role: "Event Planner",
-    content: "The virtual cards are a game-changer. We collected funds and spent them instantly for our company retreat.",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
-    rating: 5,
-  },
-  {
-    name: "Emily K.",
-    role: "Gift Coordinator",
-    content: "Perfect for group gifts! Everyone chips in, and I can buy exactly what we want with the virtual card.",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
-    rating: 5,
-  },
-];
 
 export default function Landing() {
   const { theme, setTheme } = useTheme();
@@ -52,7 +21,6 @@ export default function Landing() {
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors" data-testid="link-features">Features</a>
             <a href="#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors" data-testid="link-how-it-works">How It Works</a>
-            <a href="#testimonials" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors" data-testid="link-testimonials">Reviews</a>
             <a href="#developers" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors" data-testid="link-developers">Developers</a>
           </div>
 
@@ -108,15 +76,6 @@ export default function Landing() {
                 <Link href="/how-it-works">See How It Works</Link>
               </Button>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl mx-auto mt-20 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500">
-            {stats.map((stat, i) => (
-              <div key={i} className="text-center">
-                <div className="text-3xl md:text-4xl font-display font-bold text-primary mb-1">{stat.value}</div>
-                <div className="text-sm text-muted-foreground">{stat.label}</div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
@@ -230,42 +189,6 @@ export default function Landing() {
               <h3 className="font-display font-bold text-xl mb-3">Spend Together</h3>
               <p className="text-muted-foreground">Use your virtual card to make purchases anywhere Visa is accepted.</p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="testimonials" className="py-20 bg-white/[0.01]">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 text-yellow-400 text-sm font-semibold mb-4">
-              <Star className="w-4 h-4" /> Reviews
-            </div>
-            <h2 className="text-3xl md:text-5xl font-display font-bold mb-4">Loved by Thousands</h2>
-            <p className="text-muted-foreground text-lg">See what our users are saying</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {testimonials.map((testimonial, i) => (
-              <div key={i} className="p-6 rounded-2xl bg-gradient-to-br from-white/[0.05] to-transparent border border-white/10 hover:border-white/20 transition-colors">
-                <div className="flex gap-1 mb-4">
-                  {[...Array(testimonial.rating)].map((_, j) => (
-                    <Star key={j} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                  ))}
-                </div>
-                <p className="text-foreground mb-6 leading-relaxed">"{testimonial.content}"</p>
-                <div className="flex items-center gap-3">
-                  <img 
-                    src={testimonial.avatar} 
-                    alt={testimonial.name}
-                    className="w-10 h-10 rounded-full object-cover"
-                  />
-                  <div>
-                    <div className="font-medium text-sm">{testimonial.name}</div>
-                    <div className="text-xs text-muted-foreground">{testimonial.role}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
