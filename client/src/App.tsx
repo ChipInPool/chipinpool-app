@@ -26,6 +26,10 @@ import SplitCalculator from "@/pages/split-calculator";
 import { ThemeProvider } from "@/components/theme-provider";
 import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
+import About from "@/pages/about";
+import Careers from "@/pages/careers";
+import Contact from "@/pages/contact";
+import FAQ from "@/pages/faq";
 
 function Router() {
   return (
@@ -50,6 +54,10 @@ function Router() {
       <Route path="/split-calculator" component={SplitCalculator} />
       <Route path="/terms" component={Terms} />
       <Route path="/privacy" component={Privacy} />
+      <Route path="/about" component={About} />
+      <Route path="/careers" component={Careers} />
+      <Route path="/contact" component={Contact} />
+      <Route path="/faq" component={FAQ} />
       <Route component={NotFound} />
     </Switch>
   );
