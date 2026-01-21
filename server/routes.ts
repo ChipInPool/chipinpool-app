@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
-import { registerSchema, loginSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, sendPhoneCodeSchema, verifyPhoneCodeSchema } from "@shared/schema";
+import { registerSchema, loginSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcrypt";
@@ -1957,6 +1957,277 @@ export async function registerRoutes(
         message: "API access request submitted successfully",
         email: user.email,
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ========== ADMIN ROUTES ==========
+  
+  // Admin middleware - requires admin role
+  const requireAdmin = async (req: any, res: any, next: any) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    req.adminUser = user;
+    next();
+  };
+
+  // Log admin action helper
+  const logAdminAction = async (adminId: string, action: string, targetType: string, targetId?: string, details?: string, ipAddress?: string) => {
+    await db.insert(adminAuditLogs).values({
+      adminId,
+      action,
+      targetType,
+      targetId,
+      details,
+      ipAddress,
+    });
+  };
+
+  // Admin dashboard stats
+  app.get("/api/admin/stats", requireAdmin, async (req, res, next) => {
+    try {
+      const [
+        totalUsersResult,
+        activePoolsResult,
+        completedPoolsResult,
+        totalContributionsResult,
+        pendingKycResult,
+        suspendedUsersResult,
+      ] = await Promise.all([
+        db.select({ count: sql`count(*)` }).from(users),
+        db.select({ count: sql`count(*)` }).from(pools).where(eq(pools.status, 'active')),
+        db.select({ count: sql`count(*)` }).from(pools).where(eq(pools.status, 'completed')),
+        db.select({ total: sql`COALESCE(SUM(amount), 0)` }).from(contributions),
+        db.select({ count: sql`count(*)` }).from(users).where(eq(users.kycStatus, 'pending')),
+        db.select({ count: sql`count(*)` }).from(users).where(eq(users.suspended, true)),
+      ]);
+
+      // Recent signups (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const recentSignupsResult = await db.select({ count: sql`count(*)` })
+        .from(users)
+        .where(sql`${users.createdAt} >= ${thirtyDaysAgo}`);
+
+      res.json({
+        totalUsers: Number(totalUsersResult[0]?.count || 0),
+        activePools: Number(activePoolsResult[0]?.count || 0),
+        completedPools: Number(completedPoolsResult[0]?.count || 0),
+        totalContributions: Number(totalContributionsResult[0]?.total || 0),
+        pendingKyc: Number(pendingKycResult[0]?.count || 0),
+        suspendedUsers: Number(suspendedUsersResult[0]?.count || 0),
+        recentSignups: Number(recentSignupsResult[0]?.count || 0),
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin list users
+  app.get("/api/admin/users", requireAdmin, async (req, res, next) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const search = req.query.search as string || '';
+      const kycStatus = req.query.kycStatus as string || '';
+      const offset = (page - 1) * limit;
+
+      let query = db.select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        username: users.username,
+        email: users.email,
+        phone: users.phone,
+        kycStatus: users.kycStatus,
+        role: users.role,
+        suspended: users.suspended,
+        poolsCreated: users.poolsCreated,
+        totalContributed: users.totalContributed,
+        createdAt: users.createdAt,
+      }).from(users);
+
+      if (search) {
+        query = query.where(
+          sql`${users.email} ILIKE ${'%' + search + '%'} OR ${users.firstName} ILIKE ${'%' + search + '%'} OR ${users.lastName} ILIKE ${'%' + search + '%'} OR ${users.username} ILIKE ${'%' + search + '%'}`
+        ) as any;
+      }
+
+      if (kycStatus && ['not_started', 'pending', 'verified', 'failed'].includes(kycStatus)) {
+        query = query.where(eq(users.kycStatus, kycStatus as any)) as any;
+      }
+
+      const userList = await query.orderBy(desc(users.createdAt)).limit(limit).offset(offset);
+
+      const totalResult = await db.select({ count: sql`count(*)` }).from(users);
+      const total = Number(totalResult[0]?.count || 0);
+
+      res.json({
+        users: userList,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin get user details
+  app.get("/api/admin/users/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const userPools = await storage.getPoolsByCreator(user.id);
+      const userContributions = await db.select().from(contributions).where(eq(contributions.userId, user.id));
+
+      const { password, ...userWithoutPassword } = user;
+
+      res.json({
+        user: userWithoutPassword,
+        pools: userPools,
+        contributions: userContributions,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin suspend user
+  app.post("/api/admin/users/:id/suspend", requireAdmin, async (req: any, res, next) => {
+    try {
+      const { reason } = req.body;
+      const userId = req.params.id;
+      const adminId = req.session.userId;
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      await db.update(users).set({
+        suspended: true,
+        suspendedAt: new Date(),
+        suspendedReason: reason || 'Suspended by admin',
+      }).where(eq(users.id, userId));
+
+      await logAdminAction(adminId, 'suspend_user', 'user', userId, reason);
+
+      res.json({ message: "User suspended successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin unsuspend user
+  app.post("/api/admin/users/:id/unsuspend", requireAdmin, async (req: any, res, next) => {
+    try {
+      const userId = req.params.id;
+      const adminId = req.session.userId;
+
+      await db.update(users).set({
+        suspended: false,
+        suspendedAt: null,
+        suspendedReason: null,
+      }).where(eq(users.id, userId));
+
+      await logAdminAction(adminId, 'unsuspend_user', 'user', userId);
+
+      res.json({ message: "User unsuspended successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin list all pools
+  app.get("/api/admin/pools", requireAdmin, async (req, res, next) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const status = req.query.status as string || '';
+      const offset = (page - 1) * limit;
+
+      let query = db.select().from(pools);
+
+      if (status && ['active', 'completed', 'expired'].includes(status)) {
+        query = query.where(eq(pools.status, status as any)) as any;
+      }
+
+      const poolList = await query.orderBy(desc(pools.createdAt)).limit(limit).offset(offset);
+
+      const totalResult = await db.select({ count: sql`count(*)` }).from(pools);
+      const total = Number(totalResult[0]?.count || 0);
+
+      res.json({
+        pools: poolList,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin list all transactions
+  app.get("/api/admin/transactions", requireAdmin, async (req, res, next) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = (page - 1) * limit;
+
+      const transactionList = await db.select()
+        .from(transactions)
+        .orderBy(desc(transactions.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      const totalResult = await db.select({ count: sql`count(*)` }).from(transactions);
+      const total = Number(totalResult[0]?.count || 0);
+
+      res.json({
+        transactions: transactionList,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin audit logs
+  app.get("/api/admin/audit-logs", requireAdmin, async (req, res, next) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = (page - 1) * limit;
+
+      const logs = await db.select()
+        .from(adminAuditLogs)
+        .orderBy(desc(adminAuditLogs.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      res.json({ logs });
     } catch (error) {
       next(error);
     }
