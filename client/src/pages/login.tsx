@@ -193,6 +193,11 @@ export default function Login() {
       return;
     }
 
+    if (checkingField) {
+      toast({ description: "Please wait while we verify your information", variant: "destructive" });
+      return;
+    }
+
     setCodeSending(true);
     try {
       await api.auth.sendPhoneCode(registerForm.phone);
