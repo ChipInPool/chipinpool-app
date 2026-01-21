@@ -1,8 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/admin-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Layers, DollarSign, Clock, AlertTriangle, UserPlus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, Layers, DollarSign, Clock, AlertTriangle, UserPlus, RefreshCw } from "lucide-react";
 import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface AdminStats {
   totalUsers: number;
@@ -22,10 +24,35 @@ async function fetchAdminStats(): Promise<AdminStats> {
   return response.json();
 }
 
+async function syncStripeDeposits(): Promise<{ synced: number; skipped: number; message: string }> {
+  const response = await fetch("/api/admin/sync-stripe-deposits", { 
+    method: "POST",
+    credentials: "include" 
+  });
+  if (!response.ok) {
+    throw new Error("Failed to sync Stripe deposits");
+  }
+  return response.json();
+}
+
 export default function AdminDashboard() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
   const { data: stats, isLoading, error } = useQuery({
     queryKey: ["admin", "stats"],
     queryFn: fetchAdminStats,
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: syncStripeDeposits,
+    onSuccess: (data) => {
+      toast({ description: data.message });
+      queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
+    },
+    onError: (err: any) => {
+      toast({ description: err.message || "Sync failed", variant: "destructive" });
+    },
   });
 
   if (isLoading) {
@@ -61,9 +88,24 @@ export default function AdminDashboard() {
 
   return (
     <AdminLayout>
-      <div className="mb-8">
-        <h1 className="text-3xl font-display font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Overview of ChipIn platform metrics</p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-display font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">Overview of ChipIn platform metrics</p>
+        </div>
+        <Button 
+          onClick={() => syncMutation.mutate()} 
+          disabled={syncMutation.isPending}
+          variant="outline"
+          data-testid="button-sync-stripe"
+        >
+          {syncMutation.isPending ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4 mr-2" />
+          )}
+          Sync Stripe
+        </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

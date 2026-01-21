@@ -2322,5 +2322,66 @@ export async function registerRoutes(
     }
   });
 
+  // Admin: Sync Stripe checkout sessions for wallet deposits
+  app.post("/api/admin/sync-stripe-deposits", requireAdmin, async (req: any, res, next) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      
+      // Get recent completed checkout sessions from last 7 days
+      const sessions = await stripe.checkout.sessions.list({
+        limit: 100,
+        created: {
+          gte: Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60), // Last 7 days
+        },
+      });
+
+      let synced = 0;
+      let skipped = 0;
+      let errors: string[] = [];
+
+      for (const session of sessions.data) {
+        if (session.payment_status !== 'paid') {
+          skipped++;
+          continue;
+        }
+
+        const { type, userId, amount } = session.metadata || {};
+        
+        if (type === 'wallet_deposit' && userId && amount) {
+          try {
+            const success = await storage.createWalletDeposit(userId, amount, session.id);
+            if (success) {
+              synced++;
+              console.log(`Synced wallet deposit: $${amount} for user ${userId}`);
+            } else {
+              skipped++; // Already exists
+            }
+          } catch (err: any) {
+            errors.push(`Session ${session.id}: ${err.message}`);
+          }
+        }
+      }
+
+      await logAdminAction(
+        req.session.userId!,
+        'sync_stripe_deposits',
+        'system',
+        undefined,
+        `Synced ${synced} deposits, skipped ${skipped}`,
+        req.ip
+      );
+
+      res.json({ 
+        success: true, 
+        synced, 
+        skipped, 
+        errors: errors.length > 0 ? errors : undefined,
+        message: `Synced ${synced} wallet deposits from Stripe`
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return httpServer;
 }
