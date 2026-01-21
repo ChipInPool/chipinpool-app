@@ -190,6 +190,7 @@ export default function Profile() {
                   <h1 className="text-3xl font-display font-bold">{user.firstName} {user.lastName}</h1>
                   <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">Pro Member</Badge>
                 </div>
+                <p className="text-muted-foreground mb-2">@{user.username}</p>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {user.location || 'Location not set'}</span>
                   <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> Joined {new Date(user.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>

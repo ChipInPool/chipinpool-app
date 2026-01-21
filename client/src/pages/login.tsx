@@ -181,7 +181,10 @@ export default function Login() {
   };
 
   const handleSocialLogin = (provider: 'google' | 'apple') => {
-    window.location.href = `/api/auth/${provider}`;
+    toast({ 
+      title: "Coming Soon", 
+      description: `${provider === 'google' ? 'Google' : 'Apple'} sign-in will be available soon.` 
+    });
   };
 
   if (showKycPrompt) {
