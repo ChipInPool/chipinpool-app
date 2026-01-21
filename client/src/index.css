@@ -5,7 +5,7 @@
 
 @theme inline {
   --font-sans: 'Inter', sans-serif;
-  --font-display: 'Plus Jakarta Sans', sans-serif;
+  --font-display: 'Poppins', sans-serif;
 
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
@@ -33,102 +33,102 @@
 }
 
 :root {
-  --radius: 0.75rem;
+  --radius: 0.5rem;
 }
 
 .dark {
-  /* Neo-Fintech Dark Theme Base */
-  --background: 222 47% 11%;
-  --foreground: 210 40% 98%;
+  /* Dark Theme - Deep Navy Finance Theme */
+  --background: 210 100% 8%;
+  --foreground: 0 0% 98%;
 
   /* Card: Slightly lighter navy */
-  --card: 217 33% 17%;
-  --card-foreground: 210 40% 98%;
+  --card: 210 80% 12%;
+  --card-foreground: 0 0% 98%;
 
   /* Popover */
-  --popover: 222 47% 11%;
-  --popover-foreground: 210 40% 98%;
+  --popover: 210 100% 8%;
+  --popover-foreground: 0 0% 98%;
 
-  /* Primary: Electric Lime */
-  --primary: 84 100% 45%;
-  --primary-foreground: 222 47% 11%;
+  /* Primary: Deep Navy Blue (#001F3F) */
+  --primary: 160 100% 75%;
+  --primary-foreground: 210 100% 12%;
 
-  /* Secondary: Soft Blue-Grey */
-  --secondary: 217 19% 27%;
-  --secondary-foreground: 210 40% 98%;
+  /* Secondary: Slate Gray */
+  --secondary: 210 13% 30%;
+  --secondary-foreground: 0 0% 98%;
 
   /* Muted */
-  --muted: 217 19% 27%;
-  --muted-foreground: 215 20% 65%;
+  --muted: 210 20% 20%;
+  --muted-foreground: 210 13% 60%;
 
-  /* Accent: Electric Blue */
-  --accent: 190 100% 50%;
-  --accent-foreground: 222 47% 11%;
+  /* Accent: Mint Green (#7FFFD4) */
+  --accent: 160 100% 75%;
+  --accent-foreground: 210 100% 12%;
 
   /* Destructive */
-  --destructive: 0 63% 31%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive: 0 63% 45%;
+  --destructive-foreground: 0 0% 98%;
 
   /* Borders */
-  --border: 217 19% 27%;
-  --input: 217 19% 27%;
-  --ring: 84 100% 45%;
+  --border: 210 20% 20%;
+  --input: 210 20% 20%;
+  --ring: 160 100% 75%;
 }
 
 .light {
-  /* Light Theme - Clean, Modern Fintech */
-  --background: 210 40% 98%;
-  --foreground: 222 47% 11%;
+  /* Light Theme - Clean Minimalist Finance */
+  --background: 0 0% 100%;
+  --foreground: 210 13% 50%;
 
-  /* Card: White with subtle warmth */
+  /* Card: Pure White */
   --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
+  --card-foreground: 210 100% 12%;
 
   /* Popover */
   --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
+  --popover-foreground: 210 100% 12%;
 
-  /* Primary: Deep Teal Green for fintech trust */
-  --primary: 160 84% 39%;
+  /* Primary: Deep Navy Blue (#001F3F) */
+  --primary: 210 100% 12%;
   --primary-foreground: 0 0% 100%;
 
-  /* Secondary: Soft Blue-Gray */
-  --secondary: 214 32% 91%;
-  --secondary-foreground: 222 47% 11%;
+  /* Secondary: Light Gray */
+  --secondary: 210 20% 96%;
+  --secondary-foreground: 210 100% 12%;
 
-  /* Muted: Light Gray */
-  --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
+  /* Muted: Very Light Gray */
+  --muted: 210 20% 96%;
+  --muted-foreground: 210 13% 50%;
 
-  /* Accent: Vibrant Blue */
-  --accent: 199 89% 48%;
-  --accent-foreground: 0 0% 100%;
+  /* Accent: Mint Green (#7FFFD4) */
+  --accent: 160 100% 40%;
+  --accent-foreground: 210 100% 12%;
 
   /* Destructive */
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
 
-  /* Borders - more visible */
-  --border: 214 32% 85%;
-  --input: 214 32% 91%;
-  --ring: 160 84% 39%;
+  /* Borders - subtle */
+  --border: 210 20% 90%;
+  --input: 210 20% 96%;
+  --ring: 210 100% 12%;
 }
 
-/* Light mode specific overrides */
+/* Light mode specific overrides for minimalist design */
 .light .glass {
-  @apply bg-black/5 backdrop-blur-lg border border-black/10;
+  @apply bg-primary/5 backdrop-blur-lg border border-primary/10;
 }
 
 .light .glass-card {
-  @apply bg-white/90 backdrop-blur-md border border-black/5 shadow-lg;
+  @apply bg-white border border-border;
 }
 
 .light nav {
-  @apply border-b border-black/10 bg-white/80;
+  @apply border-b border-border bg-white/95;
 }
 
 .light footer {
-  @apply border-t border-black/10;
+  @apply border-t border-border;
 }
 
 @layer base {
@@ -139,19 +139,26 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display tracking-tight;
+    @apply font-display font-bold tracking-tight;
   }
 }
 
-/* Custom Glassmorphism Utilities */
+/* Minimalist Utilities - Flat Design */
 @layer utilities {
   .glass {
     @apply bg-white/5 backdrop-blur-lg border border-white/10;
   }
   .glass-card {
-    @apply bg-card/80 backdrop-blur-md border border-white/5 shadow-xl;
+    @apply bg-card border border-border;
   }
   .text-gradient {
     @apply bg-clip-text text-transparent bg-linear-to-r from-primary to-accent;
+  }
+  /* Subtle gradient buttons */
+  .btn-gradient {
+    @apply bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary transition-all;
+  }
+  .btn-accent-gradient {
+    @apply bg-gradient-to-r from-accent to-accent/80 hover:from-accent/90 hover:to-accent transition-all;
   }
 }
