@@ -82,6 +82,11 @@ export const api = {
   },
   virtualCards: {
     get: (poolId: string) => fetchApi(`/api/pools/${poolId}/virtual-card`),
+    getEphemeralKey: (poolId: string, nonce: string) => 
+      fetchApi(`/api/pools/${poolId}/virtual-card/ephemeral-key`, {
+        method: "POST",
+        body: JSON.stringify({ nonce }),
+      }),
     getTransactions: (cardId: string) =>
       fetchApi(`/api/virtual-cards/${cardId}/transactions`),
     createTransaction: (cardId: string, merchant: string, amount: string) =>

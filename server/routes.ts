@@ -637,6 +637,45 @@ export async function registerRoutes(
     }
   });
 
+  // Create ephemeral key for secure card detail retrieval via Stripe.js
+  app.post("/api/pools/:id/virtual-card/ephemeral-key", requireAuth, async (req, res, next) => {
+    try {
+      const { nonce } = z.object({ nonce: z.string() }).parse(req.body);
+      
+      const pool = await storage.getPool(req.params.id);
+      if (!pool) {
+        return res.status(404).json({ message: "Pool not found" });
+      }
+
+      // Authorization: Only pool creator can access card details
+      if (pool.creatorId !== req.session.userId) {
+        return res.status(403).json({ message: "Only pool creator can access card details" });
+      }
+
+      const card = await storage.getVirtualCardByPool(pool.id);
+      if (!card || !card.stripeCardId) {
+        return res.status(404).json({ message: "No active virtual card found for this pool" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+
+      // Create ephemeral key for secure client-side card detail retrieval
+      const ephemeralKey = await stripe.ephemeralKeys.create({
+        nonce: nonce,
+        issuing_card: card.stripeCardId,
+      }, {
+        apiVersion: '2024-12-18.acacia',
+      });
+
+      res.json({
+        ephemeralKeySecret: ephemeralKey.secret,
+        issuingCard: card.stripeCardId,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post("/api/virtual-cards/:id/transactions", requireAuth, async (req, res, next) => {
     try {
       const data = insertTransactionSchema.parse({

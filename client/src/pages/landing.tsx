@@ -282,7 +282,7 @@ export default function Landing() {
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <CheckCircle className="w-4 h-4 text-green-400" />
-                  Sandbox Environment
+                  Production Ready
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">

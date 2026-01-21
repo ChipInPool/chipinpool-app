@@ -73,7 +73,9 @@ Preferred communication style: Simple, everyday language.
 8. **Receipt Attachments** - Transactions support receipt URLs and notes
 9. **Dark/Light Theme Toggle** - User can switch themes from navbar dropdown (desktop & mobile)
 10. **KYC Verification Flow** - Identity verification prompted after signup, required to create pools
-    - Uses Stripe Identity when configured, falls back to demo verification for prototype
+    - Uses Stripe Identity (real identity verification, no demo fallback)
+11. **Virtual Cards** - Real Stripe Issuing virtual cards with secure ephemeral key-based card detail retrieval
+12. **Production Mode** - All APIs use live/production mode (no demo data, no mock fallbacks)
 
 ### Theme System:
 - Custom ThemeProvider in `client/src/components/theme-provider.tsx`
@@ -91,9 +93,12 @@ Preferred communication style: Simple, everyday language.
 
 ## External Dependencies
 
-### Third-Party Services
+### Third-Party Services (Production APIs)
+- **Stripe**: Payments, Stripe Identity (KYC), Stripe Issuing (virtual cards)
+- **Plaid**: Bank account linking (production mode)
+- **Resend**: Email invitations
+- **ClickSend**: SMS invitations
 - **Fonts**: Google Fonts (Inter, Plus Jakarta Sans)
-- **Images**: Unsplash for demo avatars
 
 ### Key NPM Packages
 - `@tanstack/react-query`: Server state management

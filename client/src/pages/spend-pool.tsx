@@ -50,6 +50,8 @@ export default function SpendPool() {
   const [showCardPanel, setShowCardPanel] = useState(true);
   const [iframeError, setIframeError] = useState(false);
   const [cardHelperOpen, setCardHelperOpen] = useState(false);
+  const [cardDetailsLoading, setCardDetailsLoading] = useState(false);
+  const [stripeElementsReady, setStripeElementsReady] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: poolData, isLoading: poolLoading } = useQuery({
@@ -140,16 +142,119 @@ export default function SpendPool() {
   }
 
   const currentBalance = parseFloat(card?.balance || pool.currentAmount || '0');
-  const cardNumber = card?.cardNumber || '4922000000000000';
-  const cvc = card?.cvc || '000';
-  const expiry = card?.expiry || '05/28';
+  const lastFour = card?.lastFour || '****';
+  const expiry = card?.expiry || '';
 
-  const formatCardNumber = (num: string, show: boolean) => {
-    const clean = num.replace(/\s/g, '');
-    if (show) {
-      return `${clean.slice(0,4)} ${clean.slice(4,8)} ${clean.slice(8,12)} ${clean.slice(12,16)}`;
+  const formatCardNumber = () => {
+    return `•••• •••• •••• ${lastFour}`;
+  };
+
+  const handleToggleCardDetails = async () => {
+    if (showCardDetails) {
+      setShowCardDetails(false);
+      setStripeElementsReady(false);
+      return;
     }
-    return `•••• •••• •••• ${clean.slice(-4)}`;
+    
+    if (!card?.stripeCardId) {
+      toast({ description: "No virtual card available. Card will be created when pool is funded.", variant: "destructive" });
+      return;
+    }
+    
+    setCardDetailsLoading(true);
+    try {
+      const stripeKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+      if (!stripeKey) {
+        toast({ description: "Stripe is not configured", variant: "destructive" });
+        return;
+      }
+      
+      const { loadStripe } = await import('@stripe/stripe-js');
+      const stripe = await loadStripe(stripeKey);
+      
+      if (!stripe) {
+        toast({ description: "Failed to load Stripe", variant: "destructive" });
+        return;
+      }
+      
+      // Create nonce for ephemeral key
+      const nonceResult = await stripe.createEphemeralKeyNonce({
+        issuingCard: card.stripeCardId,
+      });
+      
+      if (!nonceResult.nonce) {
+        toast({ description: "Failed to create secure session", variant: "destructive" });
+        return;
+      }
+      
+      // Get ephemeral key from server
+      const keyData = await api.virtualCards.getEphemeralKey(params?.id || '', nonceResult.nonce);
+      
+      // Create Stripe Elements for card display
+      const elements = stripe.elements();
+      
+      // Mount card number element
+      const cardNumberElement = elements.create('issuingCardNumberDisplay', {
+        issuingCard: card.stripeCardId,
+        nonce: nonceResult.nonce,
+        ephemeralKeySecret: keyData.ephemeralKeySecret,
+        style: {
+          base: {
+            color: '#fff',
+            fontSize: '16px',
+            fontFamily: 'monospace',
+          },
+        },
+      });
+      
+      // Mount CVC element
+      const cardCvcElement = elements.create('issuingCardCvcDisplay', {
+        issuingCard: card.stripeCardId,
+        nonce: nonceResult.nonce,
+        ephemeralKeySecret: keyData.ephemeralKeySecret,
+        style: {
+          base: {
+            color: '#fff',
+            fontSize: '14px',
+            fontFamily: 'monospace',
+          },
+        },
+      });
+      
+      // Mount expiry element
+      const cardExpiryElement = elements.create('issuingCardExpiryDisplay', {
+        issuingCard: card.stripeCardId,
+        nonce: nonceResult.nonce,
+        ephemeralKeySecret: keyData.ephemeralKeySecret,
+        style: {
+          base: {
+            color: '#fff',
+            fontSize: '14px',
+            fontFamily: 'monospace',
+          },
+        },
+      });
+      
+      // Wait a moment for DOM to be ready
+      setShowCardDetails(true);
+      await new Promise(r => setTimeout(r, 100));
+      
+      const numberContainer = document.getElementById('stripe-card-number');
+      const cvcContainer = document.getElementById('stripe-card-cvc');
+      const expiryContainer = document.getElementById('stripe-card-expiry');
+      
+      if (numberContainer) cardNumberElement.mount(numberContainer);
+      if (cvcContainer) cardCvcElement.mount(cvcContainer);
+      if (expiryContainer) cardExpiryElement.mount(expiryContainer);
+      
+      setStripeElementsReady(true);
+    } catch (error: any) {
+      console.error('Card details error:', error);
+      toast({ description: error.message || "Failed to retrieve card details", variant: "destructive" });
+      setShowCardDetails(false);
+    } finally {
+      setCardDetailsLoading(false);
+    }
   };
 
   const handleCopy = (text: string, label: string) => {
@@ -287,11 +392,18 @@ export default function SpendPool() {
                     variant="outline" 
                     size="sm" 
                     className="h-8 border-white/10"
-                    onClick={() => setShowCardDetails(!showCardDetails)}
+                    onClick={handleToggleCardDetails}
+                    disabled={cardDetailsLoading}
                     data-testid="button-toggle-card-details"
                   >
-                    {showCardDetails ? <EyeOff className="w-3.5 h-3.5 mr-2" /> : <Eye className="w-3.5 h-3.5 mr-2" />}
-                    {showCardDetails ? "Hide Numbers" : "Show Numbers"}
+                    {cardDetailsLoading ? (
+                      <RefreshCw className="w-3.5 h-3.5 mr-2 animate-spin" />
+                    ) : showCardDetails ? (
+                      <EyeOff className="w-3.5 h-3.5 mr-2" />
+                    ) : (
+                      <Eye className="w-3.5 h-3.5 mr-2" />
+                    )}
+                    {cardDetailsLoading ? "Loading..." : showCardDetails ? "Hide Numbers" : "Show Numbers"}
                   </Button>
                 </div>
 
@@ -299,8 +411,8 @@ export default function SpendPool() {
                   <VirtualCard 
                     balance={currentBalance} 
                     poolName={pool.title}
-                    cardNumber={formatCardNumber(cardNumber, showCardDetails)}
-                    cvc={showCardDetails ? cvc : "•••"}
+                    cardNumber={formatCardNumber()}
+                    cvc="•••"
                     expiry={expiry}
                   />
                 </div>
@@ -314,21 +426,24 @@ export default function SpendPool() {
                       className="overflow-hidden"
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="p-3 rounded-lg bg-white/5 border border-white/5 flex justify-between items-center group cursor-pointer" onClick={() => handleCopy(cardNumber.replace(/\s/g, ''), "Card number")}>
-                          <div>
-                            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Card Number</div>
-                            <div className="font-mono text-sm font-medium text-foreground">{formatCardNumber(cardNumber, true)}</div>
+                        <div className="p-3 rounded-lg bg-white/5 border border-white/5">
+                          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Card Number</div>
+                          <div id="stripe-card-number" className="font-mono text-sm font-medium text-foreground min-h-[24px]">
+                            {!stripeElementsReady && <span className="animate-pulse">Loading...</span>}
                           </div>
-                          <Copy className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
-                          <div className="p-3 rounded-lg bg-white/5 border border-white/5 group cursor-pointer" onClick={() => handleCopy(expiry, "Expiry")}>
-                            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Expiry</div>
-                            <div className="font-mono text-sm font-medium text-foreground">{expiry}</div>
+                          <div className="p-3 rounded-lg bg-white/5 border border-white/5">
+                            <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Expiry</div>
+                            <div id="stripe-card-expiry" className="font-mono text-sm font-medium text-foreground min-h-[24px]">
+                              {!stripeElementsReady && <span className="animate-pulse">Loading...</span>}
+                            </div>
                           </div>
-                          <div className="p-3 rounded-lg bg-white/5 border border-white/5 group cursor-pointer" onClick={() => handleCopy(cvc, "CVC")}>
-                            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">CVC</div>
-                            <div className="font-mono text-sm font-medium text-foreground">{cvc}</div>
+                          <div className="p-3 rounded-lg bg-white/5 border border-white/5">
+                            <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">CVC</div>
+                            <div id="stripe-card-cvc" className="font-mono text-sm font-medium text-foreground min-h-[24px]">
+                              {!stripeElementsReady && <span className="animate-pulse">Loading...</span>}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -607,40 +722,22 @@ export default function SpendPool() {
                     </div>
                   </div>
                   <div className="p-3 space-y-2">
-                    <div 
-                      className="p-2 rounded-lg bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition-colors flex justify-between items-center group"
-                      onClick={() => handleCopy(cardNumber.replace(/\s/g, ''), "Card number")}
-                    >
-                      <div>
-                        <div className="text-[9px] text-muted-foreground uppercase">Card Number</div>
-                        <div className="font-mono text-xs font-medium">{formatCardNumber(cardNumber, true)}</div>
-                      </div>
-                      <Copy className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
+                    <div className="p-2 rounded-lg bg-white/5 border border-white/5">
+                      <div className="text-[9px] text-muted-foreground uppercase">Card Number</div>
+                      <div className="font-mono text-xs font-medium">{formatCardNumber()}</div>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <div 
-                        className="p-2 rounded-lg bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition-colors group"
-                        onClick={() => handleCopy(expiry, "Expiry")}
-                      >
+                      <div className="p-2 rounded-lg bg-white/5 border border-white/5">
                         <div className="text-[9px] text-muted-foreground uppercase">Expiry</div>
-                        <div className="font-mono text-xs font-medium flex items-center justify-between">
-                          {expiry}
-                          <Copy className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
-                        </div>
+                        <div className="font-mono text-xs font-medium">{expiry || '••/••'}</div>
                       </div>
-                      <div 
-                        className="p-2 rounded-lg bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition-colors group"
-                        onClick={() => handleCopy(cvc, "CVC")}
-                      >
+                      <div className="p-2 rounded-lg bg-white/5 border border-white/5">
                         <div className="text-[9px] text-muted-foreground uppercase">CVC</div>
-                        <div className="font-mono text-xs font-medium flex items-center justify-between">
-                          {cvc}
-                          <Copy className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
-                        </div>
+                        <div className="font-mono text-xs font-medium">•••</div>
                       </div>
                     </div>
                     <div className="pt-1 text-[10px] text-center text-muted-foreground">
-                      Click any field to copy
+                      View full details in card panel
                     </div>
                   </div>
                 </motion.div>
@@ -693,39 +790,25 @@ export default function SpendPool() {
                 </div>
               </div>
               
-              <div 
-                className="p-3 rounded-xl bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition-colors flex justify-between items-center group"
-                onClick={() => handleCopy(cardNumber.replace(/\s/g, ''), "Card number")}
-              >
-                <div>
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Card Number</div>
-                  <div className="font-mono text-sm font-medium">{formatCardNumber(cardNumber, true)}</div>
-                </div>
-                <Copy className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="p-3 rounded-xl bg-white/5 border border-white/5">
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Card Number</div>
+                <div className="font-mono text-sm font-medium">{formatCardNumber()}</div>
               </div>
               
               <div className="grid grid-cols-2 gap-3">
-                <div 
-                  className="p-3 rounded-xl bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition-colors group"
-                  onClick={() => handleCopy(expiry, "Expiry")}
-                >
+                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
                   <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Expiry</div>
-                  <div className="font-mono text-sm font-medium flex items-center justify-between">
-                    {expiry}
-                    <Copy className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
-                  </div>
+                  <div className="font-mono text-sm font-medium">{expiry || '••/••'}</div>
                 </div>
-                <div 
-                  className="p-3 rounded-xl bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition-colors group"
-                  onClick={() => handleCopy(cvc, "CVC")}
-                >
+                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
                   <div className="text-[10px] text-muted-foreground uppercase tracking-wider">CVC</div>
-                  <div className="font-mono text-sm font-medium flex items-center justify-between">
-                    {cvc}
-                    <Copy className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
-                  </div>
+                  <div className="font-mono text-sm font-medium">•••</div>
                 </div>
               </div>
+              
+              <p className="text-[10px] text-center text-muted-foreground mt-2">
+                Click "Show Numbers" in the card panel to reveal full details
+              </p>
               
               <Button 
                 variant="outline" 
