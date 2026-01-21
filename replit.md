@@ -83,13 +83,34 @@ Preferred communication style: Simple, everyday language.
 - Dark theme: Neo-fintech with deep navy and electric lime
 - Theme toggle in both desktop navbar and mobile menu
 
-### Authentication
+### Authentication & User Registration
 
+**Session Management:**
 - Session-based authentication using express-session
 - Passwords hashed with bcrypt (10 rounds)
 - Auth context provider on frontend manages login state
 - Protected routes redirect to `/login` when unauthenticated
 - Session stored in cookies (7-day expiry, httpOnly, secure in production)
+
+**User Profile Fields:**
+- `firstName`, `lastName`: Full name (required)
+- `username`: Unique handle starting with @ (required, lowercase, letters/numbers/underscores only)
+- `email`: Unique email address (required)
+- `phone`: Phone number with SMS verification (required)
+- `dateOfBirth`: Must be 18+ years old (required)
+- `authProvider`: 'email', 'google', or 'apple'
+- `kycStatus`: Identity verification status via Stripe Identity
+
+**Registration Flow:**
+1. User fills form: first/last name, username, email, phone, DOB, password
+2. User clicks "Verify Phone & Continue" - SMS code sent via ClickSend
+3. User enters 6-digit code from SMS
+4. Account created, user logged in automatically
+5. Optional KYC verification prompt shown (Stripe Identity)
+
+**Social Login (Coming Soon):**
+- Google and Apple sign-in buttons are visible but show "Coming Soon" toast
+- Backend OAuth routes will be implemented when credentials are configured
 
 ## External Dependencies
 
