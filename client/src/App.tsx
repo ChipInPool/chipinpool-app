@@ -35,6 +35,7 @@ import AdminUsers from "@/pages/admin/users";
 import AdminUserDetail from "@/pages/admin/user-detail";
 import AdminPools from "@/pages/admin/pools";
 import AdminTransactions from "@/pages/admin/transactions";
+import ResetPassword from "@/pages/reset-password";
 
 function Router() {
   return (
@@ -42,6 +43,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/welcome" component={Landing} />
       <Route path="/login" component={Login} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/create" component={CreatePool} />
       <Route path="/explore" component={Explore} />
       <Route path="/how-it-works" component={HowItWorks} />

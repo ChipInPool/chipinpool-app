@@ -287,6 +287,33 @@ export async function sendVerificationSMS(phone: string, code: string): Promise<
   return sendSMS(phone, `Your ChipIn verification code is: ${code}. Expires in 10 minutes.`);
 }
 
+export async function sendPasswordResetEmail(email: string, resetLink: string): Promise<boolean> {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
+        <h1 style="color: #d4ff00; margin: 0 0 16px;">Reset Your Password</h1>
+        <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
+          Click the button below to reset your password. This link expires in 30 minutes.
+        </p>
+        <a href="${resetLink}" style="background: #d4ff00; color: #0a1628; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">
+          Reset Password
+        </a>
+        <p style="color: #888; font-size: 14px; margin-top: 24px;">
+          If you didn't request this, you can safely ignore this email.
+        </p>
+      </div>
+      <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
+        ChipIn - Pool funds together. Pay smarter.
+      </p>
+    </div>
+  `;
+  return sendEmail(email, 'Reset Your Password - ChipInPay', html);
+}
+
+export async function sendPasswordResetSMS(phone: string, resetLink: string): Promise<boolean> {
+  return sendSMS(phone, `Reset your ChipInPay password: ${resetLink} (expires in 30 min)`);
+}
+
 export async function sendWelcomeEmail(email: string, name: string): Promise<boolean> {
   const baseUrl = getBaseUrl();
   const html = `

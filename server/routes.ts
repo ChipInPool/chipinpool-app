@@ -24,6 +24,8 @@ import {
   sendPoolInviteNotification,
   sendVerificationEmail,
   sendVerificationSMS,
+  sendPasswordResetEmail,
+  sendPasswordResetSMS,
   sendWelcomeEmail
 } from "./notificationService";
 
@@ -406,9 +408,9 @@ export async function registerRoutes(
       const resetLink = `${process.env.NODE_ENV === 'production' ? 'https://' + req.get('host') : 'http://localhost:5000'}/reset-password?token=${token}`;
       
       if (data.method === 'email' && user.email) {
-        await sendVerificationEmail(user.email, `Your password reset link: ${resetLink}`, 'Password Reset - ChipInPay');
+        await sendPasswordResetEmail(user.email, resetLink);
       } else if (data.method === 'phone' && user.phone) {
-        await sendVerificationSMS(user.phone, `Your ChipInPay password reset code: ${token.slice(0, 6).toUpperCase()}. Or use link: ${resetLink}`);
+        await sendPasswordResetSMS(user.phone, resetLink);
       }
 
       res.json({ message: "If an account exists, you will receive a reset link" });
@@ -422,34 +424,42 @@ export async function registerRoutes(
     try {
       const data = resetPasswordSchema.parse(req.body);
       
-      const [resetToken] = await db.select()
-        .from(passwordResetTokens)
-        .where(eq(passwordResetTokens.token, data.token))
-        .limit(1);
+      // Use transaction to atomically mark as used and update password
+      await db.transaction(async (tx) => {
+        const [resetToken] = await tx.select()
+          .from(passwordResetTokens)
+          .where(eq(passwordResetTokens.token, data.token))
+          .limit(1);
 
-      if (!resetToken) {
-        return res.status(400).json({ message: "Invalid or expired reset token" });
-      }
+        if (!resetToken) {
+          throw new Error("Invalid or expired reset token");
+        }
 
-      if (resetToken.used) {
-        return res.status(400).json({ message: "This reset link has already been used" });
-      }
+        if (resetToken.used) {
+          throw new Error("This reset link has already been used");
+        }
 
-      if (new Date() > resetToken.expiresAt) {
-        return res.status(400).json({ message: "Reset link has expired. Please request a new one." });
-      }
+        if (new Date() > resetToken.expiresAt) {
+          throw new Error("Reset link has expired. Please request a new one.");
+        }
 
-      // Hash new password and update user
-      const hashedPassword = await bcrypt.hash(data.newPassword, 10);
-      await storage.updateUser(resetToken.userId, { password: hashedPassword });
+        // Mark token as used FIRST to prevent race conditions
+        await tx.update(passwordResetTokens)
+          .set({ used: true })
+          .where(eq(passwordResetTokens.id, resetToken.id));
 
-      // Mark token as used
-      await db.update(passwordResetTokens)
-        .set({ used: true })
-        .where(eq(passwordResetTokens.id, resetToken.id));
+        // Hash new password and update user
+        const hashedPassword = await bcrypt.hash(data.newPassword, 10);
+        await tx.update(users)
+          .set({ password: hashedPassword })
+          .where(eq(users.id, resetToken.userId));
+      });
 
       res.json({ message: "Password reset successfully. You can now log in." });
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message.includes("Invalid") || error.message.includes("already been used") || error.message.includes("expired")) {
+        return res.status(400).json({ message: error.message });
+      }
       next(error);
     }
   });
