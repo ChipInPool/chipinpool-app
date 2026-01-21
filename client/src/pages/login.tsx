@@ -34,6 +34,7 @@ export default function Login() {
   const [codeVerifying, setCodeVerifying] = useState(false);
   const [showKycPrompt, setShowKycPrompt] = useState(false);
   const [kycLoading, setKycLoading] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated && !showKycPrompt) {
@@ -134,11 +135,17 @@ export default function Login() {
       return;
     }
 
+    if (!acceptTerms) {
+      toast({ description: "Please accept the Terms of Service and Privacy Policy", variant: "destructive" });
+      return;
+    }
+
     setIsLoading(true);
     try {
       await register({
         ...registerForm,
         phoneVerificationCode: verificationCode,
+        acceptTerms: true,
       });
       toast({ description: "Account created! Welcome to ChipIn." });
       setShowKycPrompt(true);
@@ -551,7 +558,29 @@ export default function Login() {
                           <CheckCircle2 className="w-4 h-4" />
                           Phone verified successfully!
                         </div>
-                        <Button type="submit" className="w-full" disabled={isLoading} data-testid="button-register">
+                        
+                        <div className="flex items-start gap-3 p-3 rounded-lg bg-white/5 border border-white/10">
+                          <input
+                            type="checkbox"
+                            id="accept-terms"
+                            checked={acceptTerms}
+                            onChange={(e) => setAcceptTerms(e.target.checked)}
+                            className="mt-1 h-4 w-4 rounded border-white/20 bg-white/10 text-primary focus:ring-primary"
+                            data-testid="checkbox-accept-terms"
+                          />
+                          <label htmlFor="accept-terms" className="text-sm text-muted-foreground leading-relaxed">
+                            I agree to the{" "}
+                            <a href="/terms" target="_blank" className="text-primary hover:underline">
+                              Terms of Service
+                            </a>{" "}
+                            and{" "}
+                            <a href="/privacy" target="_blank" className="text-primary hover:underline">
+                              Privacy Policy
+                            </a>
+                          </label>
+                        </div>
+                        
+                        <Button type="submit" className="w-full" disabled={isLoading || !acceptTerms} data-testid="button-register">
                           {isLoading ? (
                             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating Account...</>
                           ) : (

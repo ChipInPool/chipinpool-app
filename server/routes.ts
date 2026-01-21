@@ -152,6 +152,7 @@ export async function registerRoutes(
       }
 
       const hashedPassword = await bcrypt.hash(data.password, 10);
+      const now = new Date();
       const user = await storage.createUser({
         firstName: data.firstName,
         lastName: data.lastName,
@@ -161,6 +162,8 @@ export async function registerRoutes(
         dateOfBirth: new Date(data.dateOfBirth),
         password: hashedPassword,
         authProvider: 'email',
+        termsAcceptedAt: now,
+        privacyAcceptedAt: now,
       });
       
       // Mark phone as verified

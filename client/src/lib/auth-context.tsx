@@ -32,6 +32,7 @@ interface RegisterData {
   phone: string;
   dateOfBirth: string;
   phoneVerificationCode: string;
+  acceptTerms: boolean;
 }
 
 interface AuthContextType {

@@ -34,6 +34,7 @@ export const api = {
       phone: string;
       dateOfBirth: string;
       phoneVerificationCode: string;
+      acceptTerms: boolean;
     }) =>
       fetchApi("/api/auth/register", {
         method: "POST",

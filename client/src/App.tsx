@@ -24,6 +24,8 @@ import ActivityFeed from "@/pages/activity";
 import Settings from "@/pages/settings";
 import SplitCalculator from "@/pages/split-calculator";
 import { ThemeProvider } from "@/components/theme-provider";
+import Terms from "@/pages/terms";
+import Privacy from "@/pages/privacy";
 
 function Router() {
   return (
@@ -46,6 +48,8 @@ function Router() {
       <Route path="/activity" component={ActivityFeed} />
       <Route path="/settings" component={Settings} />
       <Route path="/split-calculator" component={SplitCalculator} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/privacy" component={Privacy} />
       <Route component={NotFound} />
     </Switch>
   );

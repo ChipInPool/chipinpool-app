@@ -46,6 +46,8 @@ export const users = pgTable("users", {
   stripeCardholderId: text("stripe_cardholder_id"),
   plaidAccessToken: text("plaid_access_token"),
   plaidAccountId: text("plaid_account_id"),
+  termsAcceptedAt: timestamp("terms_accepted_at"),
+  privacyAcceptedAt: timestamp("privacy_accepted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -275,6 +277,7 @@ export const registerSchema = z.object({
     return age >= 18;
   }, "You must be at least 18 years old"),
   phoneVerificationCode: z.string().length(6, "Verification code must be 6 digits"),
+  acceptTerms: z.literal(true, { errorMap: () => ({ message: "You must accept the Terms of Service and Privacy Policy" }) }),
 });
 
 export const sendPhoneCodeSchema = z.object({
