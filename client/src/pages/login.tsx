@@ -78,16 +78,23 @@ export default function Login() {
         // Use demo verification flow
         const demoResult = await api.security.demoVerifyKYC();
         toast({ description: demoResult.message || "Identity verified!" });
-        // Small delay to let session update
         await new Promise(r => setTimeout(r, 500));
         window.location.href = "/";
         return;
       }
       
       if (data.clientSecret) {
-        const stripe = await import('@stripe/stripe-js').then(m => 
-          m.loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '')
-        );
+        const stripeKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+        if (!stripeKey) {
+          // No Stripe key, use demo flow instead
+          const demoResult = await api.security.demoVerifyKYC();
+          toast({ description: demoResult.message || "Identity verified!" });
+          await new Promise(r => setTimeout(r, 500));
+          window.location.href = "/";
+          return;
+        }
+        
+        const stripe = await import('@stripe/stripe-js').then(m => m.loadStripe(stripeKey));
         
         if (stripe && data.clientSecret) {
           const { error } = await stripe.verifyIdentity(data.clientSecret);

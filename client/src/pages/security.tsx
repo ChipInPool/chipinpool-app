@@ -210,12 +210,23 @@ export default function Security() {
       }
       
       if (data.clientSecret) {
+        const stripeKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+        if (!stripeKey) {
+          // No Stripe key, use demo flow instead
+          try {
+            const demoResult = await api.security.demoVerifyKYC();
+            queryClient.invalidateQueries({ queryKey: ["securityStatus"] });
+            toast({ description: demoResult.message || "Identity verified!" });
+          } catch (e: any) {
+            toast({ description: e.message || "Demo verification failed", variant: "destructive" });
+          }
+          return;
+        }
+        
         setKycClientSecret(data.clientSecret);
         setShowKYCModal(true);
         
-        const stripe = await import('@stripe/stripe-js').then(m => 
-          m.loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '')
-        );
+        const stripe = await import('@stripe/stripe-js').then(m => m.loadStripe(stripeKey));
         
         if (stripe && data.clientSecret) {
           const { error } = await stripe.verifyIdentity(data.clientSecret);
