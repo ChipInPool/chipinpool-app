@@ -76,6 +76,7 @@ export default function Contact() {
                 <a 
                   href={`mailto:${option.email}`} 
                   className="text-sm text-primary hover:underline"
+                  data-testid={`link-contact-email-${index}`}
                 >
                   {option.email}
                 </a>

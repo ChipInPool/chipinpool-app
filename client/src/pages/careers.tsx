@@ -107,6 +107,7 @@ export default function Careers() {
                   variant="outline" 
                   className="border-white/10"
                   onClick={() => window.location.href = `mailto:mail@chipinpool.com?subject=Application: ${position.title}`}
+                  data-testid={`button-apply-${index}`}
                 >
                   Apply Now
                 </Button>
@@ -120,7 +121,7 @@ export default function Careers() {
           <p className="text-muted-foreground mb-6">
             We're always looking for talented people. Send us your resume and tell us how you'd contribute to ChipIn.
           </p>
-          <Button onClick={() => window.location.href = 'mailto:mail@chipinpool.com?subject=General Application'}>
+          <Button onClick={() => window.location.href = 'mailto:mail@chipinpool.com?subject=General Application'} data-testid="button-general-application">
             Send General Application
           </Button>
         </div>

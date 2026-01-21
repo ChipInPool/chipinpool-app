@@ -105,7 +105,7 @@ export default function About() {
           <p className="text-muted-foreground mb-6 max-w-xl mx-auto">
             We're just getting started. Join thousands of users who are already making group payments easier with ChipIn.
           </p>
-          <a href="/login" className="inline-flex items-center justify-center px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary/90 transition-colors">
+          <a href="/login" className="inline-flex items-center justify-center px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary/90 transition-colors" data-testid="link-about-get-started">
             Get Started Free
           </a>
         </div>
