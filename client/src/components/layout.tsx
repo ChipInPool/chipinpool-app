@@ -282,7 +282,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       <footer className="border-t border-white/5 py-8 mt-auto">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          © 2025 ChipIn Inc. All rights reserved.
+          © 2026 ChipInPool Corp. All rights reserved.
         </div>
       </footer>
     </div>
