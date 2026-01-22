@@ -277,6 +277,13 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
+      // Check if MFA is enabled
+      if (user.twoFactorEnabled) {
+        // Store user ID in session temporarily for MFA verification
+        req.session.pendingMfaUserId = user.id;
+        return res.json({ mfaRequired: true, userId: user.id });
+      }
+
       req.session.userId = user.id;
       const { password, ...userWithoutPassword } = user;
       res.json({ user: userWithoutPassword });
@@ -305,7 +312,57 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
+      // Check if MFA is enabled
+      if (user.twoFactorEnabled) {
+        req.session.pendingMfaUserId = user.id;
+        return res.json({ mfaRequired: true, userId: user.id });
+      }
+
       req.session.userId = user.id;
+      const { password, ...userWithoutPassword } = user;
+      res.json({ user: userWithoutPassword });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Verify MFA code during login
+  app.post("/api/auth/verify-mfa", async (req, res, next) => {
+    try {
+      const { userId, code, useRecoveryCode } = req.body;
+      
+      if (!userId || !code) {
+        return res.status(400).json({ message: "Missing userId or code" });
+      }
+
+      // Verify the pending MFA session
+      if (req.session.pendingMfaUserId !== userId) {
+        return res.status(401).json({ message: "Invalid MFA session" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      let isValid = false;
+      const ipAddress = req.ip || req.headers['x-forwarded-for']?.toString();
+      const userAgent = req.headers['user-agent'];
+
+      if (useRecoveryCode) {
+        isValid = await mfaService.useRecoveryCode(userId, code, ipAddress, userAgent);
+      } else {
+        isValid = await mfaService.verifyMFA(userId, code, ipAddress, userAgent);
+      }
+
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid verification code" });
+      }
+
+      // Complete the login
+      req.session.userId = userId;
+      delete req.session.pendingMfaUserId;
+      
       const { password, ...userWithoutPassword } = user;
       res.json({ user: userWithoutPassword });
     } catch (error) {
@@ -367,6 +424,12 @@ export async function registerRoutes(
       const user = await storage.getUserByPhone(data.phone);
       if (!user) {
         return res.status(404).json({ message: "No account found with this phone number" });
+      }
+
+      // Check if MFA is enabled - phone OTP counts as first factor, still need TOTP
+      if (user.twoFactorEnabled) {
+        req.session.pendingMfaUserId = user.id;
+        return res.json({ mfaRequired: true, userId: user.id });
       }
 
       req.session.userId = user.id;
