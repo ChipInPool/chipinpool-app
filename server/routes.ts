@@ -2279,8 +2279,8 @@ export async function registerRoutes(
 
       // Fetch user details for each contributor
       const contributors = [];
-      for (const [userId, data] of contributorMap) {
-        const user = await storage.getUser(userId);
+      for (const [contributorId, data] of Array.from(contributorMap)) {
+        const user = await storage.getUser(contributorId);
         if (user) {
           contributors.push({
             userId: user.id,
@@ -2289,7 +2289,7 @@ export async function registerRoutes(
             username: user.username,
             avatar: user.avatar,
             totalContributed: data.totalAmount.toFixed(2),
-            hasBankLinked: !!(await storage.getBankAccountsByUser(userId)).length,
+            hasBankLinked: !!(await storage.getBankAccountsByUser(contributorId)).length,
           });
         }
       }
@@ -2377,7 +2377,6 @@ export async function registerRoutes(
           virtualCardId: null as any,
           amount: data.amount,
           merchant: `Bank Transfer to ${bankAccounts.find(a => a.id === bankAccountId)?.accountName || 'Bank Account'}`,
-          status: 'completed',
           notes: data.notes || `Pool transfer to bank account`,
         });
 
@@ -2401,18 +2400,18 @@ export async function registerRoutes(
           type: 'contribution',
           title: 'Transfer Request',
           message: `You have a pending transfer of $${transferAmount.toFixed(2)} from the pool "${pool.title}". Tap to accept.`,
-          relatedId: transfer.id,
+          link: `/accept-transfer/${transfer.id}`,
         });
 
         // Send notification via email/SMS if enabled
-        const user = await storage.getUser(userId);
+        const senderUser = await storage.getUser(userId);
         if (toUser.notifyEmail) {
-          sendPoolActivityNotification(
+          sendPoolInviteNotification(
             toUser.email,
             toUser.phone,
-            toUser.firstName,
-            `Transfer Request from ${user?.firstName || 'Pool Creator'}`,
-            `You have a pending transfer of $${transferAmount.toFixed(2)} from the pool "${pool.title}". Log in to accept.`,
+            senderUser?.firstName || 'Pool Creator',
+            pool.id,
+            `${pool.title} - Transfer Request: $${transferAmount.toFixed(2)}`,
             true,
             false
           ).catch(console.error);
@@ -2440,7 +2439,7 @@ export async function registerRoutes(
         const sender = await storage.getUser(request.fromUserId);
         return {
           ...request,
-          pool: pool ? { id: pool.id, title: pool.title, coverImage: pool.coverImage } : null,
+          pool: pool ? { id: pool.id, title: pool.title } : null,
           sender: sender ? { 
             id: sender.id, 
             firstName: sender.firstName, 
@@ -2525,7 +2524,7 @@ export async function registerRoutes(
           type: 'contribution',
           title: 'Transfer Accepted',
           message: `${recipient?.firstName || 'Contributor'} accepted the transfer of $${transferAmount.toFixed(2)}`,
-          relatedId: requestId,
+          link: `/pool/${transferRequest.poolId}`,
         });
       }
 
@@ -2568,7 +2567,7 @@ export async function registerRoutes(
           type: 'contribution',
           title: 'Transfer Declined',
           message: `${recipient?.firstName || 'Contributor'} declined the transfer of $${parseFloat(transferRequest.amount).toFixed(2)}`,
-          relatedId: requestId,
+          link: `/pool/${transferRequest.poolId}`,
         });
       }
 

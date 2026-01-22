@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { VirtualCard } from "@/components/virtual-card";
-import { ArrowLeft, Copy, Eye, EyeOff, ShoppingBag, ExternalLink, ShieldCheck, Store, Zap, DollarSign, Radio, Globe, X, ChevronRight, CreditCard, RefreshCw, Search, Building2, Loader2, CheckCircle, AlertCircle, Banknote } from "lucide-react";
+import { ArrowLeft, Copy, Eye, EyeOff, ShoppingBag, ExternalLink, ShieldCheck, Store, Zap, DollarSign, Radio, Globe, X, ChevronRight, CreditCard, RefreshCw, Search, Building2, Loader2, CheckCircle, AlertCircle, Banknote, User, Users } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Link, useRoute, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,20 +22,67 @@ interface TransferSectionProps {
   onTransferComplete: () => void;
 }
 
+interface BankAccount {
+  id: string;
+  institutionName: string;
+  accountName: string;
+  accountMask: string;
+  accountType: string;
+  isDefault: boolean;
+}
+
+interface Contributor {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+  avatar: string | null;
+  totalContributed: string;
+  hasBankLinked: boolean;
+}
+
 function TransferSection({ poolId, balance, onTransferComplete }: TransferSectionProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [transferAmount, setTransferAmount] = useState("");
-  const [recipientName, setRecipientName] = useState("");
-  const [transferMethod, setTransferMethod] = useState<"bank" | "wallet">("bank");
+  const [recipientType, setRecipientType] = useState<"self" | "contributor">("self");
+  const [selectedContributor, setSelectedContributor] = useState<Contributor | null>(null);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>("");
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [bankDetails, setBankDetails] = useState({
-    accountNumber: "",
-    routingNumber: "",
-    accountType: "checking" as "checking" | "savings",
+  const [notes, setNotes] = useState("");
+
+  const { data: bankAccountsData, isLoading: loadingBankAccounts } = useQuery({
+    queryKey: ["bankAccounts"],
+    queryFn: async () => {
+      const res = await fetch("/api/bank-accounts", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load bank accounts");
+      return res.json();
+    },
   });
 
+  const { data: contributorsData, isLoading: loadingContributors } = useQuery({
+    queryKey: ["poolContributors", poolId],
+    queryFn: async () => {
+      const res = await fetch(`/api/pools/${poolId}/contributors`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load contributors");
+      return res.json();
+    },
+  });
+
+  const bankAccounts: BankAccount[] = bankAccountsData?.accounts || [];
+  const contributors: Contributor[] = (contributorsData?.contributors || []).filter(
+    (c: Contributor) => c.userId !== user?.id
+  );
+
+  useEffect(() => {
+    if (bankAccounts.length > 0 && !selectedBankAccountId) {
+      const defaultAccount = bankAccounts.find(a => a.isDefault) || bankAccounts[0];
+      setSelectedBankAccountId(defaultAccount.id);
+    }
+  }, [bankAccounts, selectedBankAccountId]);
+
   const transferMutation = useMutation({
-    mutationFn: async (data: { amount: string; recipientName: string; method: string; bankDetails?: typeof bankDetails }) => {
+    mutationFn: async (data: { toUserId: string; amount: string; notes?: string; bankAccountId?: string }) => {
       const res = await fetch(`/api/pools/${poolId}/transfer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -43,18 +91,18 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
       });
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.message || "Transfer failed");
+        throw new Error(error.error || error.message || "Transfer failed");
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
-        title: "Transfer Initiated",
-        description: `$${parseFloat(transferAmount).toFixed(2)} transfer to ${recipientName} has been initiated.`,
+        title: recipientType === "self" ? "Transfer Initiated" : "Transfer Request Sent",
+        description: data.message,
       });
       setTransferAmount("");
-      setRecipientName("");
-      setBankDetails({ accountNumber: "", routingNumber: "", accountType: "checking" });
+      setNotes("");
+      setSelectedContributor(null);
       setConfirmOpen(false);
       onTransferComplete();
     },
@@ -76,44 +124,189 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
       toast({ description: "Amount exceeds available balance", variant: "destructive" });
       return;
     }
-    if (!recipientName.trim()) {
-      toast({ description: "Please enter recipient name", variant: "destructive" });
+    if (recipientType === "self" && !selectedBankAccountId) {
+      toast({ description: "Please link a bank account first", variant: "destructive" });
       return;
     }
-    if (transferMethod === "bank" && (!bankDetails.accountNumber || !bankDetails.routingNumber)) {
-      toast({ description: "Please enter bank account details", variant: "destructive" });
+    if (recipientType === "contributor" && !selectedContributor) {
+      toast({ description: "Please select a contributor", variant: "destructive" });
       return;
     }
     setConfirmOpen(true);
   };
 
   const confirmTransfer = () => {
+    const toUserId = recipientType === "self" ? user?.id : selectedContributor?.userId;
+    if (!toUserId) return;
+
     transferMutation.mutate({
+      toUserId,
       amount: transferAmount,
-      recipientName,
-      method: transferMethod,
-      bankDetails: transferMethod === "bank" ? bankDetails : undefined,
+      notes: notes || undefined,
+      bankAccountId: recipientType === "self" ? selectedBankAccountId : undefined,
     });
   };
+
+  const getRecipientName = () => {
+    if (recipientType === "self") {
+      return "Your bank account";
+    }
+    return selectedContributor ? `${selectedContributor.firstName} ${selectedContributor.lastName}` : "";
+  };
+
+  const getSelectedBankAccount = () => bankAccounts.find(a => a.id === selectedBankAccountId);
 
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted-foreground">
-        Transfer pool funds directly to a bank account. Transfers typically arrive within 1-3 business days.
+        Transfer pool funds to your bank account or send to a contributor.
       </p>
 
       <div className="space-y-4">
         <div>
-          <Label htmlFor="recipientName">Recipient Name</Label>
-          <Input
-            id="recipientName"
-            placeholder="John Doe or Business Name"
-            value={recipientName}
-            onChange={(e) => setRecipientName(e.target.value)}
-            className="mt-1.5 bg-background/50 border-white/10"
-            data-testid="input-recipient-name"
-          />
+          <Label className="text-sm font-medium mb-2 block">Transfer To</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => { setRecipientType("self"); setSelectedContributor(null); }}
+              className={`p-3 rounded-lg border text-left transition-all ${
+                recipientType === "self" 
+                  ? "border-primary bg-primary/10" 
+                  : "border-white/10 hover:border-white/20"
+              }`}
+              data-testid="button-transfer-self"
+            >
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4" />
+                <span className="text-sm font-medium">My Bank Account</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Transfer to your linked bank</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRecipientType("contributor")}
+              className={`p-3 rounded-lg border text-left transition-all ${
+                recipientType === "contributor" 
+                  ? "border-primary bg-primary/10" 
+                  : "border-white/10 hover:border-white/20"
+              }`}
+              data-testid="button-transfer-contributor"
+            >
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                <span className="text-sm font-medium">Pool Contributor</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Send to someone who contributed</p>
+            </button>
+          </div>
         </div>
+
+        {recipientType === "self" && (
+          <div className="p-4 rounded-lg bg-white/5 border border-white/10 space-y-3">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">Select Bank Account</span>
+            </div>
+            {loadingBankAccounts ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : bankAccounts.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground mb-3">No bank accounts linked yet</p>
+                <Button variant="outline" size="sm" className="border-white/10" asChild>
+                  <Link href="/wallet">Link Bank Account</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {bankAccounts.map((account) => (
+                  <button
+                    key={account.id}
+                    type="button"
+                    onClick={() => setSelectedBankAccountId(account.id)}
+                    className={`w-full p-3 rounded-lg border text-left transition-all flex items-center justify-between ${
+                      selectedBankAccountId === account.id
+                        ? "border-primary bg-primary/5"
+                        : "border-white/10 hover:border-white/20"
+                    }`}
+                    data-testid={`bank-account-${account.id}`}
+                  >
+                    <div>
+                      <div className="font-medium text-sm">{account.institutionName}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {account.accountName} ****{account.accountMask}
+                      </div>
+                    </div>
+                    {account.isDefault && (
+                      <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">Default</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {recipientType === "contributor" && (
+          <div className="p-4 rounded-lg bg-white/5 border border-white/10 space-y-3">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">Select Contributor</span>
+            </div>
+            {loadingContributors ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : contributors.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground">No other contributors to this pool</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {contributors.map((contributor) => (
+                  <button
+                    key={contributor.userId}
+                    type="button"
+                    onClick={() => setSelectedContributor(contributor)}
+                    className={`w-full p-3 rounded-lg border text-left transition-all flex items-center gap-3 ${
+                      selectedContributor?.userId === contributor.userId
+                        ? "border-primary bg-primary/5"
+                        : "border-white/10 hover:border-white/20"
+                    }`}
+                    data-testid={`contributor-${contributor.userId}`}
+                  >
+                    <Avatar className="w-10 h-10 border border-white/10">
+                      <AvatarImage src={contributor.avatar || undefined} />
+                      <AvatarFallback className="bg-primary/10 text-sm">
+                        {contributor.firstName?.[0]}{contributor.lastName?.[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm truncate">
+                        {contributor.firstName} {contributor.lastName}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        @{contributor.username} · Contributed ${contributor.totalContributed}
+                      </div>
+                    </div>
+                    {!contributor.hasBankLinked && (
+                      <span className="text-xs text-yellow-500 flex-shrink-0">No bank linked</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+            {selectedContributor && !selectedContributor.hasBankLinked && (
+              <div className="flex items-start gap-2 p-2 rounded bg-yellow-500/10 border border-yellow-500/20">
+                <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-yellow-500">
+                  This contributor hasn't linked a bank account yet. They'll be asked to link one when accepting the transfer.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div>
           <Label htmlFor="transferAmount">Transfer Amount</Label>
@@ -147,57 +340,27 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
           </div>
         </div>
 
-        <div className="p-4 rounded-lg bg-white/5 border border-white/10 space-y-4">
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium">Bank Account Details</span>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <Label htmlFor="accountNumber" className="text-xs">Account Number</Label>
-              <Input
-                id="accountNumber"
-                placeholder="123456789"
-                value={bankDetails.accountNumber}
-                onChange={(e) => setBankDetails(prev => ({ ...prev, accountNumber: e.target.value }))}
-                className="mt-1 bg-background/50 border-white/10"
-                data-testid="input-account-number"
-              />
-            </div>
-            <div>
-              <Label htmlFor="routingNumber" className="text-xs">Routing Number</Label>
-              <Input
-                id="routingNumber"
-                placeholder="021000021"
-                value={bankDetails.routingNumber}
-                onChange={(e) => setBankDetails(prev => ({ ...prev, routingNumber: e.target.value }))}
-                className="mt-1 bg-background/50 border-white/10"
-                data-testid="input-routing-number"
-              />
-            </div>
-            <div>
-              <Label htmlFor="accountType" className="text-xs">Account Type</Label>
-              <Select 
-                value={bankDetails.accountType} 
-                onValueChange={(v: "checking" | "savings") => setBankDetails(prev => ({ ...prev, accountType: v }))}
-              >
-                <SelectTrigger className="mt-1 bg-background/50 border-white/10" data-testid="select-account-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="checking">Checking</SelectItem>
-                  <SelectItem value="savings">Savings</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+        <div>
+          <Label htmlFor="notes">Notes (Optional)</Label>
+          <Input
+            id="notes"
+            placeholder="Add a note for this transfer..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="mt-1.5 bg-background/50 border-white/10"
+            data-testid="input-transfer-notes"
+          />
         </div>
 
         <Button 
           className="w-full bg-gradient-to-r from-primary to-primary/80"
           onClick={handleTransfer}
-          disabled={transferMutation.isPending || !transferAmount || !recipientName}
+          disabled={
+            transferMutation.isPending || 
+            !transferAmount || 
+            (recipientType === "self" && !selectedBankAccountId) ||
+            (recipientType === "contributor" && !selectedContributor)
+          }
           data-testid="button-initiate-transfer"
         >
           {transferMutation.isPending ? (
@@ -208,7 +371,7 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
           ) : (
             <>
               <Banknote className="w-4 h-4 mr-2" />
-              Transfer Funds
+              {recipientType === "self" ? "Transfer to Bank" : "Send Transfer Request"}
             </>
           )}
         </Button>
@@ -219,28 +382,44 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-yellow-500" />
-              Confirm Transfer
+              {recipientType === "self" ? "Confirm Transfer" : "Confirm Transfer Request"}
             </DialogTitle>
             <DialogDescription>
-              Please review the transfer details before confirming.
+              {recipientType === "self" 
+                ? "Please review the transfer details before confirming."
+                : "The recipient will be notified to accept this transfer."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-4">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Recipient:</span>
-              <span className="font-medium">{recipientName}</span>
+              <span className="font-medium">{getRecipientName()}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Amount:</span>
               <span className="font-medium text-lg">${parseFloat(transferAmount || "0").toFixed(2)}</span>
             </div>
+            {recipientType === "self" && getSelectedBankAccount() && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Bank Account:</span>
+                <span className="font-mono">
+                  {getSelectedBankAccount()?.institutionName} ****{getSelectedBankAccount()?.accountMask}
+                </span>
+              </div>
+            )}
+            {notes && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Notes:</span>
+                <span className="text-right max-w-[200px] truncate">{notes}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Account:</span>
-              <span className="font-mono">****{bankDetails.accountNumber.slice(-4)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Estimated Arrival:</span>
-              <span>1-3 business days</span>
+              <span className="text-muted-foreground">
+                {recipientType === "self" ? "Estimated Arrival:" : "Status:"}
+              </span>
+              <span>
+                {recipientType === "self" ? "1-3 business days" : "Pending acceptance"}
+              </span>
             </div>
           </div>
           <DialogFooter className="gap-2">
@@ -260,7 +439,7 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
               ) : (
                 <>
                   <CheckCircle className="w-4 h-4 mr-2" />
-                  Confirm Transfer
+                  {recipientType === "self" ? "Confirm Transfer" : "Send Request"}
                 </>
               )}
             </Button>
