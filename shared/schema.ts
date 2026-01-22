@@ -60,6 +60,7 @@ export const users = pgTable("users", {
   kycVerifiedAt: timestamp("kyc_verified_at"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeCardholderId: text("stripe_cardholder_id"),
+  stripeConnectId: text("stripe_connect_id"),
   plaidAccessToken: text("plaid_access_token"),
   plaidAccountId: text("plaid_account_id"),
   termsAcceptedAt: timestamp("terms_accepted_at"),
@@ -237,7 +238,8 @@ export const verificationCodes = pgTable("verification_codes", {
 export const bankAccounts = pgTable("bank_accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
-  plaidAccountId: text("plaid_account_id").notNull(),
+  plaidAccountId: text("plaid_account_id"),
+  stripeExternalAccountId: text("stripe_external_account_id"),
   institutionName: text("institution_name").notNull(),
   accountName: text("account_name").notNull(),
   accountMask: text("account_mask").notNull(),

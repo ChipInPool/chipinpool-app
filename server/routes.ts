@@ -2169,55 +2169,58 @@ export async function registerRoutes(
     }
   });
 
-  // Link bank account via Plaid and save to bank_accounts table
+  // Link bank account via Stripe Connect and save to bank_accounts table
   app.post("/api/bank-accounts/link", requireAuth, async (req, res, next) => {
     try {
-      const { publicToken, accountId, institutionName, accountName, accountMask, accountType } = z.object({
-        publicToken: z.string(),
-        accountId: z.string(),
-        institutionName: z.string(),
-        accountName: z.string(),
-        accountMask: z.string(),
-        accountType: z.string(),
+      const { accountHolderName, routingNumber, accountNumber, accountType } = z.object({
+        accountHolderName: z.string().min(1),
+        routingNumber: z.string().length(9),
+        accountNumber: z.string().min(4).max(17),
+        accountType: z.enum(['checking', 'savings']),
       }).parse(req.body);
 
       const userId = req.session.userId!;
-      const { PlaidApi, Configuration, PlaidEnvironments } = await import('plaid');
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const stripe = await getUncachableStripeClient();
       
-      const plaidClientId = process.env.PLAID_CLIENT_ID;
-      const plaidSecret = process.env.PLAID_SECRET;
-      
-      if (!plaidClientId || !plaidSecret) {
-        return res.status(400).json({ error: "Plaid not configured" });
+      // Create or get Stripe Connect account for user
+      let connectAccountId = user.stripeConnectId;
+      if (!connectAccountId) {
+        const connectAccount = await stripe.accounts.create({
+          type: 'custom',
+          country: 'US',
+          email: user.email,
+          capabilities: {
+            transfers: { requested: true },
+          },
+          business_type: 'individual',
+          individual: {
+            first_name: user.firstName,
+            last_name: user.lastName,
+            email: user.email,
+          },
+          tos_acceptance: {
+            date: Math.floor(Date.now() / 1000),
+            ip: req.ip || '127.0.0.1',
+          },
+        });
+        connectAccountId = connectAccount.id;
+        await storage.updateUser(userId, { stripeConnectId: connectAccountId });
       }
 
-      const plaidEnvName = process.env.PLAID_ENV || 'production';
-      const plaidEnv = plaidEnvName === 'sandbox' ? PlaidEnvironments.sandbox : 
-                       plaidEnvName === 'development' ? PlaidEnvironments.development : 
-                       PlaidEnvironments.production;
-      
-      const configuration = new Configuration({
-        basePath: plaidEnv,
-        baseOptions: {
-          headers: {
-            'PLAID-CLIENT-ID': plaidClientId,
-            'PLAID-SECRET': plaidSecret,
-          },
+      // Create external bank account on Connect account
+      const externalAccount = await stripe.accounts.createExternalAccount(connectAccountId, {
+        external_account: {
+          object: 'bank_account',
+          country: 'US',
+          currency: 'usd',
+          account_holder_name: accountHolderName,
+          account_holder_type: 'individual',
+          routing_number: routingNumber,
+          account_number: accountNumber,
         },
-      });
-
-      const plaidClient = new PlaidApi(configuration);
-
-      const exchangeResponse = await plaidClient.itemPublicTokenExchange({
-        public_token: publicToken,
-      });
-
-      const accessToken = exchangeResponse.data.access_token;
-      
-      // Update user with access token
-      await storage.updateUser(userId, {
-        plaidAccessToken: accessToken,
-        plaidAccountId: accountId,
       });
 
       // Get existing accounts to check if this is the first one
@@ -2225,19 +2228,25 @@ export async function registerRoutes(
       const isFirst = existingAccounts.length === 0;
 
       // Create bank account record
+      const bankAccount = externalAccount as any;
       const account = await storage.createBankAccount({
         userId,
-        plaidAccountId: accountId,
-        institutionName,
-        accountName,
-        accountMask,
+        stripeExternalAccountId: bankAccount.id,
+        institutionName: bankAccount.bank_name || 'Bank Account',
+        accountName: accountHolderName,
+        accountMask: bankAccount.last4,
         accountType,
         isDefault: isFirst,
       });
 
       res.json({ account, message: "Bank account linked successfully" });
     } catch (error: any) {
-      console.error('[Bank Link] Error:', error.message);
+      console.error('[Bank Link] Error:', error.message, error.raw?.message || '');
+      if (error.type === 'StripeInvalidRequestError' || error.raw) {
+        return res.status(400).json({ 
+          error: error.raw?.message || error.message || 'Failed to link bank account',
+        });
+      }
       next(error);
     }
   });
