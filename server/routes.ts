@@ -2251,6 +2251,93 @@ export async function registerRoutes(
     }
   });
 
+  // Link debit card via Stripe Connect for instant payouts
+  app.post("/api/debit-cards/link", requireAuth, async (req, res, next) => {
+    try {
+      const { cardNumber, expMonth, expYear, cvc, cardholderName } = z.object({
+        cardNumber: z.string().min(13).max(19),
+        expMonth: z.number().min(1).max(12),
+        expYear: z.number().min(2024).max(2050),
+        cvc: z.string().length(3),
+        cardholderName: z.string().min(1),
+      }).parse(req.body);
+
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const stripe = await getUncachableStripeClient();
+      
+      // Create or get Stripe Connect account for user
+      let connectAccountId = user.stripeConnectId;
+      if (!connectAccountId) {
+        const connectAccount = await stripe.accounts.create({
+          type: 'custom',
+          country: 'US',
+          email: user.email,
+          capabilities: {
+            transfers: { requested: true },
+          },
+          business_type: 'individual',
+          individual: {
+            first_name: user.firstName,
+            last_name: user.lastName,
+            email: user.email,
+          },
+          tos_acceptance: {
+            date: Math.floor(Date.now() / 1000),
+            ip: req.ip || '127.0.0.1',
+          },
+        });
+        connectAccountId = connectAccount.id;
+        await storage.updateUser(userId, { stripeConnectId: connectAccountId });
+      }
+
+      // Create card token and attach as external account
+      const token = await stripe.tokens.create({
+        card: {
+          number: cardNumber,
+          exp_month: expMonth.toString(),
+          exp_year: expYear.toString(),
+          cvc: cvc,
+          name: cardholderName,
+          currency: 'usd',
+        },
+      });
+
+      const externalAccount = await stripe.accounts.createExternalAccount(connectAccountId, {
+        external_account: token.id,
+      });
+
+      // Get existing accounts to check if this is the first one
+      const existingAccounts = await storage.getBankAccountsByUser(userId);
+      const isFirst = existingAccounts.length === 0;
+
+      // Create bank account record (using bankAccounts table for both bank accounts and debit cards)
+      const cardAccount = externalAccount as any;
+      const account = await storage.createBankAccount({
+        userId,
+        stripeExternalAccountId: cardAccount.id,
+        institutionName: cardAccount.brand || 'Debit Card',
+        accountName: cardholderName,
+        accountMask: cardAccount.last4,
+        accountType: 'debit',
+        payoutMethod: 'debit_card',
+        isDefault: isFirst,
+      });
+
+      res.json({ account, message: "Debit card linked successfully for instant payouts!" });
+    } catch (error: any) {
+      console.error('[Debit Card Link] Error:', error.message, error.raw?.message || '');
+      if (error.type === 'StripeInvalidRequestError' || error.raw) {
+        return res.status(400).json({ 
+          error: error.raw?.message || error.message || 'Failed to link debit card',
+        });
+      }
+      next(error);
+    }
+  });
+
   // Set default bank account
   app.put("/api/bank-accounts/:id/default", requireAuth, async (req, res, next) => {
     try {

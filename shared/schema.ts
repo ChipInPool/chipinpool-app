@@ -235,6 +235,8 @@ export const verificationCodes = pgTable("verification_codes", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const payoutMethodEnum = pgEnum('payout_method', ['bank_account', 'debit_card']);
+
 export const bankAccounts = pgTable("bank_accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
@@ -244,6 +246,7 @@ export const bankAccounts = pgTable("bank_accounts", {
   accountName: text("account_name").notNull(),
   accountMask: text("account_mask").notNull(),
   accountType: text("account_type").notNull(),
+  payoutMethod: payoutMethodEnum("payout_method").notNull().default('bank_account'),
   isDefault: boolean("is_default").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
