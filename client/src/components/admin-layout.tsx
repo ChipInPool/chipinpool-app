@@ -9,7 +9,8 @@ import {
   Settings,
   LogOut,
   Shield,
-  Store
+  Store,
+  AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -23,6 +24,7 @@ const navItems = [
   { href: "/admin/pools", icon: Layers, label: "Pools" },
   { href: "/admin/transactions", icon: CreditCard, label: "Transactions" },
   { href: "/admin/merchants", icon: Store, label: "Merchants" },
+  { href: "/admin/fraud", icon: AlertTriangle, label: "Fraud Detection" },
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {

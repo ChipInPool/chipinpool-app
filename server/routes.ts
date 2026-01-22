@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
-import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards } from "@shared/schema";
+import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts } from "@shared/schema";
 import express from "express";
 import { db } from "./db";
 import { eq, desc, sql, inArray } from "drizzle-orm";
@@ -3588,6 +3588,38 @@ export async function registerRoutes(
       });
       
       res.json({ message: "Alert updated" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/admin/fraud/seed-sample", requireAdmin, async (req, res, next) => {
+    try {
+      // Create a sample fraud alert with detailed indicators from the fraud model
+      const sampleIndicators = [
+        "High velocity: 15 actions in 24h (limit: 10)",
+        "Critical amount: $5,500 exceeds $5,000 threshold",
+        "High daily volume: $8,750.00 approaching $10,000 limit",
+        "New account: 3 days old (flagged for accounts under 7 days)",
+        "KYC not completed",
+        "Unusual time: 3:00 AM (suspicious hours: 1AM-5AM)"
+      ];
+      
+      await db.insert(fraudAlerts).values({
+        userId: null,
+        transactionId: null,
+        contributionId: null,
+        riskLevel: 'critical',
+        riskScore: 85,
+        alertType: 'velocity_anomaly',
+        description: 'Risk assessment flagged withdrawal of $5,500 from unverified account during unusual hours with high transaction velocity',
+        indicators: JSON.stringify(sampleIndicators),
+        status: 'pending',
+        ipAddress: '192.168.1.100',
+        deviceFingerprint: 'sample-device-fp-12345',
+      });
+      
+      res.json({ message: "Sample fraud alert created" });
     } catch (error) {
       next(error);
     }
