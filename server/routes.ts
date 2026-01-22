@@ -2014,12 +2014,16 @@ export async function registerRoutes(
       const user = await storage.getUser(req.session.userId!);
       if (!user) return res.status(404).json({ error: "User not found" });
 
+      const host = process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS?.split(',')[0] || '';
+      const redirectUri = host ? `https://${host}/security` : undefined;
+      
       const linkTokenResponse = await plaidClient.linkTokenCreate({
         user: { client_user_id: user.id },
-        client_name: 'ChipInPay',
+        client_name: 'ChipInPool',
         products: [Products.Auth],
         country_codes: [CountryCode.Us],
         language: 'en',
+        redirect_uri: plaidEnvName === 'production' && redirectUri ? redirectUri : undefined,
       });
 
       res.json({ linkToken: linkTokenResponse.data.link_token });
