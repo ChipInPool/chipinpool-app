@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Shield, Mail, Phone, Key, Smartphone, UserCheck, CheckCircle, XCircle, Loader2, Building, Plus } from "lucide-react";
+import { Shield, Mail, Phone, Key, Smartphone, UserCheck, CheckCircle, XCircle, Loader2, Building, Plus, CreditCard, Zap } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -89,6 +89,59 @@ export default function Security() {
     }
     setShowBankDialog(true);
   };
+
+  const [showDebitCardDialog, setShowDebitCardDialog] = useState(false);
+  const [debitCardForm, setDebitCardForm] = useState({
+    cardholderName: '',
+    cardNumber: '',
+    expMonth: '',
+    expYear: '',
+    cvc: '',
+  });
+
+  const linkDebitCardMutation = useMutation({
+    mutationFn: async (data: typeof debitCardForm) => {
+      const res = await fetch('/api/debit-cards/link', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cardholderName: data.cardholderName,
+          cardNumber: data.cardNumber.replace(/\s/g, ''),
+          expMonth: parseInt(data.expMonth),
+          expYear: parseInt(data.expYear),
+          cvc: data.cvc,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to link debit card');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
+      toast({ description: "Debit card linked for instant payouts!" });
+      setShowDebitCardDialog(false);
+      setDebitCardForm({ cardholderName: '', cardNumber: '', expMonth: '', expYear: '', cvc: '' });
+    },
+    onError: (error: any) => {
+      toast({ description: error.message || "Failed to link debit card", variant: "destructive" });
+    },
+  });
+
+  const handleLinkDebitCard = () => {
+    if (user) {
+      setDebitCardForm(prev => ({
+        ...prev,
+        cardholderName: `${user.firstName} ${user.lastName}`,
+      }));
+    }
+    setShowDebitCardDialog(true);
+  };
+
+  const bankAccountsList = bankAccounts?.filter((a: any) => a.payoutMethod === 'bank_account') || [];
+  const debitCardsList = bankAccounts?.filter((a: any) => a.payoutMethod === 'debit_card') || [];
 
   const sendEmailMutation = useMutation({
     mutationFn: api.security.sendEmailVerification,
@@ -555,9 +608,9 @@ export default function Security() {
                   <Building className="w-5 h-5 text-cyan-400" />
                   <CardTitle>Bank Accounts</CardTitle>
                 </div>
-                {bankAccounts?.length > 0 ? (
+                {bankAccountsList.length > 0 ? (
                   <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                    <CheckCircle className="w-3 h-3 mr-1" /> {bankAccounts.length} Linked
+                    <CheckCircle className="w-3 h-3 mr-1" /> {bankAccountsList.length} Linked
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="border-orange-500/30 text-orange-400">
@@ -565,12 +618,12 @@ export default function Security() {
                   </Badge>
                 )}
               </div>
-              <CardDescription>Link a bank account to withdraw funds</CardDescription>
+              <CardDescription>Link a bank account for standard withdrawals (1-3 business days, free)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {bankAccounts?.length > 0 && (
+              {bankAccountsList.length > 0 && (
                 <div className="space-y-2">
-                  {bankAccounts.map((account: any) => (
+                  {bankAccountsList.map((account: any) => (
                     <div key={account.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
                       <div className="flex items-center gap-3">
                         <Building className="w-4 h-4 text-muted-foreground" />
@@ -588,12 +641,65 @@ export default function Security() {
               )}
               <Button 
                 onClick={handleLinkBank}
-                variant={bankAccounts?.length > 0 ? "outline" : "default"}
-                className={bankAccounts?.length > 0 ? "" : "bg-gradient-to-r from-cyan-500 to-blue-500"}
+                variant={bankAccountsList.length > 0 ? "outline" : "default"}
+                className={bankAccountsList.length > 0 ? "" : "bg-gradient-to-r from-cyan-500 to-blue-500"}
                 data-testid="button-link-bank"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                {bankAccounts?.length > 0 ? "Add Another Account" : "Link Bank Account"}
+                {bankAccountsList.length > 0 ? "Add Another Account" : "Link Bank Account"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/[0.02] border-white/5">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CreditCard className="w-5 h-5 text-lime-400" />
+                  <CardTitle>Debit Cards</CardTitle>
+                  <Badge className="bg-lime-500/20 text-lime-400 border-lime-500/30">
+                    <Zap className="w-3 h-3 mr-1" /> Instant
+                  </Badge>
+                </div>
+                {debitCardsList.length > 0 ? (
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                    <CheckCircle className="w-3 h-3 mr-1" /> {debitCardsList.length} Linked
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="border-orange-500/30 text-orange-400">
+                    <XCircle className="w-3 h-3 mr-1" /> Not Linked
+                  </Badge>
+                )}
+              </div>
+              <CardDescription>Link a debit card for instant withdrawals (30 minutes, 1.5% fee)</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {debitCardsList.length > 0 && (
+                <div className="space-y-2">
+                  {debitCardsList.map((account: any) => (
+                    <div key={account.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <CreditCard className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">{account.institutionName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            ••••{account.accountMask}
+                            {account.isDefault && <span className="ml-2 text-cyan-400">(Default)</span>}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <Button 
+                onClick={handleLinkDebitCard}
+                variant={debitCardsList.length > 0 ? "outline" : "default"}
+                className={debitCardsList.length > 0 ? "" : "bg-gradient-to-r from-lime-500 to-green-500"}
+                data-testid="button-link-debit-card"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                {debitCardsList.length > 0 ? "Add Another Card" : "Link Debit Card"}
               </Button>
             </CardContent>
           </Card>
@@ -794,6 +900,99 @@ export default function Security() {
               >
                 {linkBankMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Link Account
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDebitCardDialog} onOpenChange={setShowDebitCardDialog}>
+        <DialogContent className="bg-card border-white/10">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-lime-400" />
+              Link Debit Card for Instant Payouts
+            </DialogTitle>
+            <DialogDescription>
+              Get your money in 30 minutes with a 1.5% fee. Your card details are securely processed by Stripe.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="cardholderName">Cardholder Name</Label>
+              <Input
+                id="cardholderName"
+                placeholder="Name on card"
+                value={debitCardForm.cardholderName}
+                onChange={(e) => setDebitCardForm(prev => ({ ...prev, cardholderName: e.target.value }))}
+                data-testid="input-cardholder-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cardNumber">Card Number</Label>
+              <Input
+                id="cardNumber"
+                placeholder="4242 4242 4242 4242"
+                value={debitCardForm.cardNumber}
+                onChange={(e) => setDebitCardForm(prev => ({ ...prev, cardNumber: e.target.value.replace(/\D/g, '').slice(0, 16) }))}
+                maxLength={16}
+                data-testid="input-card-number"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="expMonth">Month</Label>
+                <Input
+                  id="expMonth"
+                  placeholder="MM"
+                  value={debitCardForm.expMonth}
+                  onChange={(e) => setDebitCardForm(prev => ({ ...prev, expMonth: e.target.value.replace(/\D/g, '').slice(0, 2) }))}
+                  maxLength={2}
+                  data-testid="input-exp-month"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="expYear">Year</Label>
+                <Input
+                  id="expYear"
+                  placeholder="YYYY"
+                  value={debitCardForm.expYear}
+                  onChange={(e) => setDebitCardForm(prev => ({ ...prev, expYear: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                  maxLength={4}
+                  data-testid="input-exp-year"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cvc">CVC</Label>
+                <Input
+                  id="cvc"
+                  placeholder="123"
+                  value={debitCardForm.cvc}
+                  onChange={(e) => setDebitCardForm(prev => ({ ...prev, cvc: e.target.value.replace(/\D/g, '').slice(0, 3) }))}
+                  maxLength={3}
+                  data-testid="input-cvc"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end pt-4">
+              <Button variant="outline" onClick={() => setShowDebitCardDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => linkDebitCardMutation.mutate(debitCardForm)}
+                disabled={
+                  !debitCardForm.cardholderName ||
+                  debitCardForm.cardNumber.length < 13 ||
+                  debitCardForm.expMonth.length !== 2 ||
+                  debitCardForm.expYear.length !== 4 ||
+                  debitCardForm.cvc.length !== 3 ||
+                  linkDebitCardMutation.isPending
+                }
+                className="bg-gradient-to-r from-lime-500 to-green-500"
+                data-testid="button-confirm-link-debit-card"
+              >
+                {linkDebitCardMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Link Card
               </Button>
             </div>
           </div>
