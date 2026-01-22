@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { AdminLayout } from "@/components/admin-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, AlertTriangle, Shield, ShieldAlert, ShieldCheck, Eye } from "lucide-react";
+import { Loader2, AlertTriangle, Shield, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth-context";
 import { format } from "date-fns";
 
 interface FraudAlert {
@@ -28,11 +30,19 @@ interface FraudAlert {
 export default function AdminFraud() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [statusFilter, setStatusFilter] = useState("pending");
   const [selectedAlert, setSelectedAlert] = useState<FraudAlert | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
 
-  const { data: dashboardData, isLoading: dashboardLoading } = useQuery({
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      setLocation("/login");
+    }
+  }, [authLoading, isAuthenticated, setLocation]);
+
+  const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError } = useQuery({
     queryKey: ["admin", "fraud", "dashboard"],
     queryFn: async () => {
       const res = await fetch("/api/admin/fraud/dashboard", { credentials: "include" });
@@ -101,6 +111,28 @@ export default function AdminFraud() {
   };
 
   const alerts: FraudAlert[] = alertsData?.alerts || [];
+
+  if (authLoading || dashboardLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (!isAuthenticated || dashboardError) {
+    return (
+      <AdminLayout>
+        <div className="text-center py-12">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
+          <p className="text-muted-foreground">You don't have permission to view this page.</p>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
