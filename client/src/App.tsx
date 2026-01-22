@@ -42,6 +42,7 @@ import ChipInPayCheckout from "@/pages/chipinpay-checkout";
 import AdminFraud from "@/pages/admin/fraud";
 import CardAnalyticsPage from "@/pages/card-analytics";
 import AcceptTransfer from "@/pages/accept-transfer";
+import Rewards from "@/pages/rewards";
 
 function Router() {
   return (
@@ -82,6 +83,7 @@ function Router() {
       <Route path="/merchant" component={MerchantDashboard} />
       <Route path="/chipinpay/checkout/:sessionId" component={ChipInPayCheckout} />
       <Route path="/transfer/:requestId/accept" component={AcceptTransfer} />
+      <Route path="/rewards" component={Rewards} />
       <Route component={NotFound} />
     </Switch>
   );

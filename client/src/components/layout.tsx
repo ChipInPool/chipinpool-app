@@ -83,6 +83,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Link href="/split-calculator" className={`text-sm font-medium hover:text-primary transition-colors ${location === '/split-calculator' ? 'text-primary' : 'text-muted-foreground'}`}>
               Split
             </Link>
+            <Link href="/rewards" className={`text-sm font-medium hover:text-primary transition-colors ${location === '/rewards' ? 'text-primary' : 'text-muted-foreground'}`}>
+              Rewards
+            </Link>
             <Link href="/api-docs" className={`text-sm font-medium hover:text-primary transition-colors ${location === '/api-docs' ? 'text-primary' : 'text-muted-foreground'}`}>
               Developers
             </Link>
@@ -241,6 +244,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <Link href="/explore" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Explore Pools</Link>
                     <Link href="/recurring" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Recurring</Link>
                     <Link href="/split-calculator" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Split Calculator</Link>
+                    <Link href="/rewards" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Rewards</Link>
                     <Link href="/profile" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>My Profile</Link>
                     <Link href="/settings" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Settings</Link>
                     <Link href="/api-docs" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>For Developers</Link>

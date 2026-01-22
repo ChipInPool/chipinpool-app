@@ -779,6 +779,24 @@ export class DatabaseStorage implements IStorage {
     return !!existing;
   }
 
+  async getUserBadges(userId: string): Promise<any[]> {
+    const userBadgesData = await db.select().from(userBadges)
+      .where(eq(userBadges.userId, userId))
+      .orderBy(desc(userBadges.earnedAt));
+    
+    const badgeDetails = await Promise.all(
+      userBadgesData.map(async (ub) => {
+        const badge = await this.getBadgeById(ub.badgeId);
+        return {
+          ...ub,
+          badge,
+        };
+      })
+    );
+    
+    return badgeDetails;
+  }
+
   // Points operations
   async getUserPoints(userId: string): Promise<UserPoints | undefined> {
     const [points] = await db.select().from(userPoints).where(eq(userPoints.userId, userId));
