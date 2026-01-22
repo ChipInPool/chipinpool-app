@@ -27,7 +27,12 @@ import {
   sendVerificationSMS,
   sendPasswordResetEmail,
   sendPasswordResetSMS,
-  sendWelcomeEmail
+  sendWelcomeEmail,
+  sendSecurityAlertNotification,
+  sendKycStatusNotification,
+  sendCardActivityNotification,
+  sendWalletActivityNotification,
+  sendAccountChangeNotification
 } from "./notificationService";
 
 declare module "express-session" {
@@ -517,6 +522,21 @@ export async function registerRoutes(
         await tx.update(users)
           .set({ password: hashedPassword })
           .where(eq(users.id, resetToken.userId));
+        
+        // Get user for notification
+        const [updatedUser] = await tx.select().from(users).where(eq(users.id, resetToken.userId)).limit(1);
+        if (updatedUser) {
+          // Send security alert - gate with global channel preference AND per-category preference
+          sendSecurityAlertNotification(
+            updatedUser.email,
+            updatedUser.phone,
+            updatedUser.firstName,
+            'password_change',
+            'Your password has been successfully reset. If you did not make this change, please contact support immediately.',
+            updatedUser.notifyEmail && updatedUser.emailSecurityAlerts,
+            updatedUser.notifySMS && updatedUser.smsSecurityAlerts
+          ).catch(console.error);
+        }
       });
 
       res.json({ message: "Password reset successfully. You can now log in." });
@@ -1877,6 +1897,18 @@ export async function registerRoutes(
       // Log the withdrawal
       await storage.createWalletWithdrawal(userId, amount, user.plaidAccountId);
 
+      // Send wallet activity notification - gate with global channel preference AND per-category preference
+      sendWalletActivityNotification(
+        user.email,
+        user.phone,
+        user.firstName,
+        'withdrawal',
+        withdrawAmount.toFixed(2),
+        'pending',
+        user.notifyEmail && user.emailWalletActivity,
+        user.notifySMS && user.smsWalletActivity
+      ).catch(console.error);
+
       res.json({ 
         message: `Withdrawal of $${withdrawAmount.toFixed(2)} initiated. Funds will arrive in 1-3 business days.`,
         newBalance,
@@ -2048,6 +2080,18 @@ export async function registerRoutes(
       }
 
       await storage.updateUser(userId, { twoFactorEnabled: true });
+
+      // Send security alert notification - gate with global channel preference AND per-category preference
+      sendSecurityAlertNotification(
+        user.email,
+        user.phone,
+        user.firstName,
+        '2fa_enabled',
+        'Two-factor authentication has been enabled on your account. Your account is now more secure.',
+        user.notifyEmail && user.emailSecurityAlerts,
+        user.notifySMS && user.smsSecurityAlerts
+      ).catch(console.error);
+
       res.json({ message: "2FA enabled successfully" });
     } catch (error) {
       next(error);
@@ -2070,6 +2114,18 @@ export async function registerRoutes(
       }
 
       await storage.updateUser(userId, { twoFactorEnabled: false, twoFactorSecret: null });
+
+      // Send security alert notification - gate with global channel preference AND per-category preference
+      sendSecurityAlertNotification(
+        user.email,
+        user.phone,
+        user.firstName,
+        '2fa_disabled',
+        'Two-factor authentication has been disabled on your account. Consider re-enabling it for better security.',
+        user.notifyEmail && user.emailSecurityAlerts,
+        user.notifySMS && user.smsSecurityAlerts
+      ).catch(console.error);
+
       res.json({ message: "2FA disabled successfully" });
     } catch (error) {
       next(error);
@@ -2238,9 +2294,19 @@ export async function registerRoutes(
           emailPoolUpdates: user.notifyEmail,
           emailPoolComplete: user.notifyEmail,
           emailInvites: user.notifyEmail,
+          emailSecurityAlerts: user.emailSecurityAlerts,
+          emailKycUpdates: user.emailKycUpdates,
+          emailCardActivity: user.emailCardActivity,
+          emailWalletActivity: user.emailWalletActivity,
+          emailAccountChanges: user.emailAccountChanges,
           smsContributions: user.notifySMS,
           smsPoolComplete: user.notifySMS,
           smsInvites: user.notifySMS,
+          smsSecurityAlerts: user.smsSecurityAlerts,
+          smsKycUpdates: user.smsKycUpdates,
+          smsCardActivity: user.smsCardActivity,
+          smsWalletActivity: user.smsWalletActivity,
+          smsAccountChanges: user.smsAccountChanges,
         },
       });
     } catch (error) {
@@ -2256,30 +2322,51 @@ export async function registerRoutes(
         emailPoolUpdates: z.boolean().optional(),
         emailPoolComplete: z.boolean().optional(),
         emailInvites: z.boolean().optional(),
+        emailSecurityAlerts: z.boolean().optional(),
+        emailKycUpdates: z.boolean().optional(),
+        emailCardActivity: z.boolean().optional(),
+        emailWalletActivity: z.boolean().optional(),
+        emailAccountChanges: z.boolean().optional(),
         smsContributions: z.boolean().optional(),
         smsPoolComplete: z.boolean().optional(),
         smsInvites: z.boolean().optional(),
+        smsSecurityAlerts: z.boolean().optional(),
+        smsKycUpdates: z.boolean().optional(),
+        smsCardActivity: z.boolean().optional(),
+        smsWalletActivity: z.boolean().optional(),
+        smsAccountChanges: z.boolean().optional(),
       });
 
       const prefs = prefsSchema.parse(req.body);
       const userId = req.session.userId!;
 
-      // Determine overall email/sms preferences based on individual settings
-      // Only set to true if at least one flag is explicitly true
-      // Set to false if all flags are explicitly false
-      const hasEmailPrefs = prefs.emailContributions !== undefined || prefs.emailPoolUpdates !== undefined || 
-                            prefs.emailPoolComplete !== undefined || prefs.emailInvites !== undefined;
-      const hasSmsPrefs = prefs.smsContributions !== undefined || prefs.smsPoolComplete !== undefined || 
-                          prefs.smsInvites !== undefined;
-
-      const notifyEmail = hasEmailPrefs ? Boolean(prefs.emailContributions || prefs.emailPoolUpdates || 
-                                                   prefs.emailPoolComplete || prefs.emailInvites) : undefined;
-      const notifySMS = hasSmsPrefs ? Boolean(prefs.smsContributions || prefs.smsPoolComplete || 
-                                               prefs.smsInvites) : undefined;
-
       const updateData: Record<string, boolean> = {};
-      if (notifyEmail !== undefined) updateData.notifyEmail = notifyEmail;
-      if (notifySMS !== undefined) updateData.notifySMS = notifySMS;
+
+      // Pool activity preferences (legacy notifyEmail/notifySMS)
+      const hasEmailPoolPrefs = prefs.emailContributions !== undefined || prefs.emailPoolUpdates !== undefined || 
+                                prefs.emailPoolComplete !== undefined || prefs.emailInvites !== undefined;
+      const hasSmsPoolPrefs = prefs.smsContributions !== undefined || prefs.smsPoolComplete !== undefined || 
+                              prefs.smsInvites !== undefined;
+
+      if (hasEmailPoolPrefs) {
+        updateData.notifyEmail = Boolean(prefs.emailContributions || prefs.emailPoolUpdates || 
+                                         prefs.emailPoolComplete || prefs.emailInvites);
+      }
+      if (hasSmsPoolPrefs) {
+        updateData.notifySMS = Boolean(prefs.smsContributions || prefs.smsPoolComplete || prefs.smsInvites);
+      }
+
+      // Per-channel per-category preferences
+      if (prefs.emailSecurityAlerts !== undefined) updateData.emailSecurityAlerts = prefs.emailSecurityAlerts;
+      if (prefs.emailKycUpdates !== undefined) updateData.emailKycUpdates = prefs.emailKycUpdates;
+      if (prefs.emailCardActivity !== undefined) updateData.emailCardActivity = prefs.emailCardActivity;
+      if (prefs.emailWalletActivity !== undefined) updateData.emailWalletActivity = prefs.emailWalletActivity;
+      if (prefs.emailAccountChanges !== undefined) updateData.emailAccountChanges = prefs.emailAccountChanges;
+      if (prefs.smsSecurityAlerts !== undefined) updateData.smsSecurityAlerts = prefs.smsSecurityAlerts;
+      if (prefs.smsKycUpdates !== undefined) updateData.smsKycUpdates = prefs.smsKycUpdates;
+      if (prefs.smsCardActivity !== undefined) updateData.smsCardActivity = prefs.smsCardActivity;
+      if (prefs.smsWalletActivity !== undefined) updateData.smsWalletActivity = prefs.smsWalletActivity;
+      if (prefs.smsAccountChanges !== undefined) updateData.smsAccountChanges = prefs.smsAccountChanges;
 
       if (Object.keys(updateData).length > 0) {
         await db.update(users)
@@ -3293,6 +3380,16 @@ export async function registerRoutes(
         if (vs.status === 'verified' && user.kycStatus !== 'verified') {
           await storage.updateUser(userId, { kycStatus: 'verified' });
           synced++;
+          
+          // Send KYC status notification - gate with global channel preference AND per-category preference
+          sendKycStatusNotification(
+            user.email,
+            user.phone,
+            user.firstName,
+            'verified',
+            user.notifyEmail && user.emailKycUpdates,
+            user.notifySMS && user.smsKycUpdates
+          ).catch(console.error);
         }
       }
 

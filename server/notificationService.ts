@@ -345,3 +345,249 @@ export async function sendWelcomeEmail(email: string, name: string): Promise<boo
   `;
   return sendEmail(email, 'Welcome to ChipIn! 🎉', html);
 }
+
+// Security alert notifications
+export async function sendSecurityAlertNotification(
+  email: string,
+  phone: string | null,
+  name: string,
+  alertType: 'login' | 'password_change' | '2fa_enabled' | '2fa_disabled' | 'new_device',
+  details: string,
+  notifyEmail: boolean,
+  notifySMS: boolean
+) {
+  const alertTitles: Record<string, string> = {
+    login: 'New Login Detected',
+    password_change: 'Password Changed',
+    '2fa_enabled': '2FA Enabled',
+    '2fa_disabled': '2FA Disabled',
+    new_device: 'New Device Login',
+  };
+  
+  const promises: Promise<boolean>[] = [];
+
+  if (notifyEmail && email) {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
+          <h1 style="color: #ff6b6b; margin: 0 0 16px;">🔒 Security Alert</h1>
+          <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
+            Hey ${name},<br><br>
+            <strong>${alertTitles[alertType] || 'Security Update'}</strong><br><br>
+            ${details}
+          </p>
+          <p style="color: #888; font-size: 14px;">
+            If this wasn't you, please secure your account immediately.
+          </p>
+        </div>
+        <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
+          ChipIn - Pool funds together. Pay smarter.
+        </p>
+      </div>
+    `;
+    promises.push(sendEmail(email, `🔒 ${alertTitles[alertType] || 'Security Alert'} - ChipIn`, html));
+  }
+
+  if (notifySMS && phone) {
+    promises.push(sendSMS(phone, `ChipIn Security: ${alertTitles[alertType]}. ${details}`));
+  }
+
+  await Promise.allSettled(promises);
+}
+
+// KYC status update notifications
+export async function sendKycStatusNotification(
+  email: string,
+  phone: string | null,
+  name: string,
+  status: 'pending' | 'verified' | 'failed' | 'not_started',
+  notifyEmail: boolean,
+  notifySMS: boolean
+) {
+  const baseUrl = getBaseUrl();
+  const statusMessages: Record<string, { title: string; message: string; emoji: string }> = {
+    pending: { title: 'Verification In Progress', message: 'Your identity verification is being reviewed. This usually takes a few minutes.', emoji: '⏳' },
+    verified: { title: 'Verification Complete!', message: 'Your identity has been verified. You now have full access to all ChipIn features!', emoji: '✅' },
+    failed: { title: 'Verification Failed', message: 'Unfortunately, your verification was unsuccessful. Please try again or contact support.', emoji: '❌' },
+    not_started: { title: 'Verification Required', message: 'Please complete identity verification to unlock all features.', emoji: '📋' },
+  };
+
+  const info = statusMessages[status] || statusMessages.pending;
+  const promises: Promise<boolean>[] = [];
+
+  if (notifyEmail && email) {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
+          <h1 style="color: #d4ff00; margin: 0 0 16px;">${info.emoji} ${info.title}</h1>
+          <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
+            Hey ${name},<br><br>
+            ${info.message}
+          </p>
+          <a href="${baseUrl}/security" 
+             style="display: inline-block; background: #d4ff00; color: #0a1628; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+            View Status
+          </a>
+        </div>
+        <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
+          ChipIn - Pool funds together. Pay smarter.
+        </p>
+      </div>
+    `;
+    promises.push(sendEmail(email, `${info.emoji} ${info.title} - ChipIn`, html));
+  }
+
+  if (notifySMS && phone) {
+    promises.push(sendSMS(phone, `ChipIn: ${info.emoji} ${info.title}. ${info.message}`));
+  }
+
+  await Promise.allSettled(promises);
+}
+
+// Card activity notifications
+export async function sendCardActivityNotification(
+  email: string,
+  phone: string | null,
+  name: string,
+  activityType: 'transaction' | 'card_created' | 'card_frozen' | 'card_unfrozen',
+  details: string,
+  amount?: string,
+  notifyEmail?: boolean,
+  notifySMS?: boolean
+) {
+  const activityTitles: Record<string, { title: string; emoji: string }> = {
+    transaction: { title: 'Card Transaction', emoji: '💳' },
+    card_created: { title: 'Virtual Card Created', emoji: '✨' },
+    card_frozen: { title: 'Card Frozen', emoji: '🧊' },
+    card_unfrozen: { title: 'Card Unfrozen', emoji: '🔓' },
+  };
+
+  const info = activityTitles[activityType] || { title: 'Card Activity', emoji: '💳' };
+  const promises: Promise<boolean>[] = [];
+
+  if (notifyEmail && email) {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
+          <h1 style="color: #d4ff00; margin: 0 0 16px;">${info.emoji} ${info.title}</h1>
+          <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
+            Hey ${name},<br><br>
+            ${details}
+            ${amount ? `<br><br><strong style="color: #d4ff00; font-size: 24px;">$${amount}</strong>` : ''}
+          </p>
+        </div>
+        <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
+          ChipIn - Pool funds together. Pay smarter.
+        </p>
+      </div>
+    `;
+    promises.push(sendEmail(email, `${info.emoji} ${info.title} - ChipIn`, html));
+  }
+
+  if (notifySMS && phone) {
+    const smsAmount = amount ? ` - $${amount}` : '';
+    promises.push(sendSMS(phone, `ChipIn: ${info.emoji} ${info.title}${smsAmount}. ${details}`));
+  }
+
+  await Promise.allSettled(promises);
+}
+
+// Wallet activity notifications
+export async function sendWalletActivityNotification(
+  email: string,
+  phone: string | null,
+  name: string,
+  activityType: 'deposit' | 'withdrawal' | 'transfer',
+  amount: string,
+  status: 'pending' | 'completed' | 'failed',
+  notifyEmail: boolean,
+  notifySMS: boolean
+) {
+  const activityTitles: Record<string, { title: string; emoji: string }> = {
+    deposit: { title: 'Wallet Deposit', emoji: '💰' },
+    withdrawal: { title: 'Wallet Withdrawal', emoji: '🏦' },
+    transfer: { title: 'Wallet Transfer', emoji: '↔️' },
+  };
+
+  const statusText: Record<string, string> = {
+    pending: 'is being processed',
+    completed: 'has been completed',
+    failed: 'has failed',
+  };
+
+  const info = activityTitles[activityType] || { title: 'Wallet Activity', emoji: '💰' };
+  const promises: Promise<boolean>[] = [];
+
+  if (notifyEmail && email) {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
+          <h1 style="color: #d4ff00; margin: 0 0 16px;">${info.emoji} ${info.title}</h1>
+          <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
+            Hey ${name},<br><br>
+            Your ${activityType} of <strong style="color: #d4ff00;">$${amount}</strong> ${statusText[status] || 'is in progress'}.
+          </p>
+        </div>
+        <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
+          ChipIn - Pool funds together. Pay smarter.
+        </p>
+      </div>
+    `;
+    promises.push(sendEmail(email, `${info.emoji} ${info.title} - $${amount} - ChipIn`, html));
+  }
+
+  if (notifySMS && phone) {
+    promises.push(sendSMS(phone, `ChipIn: ${info.emoji} Your ${activityType} of $${amount} ${statusText[status]}.`));
+  }
+
+  await Promise.allSettled(promises);
+}
+
+// Account changes notifications
+export async function sendAccountChangeNotification(
+  email: string,
+  phone: string | null,
+  name: string,
+  changeType: 'email_updated' | 'phone_updated' | 'profile_updated' | 'bank_linked' | 'bank_unlinked',
+  details: string,
+  notifyEmail: boolean,
+  notifySMS: boolean
+) {
+  const changeTitles: Record<string, { title: string; emoji: string }> = {
+    email_updated: { title: 'Email Updated', emoji: '📧' },
+    phone_updated: { title: 'Phone Updated', emoji: '📱' },
+    profile_updated: { title: 'Profile Updated', emoji: '👤' },
+    bank_linked: { title: 'Bank Account Linked', emoji: '🏦' },
+    bank_unlinked: { title: 'Bank Account Unlinked', emoji: '🔗' },
+  };
+
+  const info = changeTitles[changeType] || { title: 'Account Updated', emoji: '⚙️' };
+  const promises: Promise<boolean>[] = [];
+
+  if (notifyEmail && email) {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
+          <h1 style="color: #d4ff00; margin: 0 0 16px;">${info.emoji} ${info.title}</h1>
+          <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
+            Hey ${name},<br><br>
+            ${details}
+          </p>
+          <p style="color: #888; font-size: 14px;">
+            If you didn't make this change, please contact support immediately.
+          </p>
+        </div>
+        <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
+          ChipIn - Pool funds together. Pay smarter.
+        </p>
+      </div>
+    `;
+    promises.push(sendEmail(email, `${info.emoji} ${info.title} - ChipIn`, html));
+  }
+
+  if (notifySMS && phone) {
+    promises.push(sendSMS(phone, `ChipIn: ${info.emoji} ${info.title}. ${details}`));
+  }
+
+  await Promise.allSettled(promises);
+}

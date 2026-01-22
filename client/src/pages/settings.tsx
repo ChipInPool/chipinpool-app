@@ -16,9 +16,19 @@ interface NotificationPreferences {
   emailPoolUpdates: boolean;
   emailPoolComplete: boolean;
   emailInvites: boolean;
+  emailSecurityAlerts: boolean;
+  emailKycUpdates: boolean;
+  emailCardActivity: boolean;
+  emailWalletActivity: boolean;
+  emailAccountChanges: boolean;
   smsContributions: boolean;
   smsPoolComplete: boolean;
   smsInvites: boolean;
+  smsSecurityAlerts: boolean;
+  smsKycUpdates: boolean;
+  smsCardActivity: boolean;
+  smsWalletActivity: boolean;
+  smsAccountChanges: boolean;
 }
 
 export default function Settings() {
@@ -33,9 +43,19 @@ export default function Settings() {
     emailPoolUpdates: true,
     emailPoolComplete: true,
     emailInvites: true,
+    emailSecurityAlerts: true,
+    emailKycUpdates: true,
+    emailCardActivity: true,
+    emailWalletActivity: true,
+    emailAccountChanges: true,
     smsContributions: false,
     smsPoolComplete: true,
     smsInvites: true,
+    smsSecurityAlerts: true,
+    smsKycUpdates: true,
+    smsCardActivity: false,
+    smsWalletActivity: false,
+    smsAccountChanges: false,
   });
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -164,11 +184,47 @@ export default function Settings() {
               <Mail className="w-4 h-4 text-blue-400" /> Email Notifications
             </h3>
             <div className="space-y-1">
+              <p className="text-xs text-muted-foreground mb-2 px-3">Pool Activity</p>
               {[
                 { key: 'emailContributions', label: 'Contributions', desc: 'When someone contributes to your pool' },
                 { key: 'emailPoolUpdates', label: 'Pool Updates', desc: 'Progress updates on pools you contribute to' },
                 { key: 'emailPoolComplete', label: 'Pool Complete', desc: 'When a pool reaches its goal' },
                 { key: 'emailInvites', label: 'Invitations', desc: 'When someone invites you to a pool' },
+              ].map(item => (
+                <div key={item.key} className="flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors">
+                  <div>
+                    <div className="font-medium text-sm">{item.label}</div>
+                    <div className="text-xs text-muted-foreground">{item.desc}</div>
+                  </div>
+                  <Switch
+                    checked={prefs[item.key as keyof NotificationPreferences]}
+                    onCheckedChange={() => handleToggle(item.key as keyof NotificationPreferences)}
+                    data-testid={`switch-${item.key}`}
+                  />
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground mb-2 px-3 pt-4">Account & Security</p>
+              {[
+                { key: 'emailSecurityAlerts', label: 'Security Alerts', desc: 'Login attempts, password changes, 2FA updates' },
+                { key: 'emailKycUpdates', label: 'Verification Updates', desc: 'Identity verification status changes' },
+                { key: 'emailAccountChanges', label: 'Account Changes', desc: 'Profile updates, email/phone changes' },
+              ].map(item => (
+                <div key={item.key} className="flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors">
+                  <div>
+                    <div className="font-medium text-sm">{item.label}</div>
+                    <div className="text-xs text-muted-foreground">{item.desc}</div>
+                  </div>
+                  <Switch
+                    checked={prefs[item.key as keyof NotificationPreferences]}
+                    onCheckedChange={() => handleToggle(item.key as keyof NotificationPreferences)}
+                    data-testid={`switch-${item.key}`}
+                  />
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground mb-2 px-3 pt-4">Payments & Cards</p>
+              {[
+                { key: 'emailCardActivity', label: 'Card Activity', desc: 'Virtual card transactions and updates' },
+                { key: 'emailWalletActivity', label: 'Wallet Activity', desc: 'Deposits, withdrawals, and transfers' },
               ].map(item => (
                 <div key={item.key} className="flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors">
                   <div>
@@ -190,10 +246,46 @@ export default function Settings() {
               <Phone className="w-4 h-4 text-green-400" /> SMS Notifications
             </h3>
             <div className="space-y-1">
+              <p className="text-xs text-muted-foreground mb-2 px-3">Pool Activity</p>
               {[
                 { key: 'smsContributions', label: 'Contributions', desc: 'When someone contributes to your pool' },
                 { key: 'smsPoolComplete', label: 'Pool Complete', desc: 'When a pool reaches its goal' },
                 { key: 'smsInvites', label: 'Invitations', desc: 'When someone invites you to a pool' },
+              ].map(item => (
+                <div key={item.key} className="flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors">
+                  <div>
+                    <div className="font-medium text-sm">{item.label}</div>
+                    <div className="text-xs text-muted-foreground">{item.desc}</div>
+                  </div>
+                  <Switch
+                    checked={prefs[item.key as keyof NotificationPreferences]}
+                    onCheckedChange={() => handleToggle(item.key as keyof NotificationPreferences)}
+                    data-testid={`switch-${item.key}`}
+                  />
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground mb-2 px-3 pt-4">Account & Security</p>
+              {[
+                { key: 'smsSecurityAlerts', label: 'Security Alerts', desc: 'Login attempts, password changes, 2FA updates' },
+                { key: 'smsKycUpdates', label: 'Verification Updates', desc: 'Identity verification status changes' },
+                { key: 'smsAccountChanges', label: 'Account Changes', desc: 'Profile updates, email/phone changes' },
+              ].map(item => (
+                <div key={item.key} className="flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors">
+                  <div>
+                    <div className="font-medium text-sm">{item.label}</div>
+                    <div className="text-xs text-muted-foreground">{item.desc}</div>
+                  </div>
+                  <Switch
+                    checked={prefs[item.key as keyof NotificationPreferences]}
+                    onCheckedChange={() => handleToggle(item.key as keyof NotificationPreferences)}
+                    data-testid={`switch-${item.key}`}
+                  />
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground mb-2 px-3 pt-4">Payments & Cards</p>
+              {[
+                { key: 'smsCardActivity', label: 'Card Activity', desc: 'Virtual card transactions' },
+                { key: 'smsWalletActivity', label: 'Wallet Activity', desc: 'Deposits, withdrawals, and transfers' },
               ].map(item => (
                 <div key={item.key} className="flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors">
                   <div>
