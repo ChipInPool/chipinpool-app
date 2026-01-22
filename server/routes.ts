@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
+import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts } from "@shared/schema";
 import express from "express";
 import { db } from "./db";
@@ -64,6 +65,10 @@ export async function registerRoutes(
   
   // Trust proxy for secure cookies behind Replit's proxy
   app.set('trust proxy', 1);
+
+  // Register object storage routes
+  registerObjectStorageRoutes(app);
+  const objectStorageService = new ObjectStorageService();
 
   // Auth middleware
   const requireAuth = (req: any, res: any, next: any) => {
@@ -634,6 +639,76 @@ export async function registerRoutes(
       const updatedUser = await storage.getUser(userId);
       const { password, ...userWithoutPassword } = updatedUser!;
       res.json({ message: "Profile updated successfully", user: userWithoutPassword });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Update user avatar
+  app.post("/api/user/avatar", requireAuth, async (req, res, next) => {
+    try {
+      const avatarSchema = z.object({
+        objectPath: z.string().min(1).refine(
+          (path) => path.startsWith('/objects/uploads/'),
+          { message: "Invalid object path" }
+        ),
+      });
+
+      const { objectPath } = avatarSchema.parse(req.body);
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Validate that the object exists before setting ACL
+      try {
+        const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+        if (!objectFile) {
+          return res.status(400).json({ error: "Uploaded file not found" });
+        }
+      } catch (err) {
+        return res.status(400).json({ error: "Invalid or missing uploaded file" });
+      }
+
+      // Set the ACL policy to make the avatar public and owned by the user
+      try {
+        const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(objectPath, {
+          owner: userId,
+          visibility: "public",
+        });
+        
+        // Update user avatar URL
+        await storage.updateUser(userId, { avatar: normalizedPath });
+        
+        const updatedUser = await storage.getUser(userId);
+        const { password, ...userWithoutPassword } = updatedUser!;
+        res.json({ message: "Avatar updated successfully", user: userWithoutPassword });
+      } catch (aclError) {
+        console.error("Error setting ACL policy:", aclError);
+        return res.status(500).json({ error: "Failed to process uploaded image" });
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get presigned URL for avatar upload
+  app.post("/api/user/avatar/upload-url", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      
+      // Store the object path with user association for later validation
+      // The path includes a UUID that ties it to this request
+      res.json({ 
+        uploadURL, 
+        objectPath,
+        // Include constraints that client should follow (enforced on avatar update)
+        constraints: {
+          maxSizeBytes: 5 * 1024 * 1024, // 5MB
+          allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+        }
+      });
     } catch (error) {
       next(error);
     }

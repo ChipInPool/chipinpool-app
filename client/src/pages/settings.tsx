@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Bell, Mail, Phone, Moon, Sun, Shield, Save, AlertCircle, User, MapPin, Loader2 } from "lucide-react";
+import { ArrowLeft, Bell, Mail, Phone, Moon, Sun, Shield, Save, AlertCircle, User, MapPin, Loader2, Camera, Upload } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme } from "@/components/theme-provider";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface ProfileData {
   firstName: string;
@@ -124,6 +125,68 @@ export default function Settings() {
   const handleProfileChange = (field: keyof ProfileData, value: string) => {
     setProfile(prev => ({ ...prev, [field]: value }));
     setHasProfileChanges(true);
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  const avatarMutation = useMutation({
+    mutationFn: async (file: File) => {
+      // Step 1: Get presigned upload URL
+      const urlRes = await fetch("/api/user/avatar/upload-url", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json();
+
+      // Step 2: Upload file directly to presigned URL
+      const uploadRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type || "image/jpeg" },
+      });
+      if (!uploadRes.ok) throw new Error("Failed to upload image");
+
+      // Step 3: Update user avatar
+      const updateRes = await fetch("/api/user/avatar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ objectPath }),
+      });
+      if (!updateRes.ok) {
+        const error = await updateRes.json();
+        throw new Error(error.error || "Failed to save avatar");
+      }
+      return updateRes.json();
+    },
+    onSuccess: () => {
+      toast({ description: "Profile picture updated" });
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+    },
+    onError: (err: any) => {
+      toast({ description: err.message || "Failed to update picture", variant: "destructive" });
+    },
+    onSettled: () => {
+      setIsUploadingAvatar(false);
+    },
+  });
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ description: "Image must be under 5MB", variant: "destructive" });
+        return;
+      }
+      if (!file.type.startsWith("image/")) {
+        toast({ description: "Please select an image file", variant: "destructive" });
+        return;
+      }
+      setIsUploadingAvatar(true);
+      avatarMutation.mutate(file);
+    }
   };
 
   const { data, isLoading, isError } = useQuery({
@@ -273,6 +336,62 @@ export default function Settings() {
               )}
             </div>
             <div className="space-y-4">
+              {/* Profile Picture */}
+              <div className="flex items-center gap-6">
+                <div className="relative group">
+                  <Avatar className="w-24 h-24 border-2 border-white/10">
+                    <AvatarImage src={user?.avatar || undefined} alt={user?.firstName || 'User'} />
+                    <AvatarFallback className="text-2xl bg-gradient-to-br from-primary/20 to-primary/5">
+                      {user?.firstName?.[0]}{user?.lastName?.[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingAvatar}
+                    className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-not-allowed"
+                    data-testid="button-change-avatar"
+                  >
+                    {isUploadingAvatar ? (
+                      <Loader2 className="w-6 h-6 text-white animate-spin" />
+                    ) : (
+                      <Camera className="w-6 h-6 text-white" />
+                    )}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                    data-testid="input-avatar"
+                  />
+                </div>
+                <div>
+                  <p className="font-medium">Profile Picture</p>
+                  <p className="text-sm text-muted-foreground">Click the photo to change it</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2 border-white/10"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingAvatar}
+                    data-testid="button-upload-photo"
+                  >
+                    {isUploadingAvatar ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Upload Photo
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="firstName" className="text-sm font-medium">First Name</Label>
