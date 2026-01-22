@@ -1868,6 +1868,93 @@ export async function registerRoutes(
     }
   });
 
+  // Pool transfer - transfer funds from pool to bank account
+  app.post("/api/pools/:id/transfer", requireAuth, async (req, res, next) => {
+    try {
+      const transferSchema = z.object({
+        amount: z.string().refine(val => {
+          const num = parseFloat(val);
+          return !isNaN(num) && num > 0;
+        }, { message: "Amount must be a positive number" }),
+        recipientName: z.string().min(1, "Recipient name is required"),
+        method: z.enum(['bank', 'wallet']),
+        bankDetails: z.object({
+          accountNumber: z.string().min(4, "Valid account number required"),
+          routingNumber: z.string().length(9, "Routing number must be 9 digits"),
+          accountType: z.enum(['checking', 'savings']),
+        }).optional(),
+      });
+
+      const data = transferSchema.parse(req.body);
+      const pool = await storage.getPool(req.params.id);
+      
+      if (!pool) {
+        return res.status(404).json({ message: "Pool not found" });
+      }
+
+      // Only pool creator can transfer funds
+      if (pool.creatorId !== req.session.userId) {
+        return res.status(403).json({ message: "Only pool creator can transfer funds" });
+      }
+
+      const transferAmount = parseFloat(data.amount);
+      const poolBalance = parseFloat(pool.currentAmount);
+
+      if (transferAmount > poolBalance) {
+        return res.status(400).json({ message: "Transfer amount exceeds pool balance" });
+      }
+
+      // Get the virtual card for this pool
+      const card = await storage.getVirtualCardByPool(pool.id);
+
+      // Create a transaction record for the transfer
+      const transaction = await storage.createTransaction({
+        virtualCardId: card?.id || pool.id,
+        merchant: `Transfer to ${data.recipientName}`,
+        amount: data.amount,
+        notes: `Bank transfer - Account ****${data.bankDetails?.accountNumber.slice(-4) || 'N/A'}`,
+      });
+
+      // Update pool balance
+      const newPoolBalance = (poolBalance - transferAmount).toFixed(2);
+      await db.update(pools)
+        .set({ currentAmount: newPoolBalance })
+        .where(eq(pools.id, pool.id));
+
+      // Update virtual card balance if exists
+      if (card) {
+        const cardBalance = parseFloat(card.balance);
+        const newCardBalance = Math.max(0, cardBalance - transferAmount).toFixed(2);
+        await db.update(virtualCards)
+          .set({ balance: newCardBalance })
+          .where(eq(virtualCards.id, card.id));
+      }
+
+      // Send notification
+      const user = await storage.getUser(pool.creatorId);
+      if (user) {
+        sendWalletActivityNotification(
+          user.email,
+          user.phone,
+          user.firstName,
+          'transfer',
+          transferAmount.toString(),
+          'completed',
+          user.notifyEmail && user.emailWalletActivity,
+          user.notifySMS && user.smsWalletActivity
+        ).catch(console.error);
+      }
+
+      res.json({ 
+        message: "Transfer initiated successfully",
+        transaction,
+        newBalance: newPoolBalance,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Cancel a recurring contribution
   app.delete("/api/recurring-contributions/:id", requireAuth, async (req, res, next) => {
     try {

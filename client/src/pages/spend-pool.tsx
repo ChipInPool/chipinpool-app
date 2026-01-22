@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { VirtualCard } from "@/components/virtual-card";
-import { ArrowLeft, Copy, Eye, EyeOff, ShoppingBag, ExternalLink, ShieldCheck, Store, Zap, Plus, DollarSign, Radio, Globe, X, ChevronRight, CreditCard, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, Copy, Eye, EyeOff, ShoppingBag, ExternalLink, ShieldCheck, Store, Zap, DollarSign, Radio, Globe, X, ChevronRight, CreditCard, RefreshCw, Search, Building2, Loader2, CheckCircle, AlertCircle, Banknote } from "lucide-react";
 import { Link, useRoute, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,9 +10,266 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface TransferSectionProps {
+  poolId: string;
+  balance: number;
+  onTransferComplete: () => void;
+}
+
+function TransferSection({ poolId, balance, onTransferComplete }: TransferSectionProps) {
+  const { toast } = useToast();
+  const [transferAmount, setTransferAmount] = useState("");
+  const [recipientName, setRecipientName] = useState("");
+  const [transferMethod, setTransferMethod] = useState<"bank" | "wallet">("bank");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [bankDetails, setBankDetails] = useState({
+    accountNumber: "",
+    routingNumber: "",
+    accountType: "checking" as "checking" | "savings",
+  });
+
+  const transferMutation = useMutation({
+    mutationFn: async (data: { amount: string; recipientName: string; method: string; bankDetails?: typeof bankDetails }) => {
+      const res = await fetch(`/api/pools/${poolId}/transfer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Transfer failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Transfer Initiated",
+        description: `$${parseFloat(transferAmount).toFixed(2)} transfer to ${recipientName} has been initiated.`,
+      });
+      setTransferAmount("");
+      setRecipientName("");
+      setBankDetails({ accountNumber: "", routingNumber: "", accountType: "checking" });
+      setConfirmOpen(false);
+      onTransferComplete();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Transfer Failed",
+        description: error.message || "Could not process transfer",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleTransfer = () => {
+    if (!transferAmount || parseFloat(transferAmount) <= 0) {
+      toast({ description: "Please enter a valid amount", variant: "destructive" });
+      return;
+    }
+    if (parseFloat(transferAmount) > balance) {
+      toast({ description: "Amount exceeds available balance", variant: "destructive" });
+      return;
+    }
+    if (!recipientName.trim()) {
+      toast({ description: "Please enter recipient name", variant: "destructive" });
+      return;
+    }
+    if (transferMethod === "bank" && (!bankDetails.accountNumber || !bankDetails.routingNumber)) {
+      toast({ description: "Please enter bank account details", variant: "destructive" });
+      return;
+    }
+    setConfirmOpen(true);
+  };
+
+  const confirmTransfer = () => {
+    transferMutation.mutate({
+      amount: transferAmount,
+      recipientName,
+      method: transferMethod,
+      bankDetails: transferMethod === "bank" ? bankDetails : undefined,
+    });
+  };
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-muted-foreground">
+        Transfer pool funds directly to a bank account. Transfers typically arrive within 1-3 business days.
+      </p>
+
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="recipientName">Recipient Name</Label>
+          <Input
+            id="recipientName"
+            placeholder="John Doe or Business Name"
+            value={recipientName}
+            onChange={(e) => setRecipientName(e.target.value)}
+            className="mt-1.5 bg-background/50 border-white/10"
+            data-testid="input-recipient-name"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="transferAmount">Transfer Amount</Label>
+          <div className="relative mt-1.5">
+            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              id="transferAmount"
+              type="number"
+              step="0.01"
+              min="0.01"
+              max={balance}
+              placeholder="0.00"
+              value={transferAmount}
+              onChange={(e) => setTransferAmount(e.target.value)}
+              className="pl-9 bg-background/50 border-white/10"
+              data-testid="input-transfer-amount"
+            />
+          </div>
+          <div className="flex items-center justify-between mt-1.5">
+            <p className="text-xs text-muted-foreground">
+              Available: ${balance.toFixed(2)}
+            </p>
+            <button 
+              type="button"
+              onClick={() => setTransferAmount(balance.toFixed(2))}
+              className="text-xs text-primary hover:underline"
+              data-testid="button-transfer-max"
+            >
+              Transfer Max
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-lg bg-white/5 border border-white/10 space-y-4">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">Bank Account Details</span>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <Label htmlFor="accountNumber" className="text-xs">Account Number</Label>
+              <Input
+                id="accountNumber"
+                placeholder="123456789"
+                value={bankDetails.accountNumber}
+                onChange={(e) => setBankDetails(prev => ({ ...prev, accountNumber: e.target.value }))}
+                className="mt-1 bg-background/50 border-white/10"
+                data-testid="input-account-number"
+              />
+            </div>
+            <div>
+              <Label htmlFor="routingNumber" className="text-xs">Routing Number</Label>
+              <Input
+                id="routingNumber"
+                placeholder="021000021"
+                value={bankDetails.routingNumber}
+                onChange={(e) => setBankDetails(prev => ({ ...prev, routingNumber: e.target.value }))}
+                className="mt-1 bg-background/50 border-white/10"
+                data-testid="input-routing-number"
+              />
+            </div>
+            <div>
+              <Label htmlFor="accountType" className="text-xs">Account Type</Label>
+              <Select 
+                value={bankDetails.accountType} 
+                onValueChange={(v: "checking" | "savings") => setBankDetails(prev => ({ ...prev, accountType: v }))}
+              >
+                <SelectTrigger className="mt-1 bg-background/50 border-white/10" data-testid="select-account-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="checking">Checking</SelectItem>
+                  <SelectItem value="savings">Savings</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <Button 
+          className="w-full bg-gradient-to-r from-primary to-primary/80"
+          onClick={handleTransfer}
+          disabled={transferMutation.isPending || !transferAmount || !recipientName}
+          data-testid="button-initiate-transfer"
+        >
+          {transferMutation.isPending ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            <>
+              <Banknote className="w-4 h-4 mr-2" />
+              Transfer Funds
+            </>
+          )}
+        </Button>
+      </div>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="bg-card border-white/10">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-yellow-500" />
+              Confirm Transfer
+            </DialogTitle>
+            <DialogDescription>
+              Please review the transfer details before confirming.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Recipient:</span>
+              <span className="font-medium">{recipientName}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Amount:</span>
+              <span className="font-medium text-lg">${parseFloat(transferAmount || "0").toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Account:</span>
+              <span className="font-mono">****{bankDetails.accountNumber.slice(-4)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Estimated Arrival:</span>
+              <span>1-3 business days</span>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} className="border-white/10">
+              Cancel
+            </Button>
+            <Button 
+              onClick={confirmTransfer} 
+              disabled={transferMutation.isPending}
+              data-testid="button-confirm-transfer"
+            >
+              {transferMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Confirm Transfer
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
 interface Transaction {
   id: string;
@@ -41,9 +298,6 @@ export default function SpendPool() {
   const [showCardDetails, setShowCardDetails] = useState(false);
   const [activeTab, setActiveTab] = useState<'virtual' | 'transfer'>('virtual');
   const [liveMode, setLiveMode] = useState(false);
-  const [purchaseOpen, setPurchaseOpen] = useState(false);
-  const [merchantName, setMerchantName] = useState("");
-  const [purchaseAmount, setPurchaseAmount] = useState("");
   const [browserOpen, setBrowserOpen] = useState(false);
   const [browserUrl, setBrowserUrl] = useState("");
   const [urlInput, setUrlInput] = useState("");
@@ -85,9 +339,6 @@ export default function SpendPool() {
         title: "Payment Successful",
         description: `Paid $${parseFloat(variables.amount).toFixed(2)} to ${variables.merchant}`,
       });
-      setPurchaseOpen(false);
-      setMerchantName("");
-      setPurchaseAmount("");
       refetchCard();
       refetchTransactions();
       queryClient.invalidateQueries({ queryKey: queryKeys.virtualCard(params?.id || '') });
@@ -274,22 +525,6 @@ export default function SpendPool() {
     createTransactionMutation.mutate({ merchant, amount: amount.toString() });
   };
 
-  const handleCustomPurchase = () => {
-    const amount = parseFloat(purchaseAmount);
-    if (!merchantName.trim()) {
-      toast({ title: "Enter merchant name", variant: "destructive" });
-      return;
-    }
-    if (isNaN(amount) || amount <= 0) {
-      toast({ title: "Enter valid amount", variant: "destructive" });
-      return;
-    }
-    if (amount > currentBalance) {
-      toast({ title: "Insufficient balance", variant: "destructive" });
-      return;
-    }
-    createTransactionMutation.mutate({ merchant: merchantName, amount: amount.toString() });
-  };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -510,79 +745,22 @@ export default function SpendPool() {
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-white/5">
-                      <Dialog open={purchaseOpen} onOpenChange={setPurchaseOpen}>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" className="w-full border-white/10" data-testid="button-manual-entry">
-                            <Plus className="w-4 h-4 mr-2" />
-                            Log Manual Purchase
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="bg-card border-white/10">
-                          <DialogHeader>
-                            <DialogTitle>Log a Purchase</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4 pt-4">
-                            <div>
-                              <Label htmlFor="merchant">Merchant Name</Label>
-                              <Input
-                                id="merchant"
-                                placeholder="e.g., Amazon, Uber, Netflix"
-                                value={merchantName}
-                                onChange={(e) => setMerchantName(e.target.value)}
-                                className="mt-1.5"
-                                data-testid="input-merchant-name"
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="amount">Amount ($)</Label>
-                              <div className="relative mt-1.5">
-                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input
-                                  id="amount"
-                                  type="number"
-                                  step="0.01"
-                                  min="0.01"
-                                  max={currentBalance}
-                                  placeholder="0.00"
-                                  value={purchaseAmount}
-                                  onChange={(e) => setPurchaseAmount(e.target.value)}
-                                  className="pl-9"
-                                  data-testid="input-purchase-amount"
-                                />
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Available: ${currentBalance.toFixed(2)}
-                              </p>
-                            </div>
-                            <Button 
-                              className="w-full" 
-                              onClick={handleCustomPurchase}
-                              disabled={createTransactionMutation.isPending}
-                              data-testid="button-confirm-purchase"
-                            >
-                              {createTransactionMutation.isPending ? "Processing..." : "Log Purchase"}
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                    <div className="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-start gap-2">
+                      <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                      <p className="text-xs text-blue-300">
+                        Use your virtual card details at checkout. Click "Show Card Details" above to reveal your full card number, expiry, and CVC.
+                      </p>
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      Transfer funds directly to a connected bank account or merchant ID.
-                    </p>
-                    <div className="p-4 rounded-lg border border-dashed border-white/20 flex flex-col items-center justify-center text-center gap-2 py-8 hover:bg-white/5 cursor-pointer transition-colors">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                        <ExternalLink className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h4 className="font-medium">Connect Bank Account</h4>
-                        <p className="text-xs text-muted-foreground">Via Plaid or Stripe Connect</p>
-                      </div>
-                    </div>
-                  </div>
+                  <TransferSection 
+                    poolId={params?.id || ''} 
+                    balance={currentBalance} 
+                    onTransferComplete={() => {
+                      refetchCard();
+                      refetchTransactions();
+                    }}
+                  />
                 )}
               </div>
             </div>
@@ -809,18 +987,6 @@ export default function SpendPool() {
               <p className="text-[10px] text-center text-muted-foreground mt-2">
                 Click "Show Numbers" in the card panel to reveal full details
               </p>
-              
-              <Button 
-                variant="outline" 
-                className="w-full border-white/10 text-xs"
-                onClick={() => {
-                  setCardHelperOpen(false);
-                  setPurchaseOpen(true);
-                }}
-              >
-                <Plus className="w-3 h-3 mr-2" />
-                Log this purchase when done
-              </Button>
             </div>
           </motion.div>
         )}
