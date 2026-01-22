@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { 
   users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites, walletDeposits, walletWithdrawals, verificationCodes, bankAccounts, recurringContributions, apiAccessRequests,
-  merchants, merchantApiKeys, merchantCheckoutSessions, merchantWebhookDeliveries, merchantPayouts,
+  merchants, merchantApiKeys, merchantCheckoutSessions, merchantWebhookDeliveries, merchantPayouts, poolTransferRequests,
   type User, type InsertUser, type Pool, type InsertPool, type Contribution, type InsertContribution,
   type Comment, type InsertComment, type Notification, type InsertNotification,
   type VirtualCard, type InsertVirtualCard, type Transaction, type InsertTransaction,
@@ -10,7 +10,8 @@ import {
   type Merchant, type InsertMerchant, type MerchantApiKey, type InsertMerchantApiKey,
   type MerchantCheckoutSession, type InsertMerchantCheckoutSession,
   type MerchantWebhookDelivery, type InsertMerchantWebhookDelivery,
-  type MerchantPayout, type InsertMerchantPayout
+  type MerchantPayout, type InsertMerchantPayout,
+  type BankAccount, type InsertBankAccount, type PoolTransferRequest, type InsertPoolTransferRequest
 } from "@shared/schema";
 import { eq, desc, and, sql, gt, inArray } from "drizzle-orm";
 
@@ -121,6 +122,20 @@ export interface IStorage {
   // Merchant payout operations
   createMerchantPayout(payout: InsertMerchantPayout): Promise<MerchantPayout>;
   getMerchantPayouts(merchantId: string): Promise<MerchantPayout[]>;
+
+  // Bank account operations
+  getBankAccountsByUser(userId: string): Promise<BankAccount[]>;
+  getBankAccountById(id: string): Promise<BankAccount | undefined>;
+  createBankAccount(account: InsertBankAccount): Promise<BankAccount>;
+  setDefaultBankAccount(userId: string, accountId: string): Promise<void>;
+
+  // Pool transfer request operations
+  createPoolTransferRequest(request: InsertPoolTransferRequest): Promise<PoolTransferRequest>;
+  getPoolTransferRequest(id: string): Promise<PoolTransferRequest | undefined>;
+  getPoolTransferRequestsByPool(poolId: string): Promise<PoolTransferRequest[]>;
+  getPoolTransferRequestsByUser(userId: string): Promise<PoolTransferRequest[]>;
+  getPendingTransferRequestsForUser(userId: string): Promise<PoolTransferRequest[]>;
+  updatePoolTransferRequest(id: string, data: Partial<PoolTransferRequest>): Promise<PoolTransferRequest | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -640,6 +655,72 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(merchantPayouts)
       .where(eq(merchantPayouts.merchantId, merchantId))
       .orderBy(desc(merchantPayouts.createdAt));
+  }
+
+  // Bank account operations
+  async getBankAccountsByUser(userId: string): Promise<BankAccount[]> {
+    return db.select().from(bankAccounts)
+      .where(eq(bankAccounts.userId, userId))
+      .orderBy(desc(bankAccounts.isDefault), desc(bankAccounts.createdAt));
+  }
+
+  async getBankAccountById(id: string): Promise<BankAccount | undefined> {
+    const [account] = await db.select().from(bankAccounts).where(eq(bankAccounts.id, id));
+    return account;
+  }
+
+  async createBankAccount(account: InsertBankAccount): Promise<BankAccount> {
+    const [result] = await db.insert(bankAccounts).values(account).returning();
+    return result;
+  }
+
+  async setDefaultBankAccount(userId: string, accountId: string): Promise<void> {
+    await db.update(bankAccounts)
+      .set({ isDefault: false })
+      .where(eq(bankAccounts.userId, userId));
+    await db.update(bankAccounts)
+      .set({ isDefault: true })
+      .where(and(eq(bankAccounts.id, accountId), eq(bankAccounts.userId, userId)));
+  }
+
+  // Pool transfer request operations
+  async createPoolTransferRequest(request: InsertPoolTransferRequest): Promise<PoolTransferRequest> {
+    const [result] = await db.insert(poolTransferRequests).values(request).returning();
+    return result;
+  }
+
+  async getPoolTransferRequest(id: string): Promise<PoolTransferRequest | undefined> {
+    const [result] = await db.select().from(poolTransferRequests).where(eq(poolTransferRequests.id, id));
+    return result;
+  }
+
+  async getPoolTransferRequestsByPool(poolId: string): Promise<PoolTransferRequest[]> {
+    return db.select().from(poolTransferRequests)
+      .where(eq(poolTransferRequests.poolId, poolId))
+      .orderBy(desc(poolTransferRequests.createdAt));
+  }
+
+  async getPoolTransferRequestsByUser(userId: string): Promise<PoolTransferRequest[]> {
+    return db.select().from(poolTransferRequests)
+      .where(eq(poolTransferRequests.toUserId, userId))
+      .orderBy(desc(poolTransferRequests.createdAt));
+  }
+
+  async getPendingTransferRequestsForUser(userId: string): Promise<PoolTransferRequest[]> {
+    return db.select().from(poolTransferRequests)
+      .where(and(
+        eq(poolTransferRequests.toUserId, userId),
+        eq(poolTransferRequests.status, 'pending')
+      ))
+      .orderBy(desc(poolTransferRequests.createdAt));
+  }
+
+  async updatePoolTransferRequest(id: string, data: Partial<PoolTransferRequest>): Promise<PoolTransferRequest | undefined> {
+    const [result] = await db.update(poolTransferRequests)
+      .set(data)
+      .where(eq(poolTransferRequests.id, id))
+      .returning();
+    return result;
   }
 }
 

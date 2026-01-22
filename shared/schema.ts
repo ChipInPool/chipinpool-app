@@ -286,6 +286,9 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({ i
 export const insertInviteSchema = createInsertSchema(invites).omit({ id: true, createdAt: true, status: true });
 export const insertRecurringContributionSchema = createInsertSchema(recurringContributions).omit({ id: true, createdAt: true, status: true });
 export const insertApiAccessRequestSchema = createInsertSchema(apiAccessRequests).omit({ id: true, createdAt: true, status: true });
+export const insertBankAccountSchema = createInsertSchema(bankAccounts).omit({ id: true, createdAt: true });
+export type BankAccount = typeof bankAccounts.$inferSelect;
+export type InsertBankAccount = z.infer<typeof insertBankAccountSchema>;
 
 // Phone verification schemas
 export const insertPhoneVerificationSchema = createInsertSchema(phoneVerificationCodes).omit({ id: true, createdAt: true, verified: true });
@@ -688,6 +691,34 @@ export const subscriptionHistory = pgTable("subscription_history", {
   stripeInvoiceId: text("stripe_invoice_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const transferStatusEnum = pgEnum('transfer_status', ['pending', 'accepted', 'completed', 'cancelled', 'failed']);
+
+export const poolTransferRequests = pgTable("pool_transfer_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  poolId: varchar("pool_id").references(() => pools.id).notNull(),
+  fromUserId: varchar("from_user_id").references(() => users.id).notNull(),
+  toUserId: varchar("to_user_id").references(() => users.id).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  status: transferStatusEnum("status").notNull().default('pending'),
+  bankAccountId: varchar("bank_account_id").references(() => bankAccounts.id),
+  plaidTransferId: text("plaid_transfer_id"),
+  notes: text("notes"),
+  acceptedAt: timestamp("accepted_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPoolTransferRequestSchema = createInsertSchema(poolTransferRequests).omit({ 
+  id: true, 
+  createdAt: true, 
+  status: true, 
+  acceptedAt: true, 
+  completedAt: true,
+  plaidTransferId: true 
+});
+export type PoolTransferRequest = typeof poolTransferRequests.$inferSelect;
+export type InsertPoolTransferRequest = z.infer<typeof insertPoolTransferRequestSchema>;
 
 export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true, createdAt: true, isActive: true });
 export const insertUserSubscriptionSchema = createInsertSchema(userSubscriptions).omit({ id: true, createdAt: true, updatedAt: true, status: true, poolsUsed: true, monthlyContributionsUsed: true, virtualCardsUsed: true });
