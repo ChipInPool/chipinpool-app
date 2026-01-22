@@ -2400,7 +2400,7 @@ export async function registerRoutes(
           type: 'contribution',
           title: 'Transfer Request',
           message: `You have a pending transfer of $${transferAmount.toFixed(2)} from the pool "${pool.title}". Tap to accept.`,
-          link: `/accept-transfer/${transfer.id}`,
+          link: `/transfer/${transfer.id}/accept`,
         });
 
         // Send notification via email/SMS if enabled
@@ -2450,6 +2450,38 @@ export async function registerRoutes(
       }));
 
       res.json({ requests: enrichedRequests });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get single transfer request
+  app.get("/api/transfer-requests/:id", requireAuth, async (req, res, next) => {
+    try {
+      const requestId = req.params.id;
+      const userId = req.session.userId!;
+
+      const transferRequest = await storage.getPoolTransferRequest(requestId);
+      if (!transferRequest) {
+        return res.status(404).json({ error: "Transfer request not found" });
+      }
+      
+      // Only sender or recipient can view
+      if (transferRequest.fromUserId !== userId && transferRequest.toUserId !== userId) {
+        return res.status(403).json({ error: "You don't have permission to view this transfer" });
+      }
+
+      // Enrich with pool and sender details
+      const pool = await storage.getPool(transferRequest.poolId);
+      const sender = await storage.getUser(transferRequest.fromUserId);
+      
+      res.json({
+        request: {
+          ...transferRequest,
+          poolName: pool?.title || 'Unknown Pool',
+          fromUserName: sender ? `${sender.firstName} ${sender.lastName}` : 'Unknown User',
+        }
+      });
     } catch (error) {
       next(error);
     }

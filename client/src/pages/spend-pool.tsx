@@ -215,7 +215,7 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
               <div className="text-center py-4">
                 <p className="text-sm text-muted-foreground mb-3">No bank accounts linked yet</p>
                 <Button variant="outline" size="sm" className="border-white/10" asChild>
-                  <Link href="/wallet">Link Bank Account</Link>
+                  <Link href="/security">Link Bank Account</Link>
                 </Button>
               </div>
             ) : (
