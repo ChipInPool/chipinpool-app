@@ -111,7 +111,14 @@ Preferred communication style: Simple, everyday language.
     - Channels: Email and SMS with independent per-category toggles
     - Automatic notifications for: 2FA enable/disable, password reset, KYC verification, wallet withdrawals
     - Global channel opt-out respected (notifyEmail/notifySMS gates all category notifications)
-17. **Stripe Connect for Pool Withdrawals** - Bank withdrawal system via Stripe Connect & Payouts:
+17. **Stripe Connect Marketplace** (`/marketplace`) - V2 API marketplace with connected accounts:
+    - Create connected accounts using Stripe V2 API with express dashboard
+    - Onboarding via account links with status tracking
+    - Product creation at platform level with merchant mapping
+    - Storefront displaying all products from connected accounts
+    - Checkout with destination charges and 10% application fee
+    - Webhook handler for V2 thin events (requirements updates, capability changes)
+18. **Stripe Connect for Pool Withdrawals** - Bank withdrawal system via Stripe Connect & Payouts:
     - Users link bank accounts via Stripe Connect (custom accounts with external bank accounts)
     - Pool creators can transfer funds to their own linked bank account
     - Pool creators can send transfer requests to any contributor
