@@ -5,14 +5,14 @@ export async function checkAndAwardBadges(userId: string) {
   if (!user) return;
 
   const userContributions = await storage.getUserContributions(userId);
-  const userPools = await storage.getPoolsByContributor(userId);
+  const createdPools = await storage.getPoolsByCreator(userId);
   const allBadges = await storage.getAllBadges();
 
   for (const badge of allBadges) {
     const hasAlready = await storage.hasBadge(userId, badge.id);
     if (hasAlready) continue;
 
-    const shouldAward = await checkBadgeCriteria(userId, badge, user, userContributions, userPools);
+    const shouldAward = await checkBadgeCriteria(userId, badge, user, userContributions, createdPools);
     if (shouldAward) {
       await storage.awardBadge(userId, badge.id);
       
@@ -32,7 +32,7 @@ async function checkBadgeCriteria(
   badge: any,
   user: any,
   contributions: any[],
-  pools: any[]
+  createdPools: any[]
 ): Promise<boolean> {
   const { criteria, threshold } = badge;
 
@@ -50,16 +50,16 @@ async function checkBadgeCriteria(
       return parseFloat(user.totalContributed) >= 1000;
 
     case 'first_pool':
-      return pools.filter(p => p.creatorId === userId).length >= 1;
+      return createdPools.length >= 1;
 
     case 'pools_created_5':
-      return pools.filter(p => p.creatorId === userId).length >= 5;
+      return createdPools.length >= 5;
 
     case 'pools_created_10':
-      return pools.filter(p => p.creatorId === userId).length >= 10;
+      return createdPools.length >= 10;
 
     case 'pool_completed': {
-      const completedPools = pools.filter(p => p.creatorId === userId && p.status === 'completed');
+      const completedPools = createdPools.filter(p => p.status === 'completed');
       return completedPools.length >= 1;
     }
 
