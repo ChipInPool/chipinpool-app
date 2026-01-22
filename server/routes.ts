@@ -4951,5 +4951,143 @@ export async function registerRoutes(
     }
   });
 
+  // ============================================
+  // GAMIFICATION & REWARDS ENDPOINTS
+  // ============================================
+
+  // Get all available badges
+  app.get("/api/rewards/badges", requireAuth, async (req, res, next) => {
+    try {
+      const allBadges = await storage.getAllBadges();
+      const userBadgesData = await storage.getUserBadges(req.session.userId!);
+      const earnedBadgeIds = new Set(userBadgesData.map((ub: any) => ub.badgeId));
+      
+      const badgesWithStatus = allBadges.map(badge => ({
+        ...badge,
+        earned: earnedBadgeIds.has(badge.id),
+        earnedAt: userBadgesData.find((ub: any) => ub.badgeId === badge.id)?.earnedAt || null,
+      }));
+      
+      res.json(badgesWithStatus);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get user's earned badges
+  app.get("/api/rewards/my-badges", requireAuth, async (req, res, next) => {
+    try {
+      const userBadgesData = await storage.getUserBadges(req.session.userId!);
+      res.json(userBadgesData);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get user's points and stats
+  app.get("/api/rewards/points", requireAuth, async (req, res, next) => {
+    try {
+      let points = await storage.getUserPoints(req.session.userId!);
+      
+      if (!points) {
+        points = await storage.createUserPoints({
+          userId: req.session.userId!,
+          points: 0,
+          lifetimePoints: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          level: 1,
+        });
+      }
+      
+      const pointsToNextLevel = ((points.level + 1) ** 2) * 100;
+      const currentLevelPoints = (points.level ** 2) * 100;
+      const progressToNextLevel = Math.round(
+        ((points.lifetimePoints - currentLevelPoints) / (pointsToNextLevel - currentLevelPoints)) * 100
+      );
+      
+      res.json({
+        ...points,
+        pointsToNextLevel,
+        progressToNextLevel: Math.max(0, Math.min(100, progressToNextLevel)),
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get point transaction history
+  app.get("/api/rewards/history", requireAuth, async (req, res, next) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const history = await storage.getPointTransactions(req.session.userId!, limit);
+      res.json(history);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get leaderboard
+  app.get("/api/rewards/leaderboard", requireAuth, async (req, res, next) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      const leaderboard = await storage.getLeaderboard(limit);
+      
+      const userId = req.session.userId!;
+      let userRank = leaderboard.findIndex(entry => entry.userId === userId) + 1;
+      
+      if (userRank === 0) {
+        const userPoints = await storage.getUserPoints(userId);
+        if (userPoints) {
+          const fullLeaderboard = await storage.getLeaderboard(1000);
+          userRank = fullLeaderboard.findIndex(entry => entry.userId === userId) + 1;
+        }
+      }
+      
+      res.json({
+        leaderboard,
+        userRank: userRank || null,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Initialize default badges (called once on startup or manually)
+  app.post("/api/rewards/init-badges", requireAuth, async (req, res, next) => {
+    try {
+      const existingBadges = await storage.getAllBadges();
+      if (existingBadges.length > 0) {
+        return res.json({ message: "Badges already initialized", count: existingBadges.length });
+      }
+
+      const defaultBadges = [
+        { name: "First Contribution", icon: "💰", color: "#10B981", description: "Made your first contribution to a pool", category: "contribution" as const, criteria: "first_contribution", threshold: 1, pointsAwarded: 50, rarity: "common" },
+        { name: "Generous Giver", icon: "🎁", color: "#3B82F6", description: "Contributed $100+ total", category: "contribution" as const, criteria: "total_contributed_100", threshold: 100, pointsAwarded: 100, rarity: "uncommon" },
+        { name: "Big Spender", icon: "💎", color: "#8B5CF6", description: "Contributed $500+ total", category: "contribution" as const, criteria: "total_contributed_500", threshold: 500, pointsAwarded: 250, rarity: "rare" },
+        { name: "Whale", icon: "🐳", color: "#EC4899", description: "Contributed $1000+ total", category: "contribution" as const, criteria: "total_contributed_1000", threshold: 1000, pointsAwarded: 500, rarity: "epic" },
+        { name: "Pool Creator", icon: "🏊", color: "#06B6D4", description: "Created your first pool", category: "pool" as const, criteria: "first_pool", threshold: 1, pointsAwarded: 50, rarity: "common" },
+        { name: "Pool Master", icon: "👑", color: "#F59E0B", description: "Created 5+ pools", category: "pool" as const, criteria: "pools_created_5", threshold: 5, pointsAwarded: 150, rarity: "uncommon" },
+        { name: "Pool Legend", icon: "🏆", color: "#EF4444", description: "Created 10+ pools", category: "pool" as const, criteria: "pools_created_10", threshold: 10, pointsAwarded: 300, rarity: "rare" },
+        { name: "Goal Crusher", icon: "🎯", color: "#14B8A6", description: "Completed a pool goal", category: "milestone" as const, criteria: "pool_completed", threshold: 1, pointsAwarded: 100, rarity: "uncommon" },
+        { name: "Social Butterfly", icon: "🦋", color: "#A855F7", description: "Following 10+ users", category: "social" as const, criteria: "following_10", threshold: 10, pointsAwarded: 50, rarity: "common" },
+        { name: "Popular", icon: "⭐", color: "#FBBF24", description: "Have 10+ followers", category: "social" as const, criteria: "followers_10", threshold: 10, pointsAwarded: 100, rarity: "uncommon" },
+        { name: "3-Day Streak", icon: "🔥", color: "#F97316", description: "Contributed for 3 days in a row", category: "streak" as const, criteria: "streak_3", threshold: 3, pointsAwarded: 30, rarity: "common" },
+        { name: "Week Warrior", icon: "⚡", color: "#EAB308", description: "7-day contribution streak", category: "streak" as const, criteria: "streak_7", threshold: 7, pointsAwarded: 100, rarity: "uncommon" },
+        { name: "Monthly Master", icon: "🌟", color: "#D946EF", description: "30-day contribution streak", category: "streak" as const, criteria: "streak_30", threshold: 30, pointsAwarded: 500, rarity: "legendary" },
+        { name: "Early Adopter", icon: "🚀", color: "#6366F1", description: "Joined ChipIn early", category: "special" as const, criteria: "early_adopter", threshold: null, pointsAwarded: 100, rarity: "rare" },
+        { name: "Verified", icon: "✅", color: "#22C55E", description: "Completed KYC verification", category: "milestone" as const, criteria: "kyc_verified", threshold: 1, pointsAwarded: 100, rarity: "common" },
+      ];
+
+      for (const badge of defaultBadges) {
+        await storage.createBadge(badge);
+      }
+
+      res.json({ message: "Badges initialized", count: defaultBadges.length });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return httpServer;
 }
