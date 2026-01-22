@@ -2062,6 +2062,9 @@ export async function registerRoutes(
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
       if (user.kycStatus === 'verified') return res.status(400).json({ error: "Already verified" });
+      if (user.kycStatus !== 'pending' && user.kycStatus !== 'failed') {
+        return res.status(400).json({ error: "Can only restart pending or failed verification" });
+      }
 
       await storage.updateUser(userId, { kycStatus: 'not_started' });
       res.json({ message: "KYC status reset. You can now start verification again." });
@@ -2984,7 +2987,11 @@ export async function registerRoutes(
         return res.status(404).json({ message: "User not found" });
       }
 
-      await db.update(users).set({ kycStatus: 'not_started' }).where(eq(users.id, userId));
+      if (user.kycStatus === 'verified') {
+        return res.status(400).json({ message: "Cannot reset verified KYC status" });
+      }
+
+      await storage.updateUser(userId, { kycStatus: 'not_started' });
       await logAdminAction(adminId, 'reset_kyc', 'user', userId, `Reset KYC status from ${user.kycStatus} to not_started`);
 
       res.json({ message: "KYC status reset successfully" });

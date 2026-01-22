@@ -475,21 +475,14 @@ export default function Security() {
                   Start Verification
                 </Button>
               )}
-              {status.kycStatus === 'pending' && (
+              {(status.kycStatus === 'pending' || status.kycStatus === 'failed') && (
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    Your verification is in progress. If you're stuck or need to restart, you can reset and try again.
+                    {status.kycStatus === 'pending' 
+                      ? "Your verification is in progress. If you're stuck or need to restart, you can reset and try again."
+                      : "Your verification failed. You can restart the process to try again."}
                   </p>
                   <div className="flex gap-2">
-                    <Button 
-                      onClick={() => startKYCMutation.mutate()}
-                      disabled={startKYCMutation.isPending}
-                      className="bg-gradient-to-r from-primary to-accent"
-                      data-testid="button-continue-kyc"
-                    >
-                      {startKYCMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                      Continue Verification
-                    </Button>
                     <Button 
                       variant="outline"
                       onClick={async () => {

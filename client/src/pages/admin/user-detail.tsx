@@ -218,7 +218,7 @@ export default function AdminUserDetail() {
               <span className="text-muted-foreground">KYC Status</span>
               <div className="flex items-center gap-2">
                 {getKycBadge(user.kycStatus)}
-                {user.kycStatus !== 'verified' && (
+                {(user.kycStatus === 'pending' || user.kycStatus === 'failed') && (
                   <Button
                     variant="ghost"
                     size="sm"
