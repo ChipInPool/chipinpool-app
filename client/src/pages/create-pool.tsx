@@ -1,17 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Gift, Plane, ShoppingBag, Calendar, ImagePlus, RefreshCw, Loader2, Sparkles, PartyPopper, Home, GraduationCap, Heart, Coffee, Shield, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Gift, Plane, ShoppingBag, Calendar, ImagePlus, RefreshCw, Loader2, Sparkles, PartyPopper, Home, GraduationCap, Heart, Coffee, Shield, AlertTriangle, Upload, X, Wand2 } from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export default function CreatePool() {
   const [, setLocation] = useLocation();
@@ -41,6 +42,98 @@ export default function CreatePool() {
   const [deadline, setDeadline] = useState("");
   const [isRecurring, setIsRecurring] = useState(false);
   const [frequency, setFrequency] = useState("monthly");
+  const [coverImage, setCoverImage] = useState<string>("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [showImageDialog, setShowImageDialog] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Image upload mutation
+  const uploadImageMutation = useMutation({
+    mutationFn: async (file: File) => {
+      // Step 1: Get presigned upload URL
+      const urlRes = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type,
+        }),
+      });
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json();
+
+      // Step 2: Upload file directly to presigned URL
+      const uploadRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type || "image/jpeg" },
+      });
+      if (!uploadRes.ok) throw new Error("Failed to upload image");
+
+      return objectPath;
+    },
+    onSuccess: (objectPath) => {
+      setCoverImage(objectPath);
+      setShowImageDialog(false);
+      toast({ description: "Image uploaded successfully" });
+    },
+    onError: (err: any) => {
+      toast({ description: err.message || "Failed to upload image", variant: "destructive" });
+    },
+    onSettled: () => {
+      setIsUploadingImage(false);
+    },
+  });
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ description: "Image must be under 5MB", variant: "destructive" });
+        return;
+      }
+      if (!file.type.startsWith("image/")) {
+        toast({ description: "Please select an image file", variant: "destructive" });
+        return;
+      }
+      setIsUploadingImage(true);
+      uploadImageMutation.mutate(file);
+    }
+  };
+
+  // Stock image options based on category
+  const getStockImages = () => {
+    const images: Record<string, string[]> = {
+      trip: [
+        "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400&h=200&fit=crop",
+        "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&h=200&fit=crop",
+        "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=400&h=200&fit=crop",
+      ],
+      gift: [
+        "https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=400&h=200&fit=crop",
+        "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=400&h=200&fit=crop",
+        "https://images.unsplash.com/photo-1512909006721-3d6018887383?w=400&h=200&fit=crop",
+      ],
+      purchase: [
+        "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&h=200&fit=crop",
+        "https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=400&h=200&fit=crop",
+        "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=200&fit=crop",
+      ],
+      event: [
+        "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=400&h=200&fit=crop",
+        "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=200&fit=crop",
+        "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=400&h=200&fit=crop",
+      ],
+      recurring: [
+        "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&h=200&fit=crop",
+        "https://images.unsplash.com/photo-1579621970795-87facc2f976d?w=400&h=200&fit=crop",
+        "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=400&h=200&fit=crop",
+      ],
+    };
+    return images[category] || images.gift;
+  };
 
   const createPoolMutation = useMutation({
     mutationFn: (data: any) => api.pools.create(data),
@@ -145,6 +238,7 @@ export default function CreatePool() {
       deadline: new Date(deadline).toISOString(),
       isRecurring,
       frequency: isRecurring ? frequency : null,
+      image: coverImage || null,
     });
   };
 
@@ -310,9 +404,97 @@ export default function CreatePool() {
               </div>
               <div className="space-y-2">
                 <Label>Cover Image</Label>
-                <div className="h-12 border border-dashed border-white/20 rounded-md flex items-center justify-center text-sm text-muted-foreground hover:bg-white/5 cursor-pointer transition-colors">
-                  <ImagePlus className="w-4 h-4 mr-2" /> Upload or Generate
-                </div>
+                {coverImage ? (
+                  <div className="relative rounded-lg overflow-hidden border border-white/10">
+                    <img 
+                      src={coverImage} 
+                      alt="Pool cover" 
+                      className="w-full h-32 object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=400&h=200&fit=crop";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setCoverImage("")}
+                      className="absolute top-2 right-2 p-1 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
+                      data-testid="button-remove-cover"
+                    >
+                      <X className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
+                ) : (
+                  <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
+                    <DialogTrigger asChild>
+                      <div 
+                        className="h-24 border border-dashed border-white/20 rounded-md flex flex-col items-center justify-center text-sm text-muted-foreground hover:bg-white/5 cursor-pointer transition-colors"
+                        data-testid="button-add-cover"
+                      >
+                        <ImagePlus className="w-6 h-6 mb-2" />
+                        <span>Upload or Choose Image</span>
+                      </div>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Add Cover Image</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        {/* Upload option */}
+                        <div>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                            data-testid="input-cover-image"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isUploadingImage}
+                            data-testid="button-upload-cover"
+                          >
+                            {isUploadingImage ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-4 h-4 mr-2" />
+                                Upload from Device
+                              </>
+                            )}
+                          </Button>
+                        </div>
+
+                        {/* Stock images */}
+                        <div>
+                          <p className="text-sm font-medium mb-3">Or choose a stock image:</p>
+                          <div className="grid grid-cols-3 gap-2">
+                            {getStockImages().map((img, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => {
+                                  setCoverImage(img);
+                                  setShowImageDialog(false);
+                                }}
+                                className="aspect-video rounded-md overflow-hidden border-2 border-transparent hover:border-primary transition-colors focus:outline-none focus:border-primary"
+                                data-testid={`button-stock-image-${idx}`}
+                              >
+                                <img src={img} alt={`Stock ${idx + 1}`} className="w-full h-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
               </div>
             </div>
           </div>
