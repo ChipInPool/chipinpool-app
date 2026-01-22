@@ -463,17 +463,54 @@ export default function Security() {
               </div>
               <CardDescription>Verify your identity to unlock higher limits and withdrawals</CardDescription>
             </CardHeader>
-            <CardContent>
-              {status.kycStatus !== 'verified' && (
+            <CardContent className="space-y-3">
+              {status.kycStatus !== 'verified' && status.kycStatus !== 'pending' && (
                 <Button 
                   onClick={() => startKYCMutation.mutate()}
-                  disabled={startKYCMutation.isPending || status.kycStatus === 'pending'}
+                  disabled={startKYCMutation.isPending}
                   className="bg-gradient-to-r from-primary to-accent"
                   data-testid="button-start-kyc"
                 >
                   {startKYCMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  {status.kycStatus === 'pending' ? 'Verification in Progress' : 'Start Verification'}
+                  Start Verification
                 </Button>
+              )}
+              {status.kycStatus === 'pending' && (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Your verification is in progress. If you're stuck or need to restart, you can reset and try again.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => startKYCMutation.mutate()}
+                      disabled={startKYCMutation.isPending}
+                      className="bg-gradient-to-r from-primary to-accent"
+                      data-testid="button-continue-kyc"
+                    >
+                      {startKYCMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Continue Verification
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch('/api/security/kyc/restart', {
+                            method: 'POST',
+                            credentials: 'include',
+                          });
+                          if (!res.ok) throw new Error('Failed to restart');
+                          queryClient.invalidateQueries({ queryKey: ['securityStatus'] });
+                          toast({ description: 'Verification reset. You can start again.' });
+                        } catch {
+                          toast({ description: 'Failed to restart verification', variant: 'destructive' });
+                        }
+                      }}
+                      data-testid="button-restart-kyc"
+                    >
+                      Restart Verification
+                    </Button>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>

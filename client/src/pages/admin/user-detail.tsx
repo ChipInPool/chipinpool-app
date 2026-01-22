@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ArrowLeft, UserX, UserCheck, Mail, Phone, Calendar, MapPin } from "lucide-react";
+import { Loader2, ArrowLeft, UserX, UserCheck, Mail, Phone, Calendar, MapPin, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "wouter";
 
@@ -69,6 +69,24 @@ export default function AdminUserDetail() {
     },
     onError: () => {
       toast({ description: "Action failed", variant: "destructive" });
+    },
+  });
+
+  const resetKycMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/admin/users/${id}/reset-kyc`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to reset KYC");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "user", id] });
+      toast({ description: "KYC status reset successfully" });
+    },
+    onError: () => {
+      toast({ description: "Failed to reset KYC", variant: "destructive" });
     },
   });
 
@@ -198,7 +216,25 @@ export default function AdminUserDetail() {
           <CardContent className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">KYC Status</span>
-              {getKycBadge(user.kycStatus)}
+              <div className="flex items-center gap-2">
+                {getKycBadge(user.kycStatus)}
+                {user.kycStatus !== 'verified' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => resetKycMutation.mutate()}
+                    disabled={resetKycMutation.isPending}
+                    data-testid="button-reset-kyc"
+                    title="Reset KYC Status"
+                  >
+                    {resetKycMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Role</span>

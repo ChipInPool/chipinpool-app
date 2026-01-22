@@ -2055,6 +2055,21 @@ export async function registerRoutes(
     }
   });
 
+  // Restart KYC verification (user self-service)
+  app.post("/api/security/kyc/restart", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      if (user.kycStatus === 'verified') return res.status(400).json({ error: "Already verified" });
+
+      await storage.updateUser(userId, { kycStatus: 'not_started' });
+      res.json({ message: "KYC status reset. You can now start verification again." });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Get security status
   app.get("/api/security/status", requireAuth, async (req, res, next) => {
     try {
@@ -2950,6 +2965,29 @@ export async function registerRoutes(
       await logAdminAction(adminId, 'suspend_user', 'user', userId, sanitizedReason);
 
       res.json({ message: "User suspended successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin reset user KYC status
+  app.post("/api/admin/users/:id/reset-kyc", requireAdmin, async (req: any, res, next) => {
+    try {
+      const adminId = req.session?.userId;
+      if (!adminId) {
+        return res.status(401).json({ message: "Admin not authenticated" });
+      }
+
+      const userId = req.params.id;
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      await db.update(users).set({ kycStatus: 'not_started' }).where(eq(users.id, userId));
+      await logAdminAction(adminId, 'reset_kyc', 'user', userId, `Reset KYC status from ${user.kycStatus} to not_started`);
+
+      res.json({ message: "KYC status reset successfully" });
     } catch (error) {
       next(error);
     }
