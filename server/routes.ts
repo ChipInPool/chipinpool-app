@@ -38,6 +38,7 @@ import {
 declare module "express-session" {
   interface SessionData {
     userId?: string;
+    pendingMfaUserId?: string;
   }
 }
 
@@ -568,6 +569,71 @@ export async function registerRoutes(
       const badges = await storage.getUserBadges(user.id);
       const { password, ...userWithoutPassword } = user;
       res.json({ user: { ...userWithoutPassword, badges } });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Update user profile
+  app.put("/api/user/profile", requireAuth, async (req, res, next) => {
+    try {
+      const profileSchema = z.object({
+        firstName: z.string().min(1).max(50).optional(),
+        lastName: z.string().min(1).max(50).optional(),
+        username: z.string().min(3).max(30).regex(/^[a-z0-9_]+$/, "Username must be lowercase letters, numbers, and underscores only").optional(),
+        email: z.string().email().optional(),
+        phone: z.string().min(10).max(15).optional(),
+        bio: z.string().max(500).optional(),
+        location: z.string().max(100).optional(),
+        avatar: z.string().url().optional(),
+      });
+
+      const data = profileSchema.parse(req.body);
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Check if username is being changed and if it's already taken
+      if (data.username && data.username !== user.username) {
+        const existingUser = await storage.getUserByUsername(data.username);
+        if (existingUser && existingUser.id !== userId) {
+          return res.status(400).json({ error: "Username already taken" });
+        }
+      }
+
+      // Check if email is being changed and if it's already taken
+      if (data.email && data.email !== user.email) {
+        const existingUser = await storage.getUserByEmail(data.email);
+        if (existingUser && existingUser.id !== userId) {
+          return res.status(400).json({ error: "Email already in use" });
+        }
+      }
+
+      // Update user profile
+      await storage.updateUser(userId, data);
+      
+      // Send account change notification if email/phone changed
+      if (data.email !== undefined || data.phone !== undefined) {
+        const changeDetails = [];
+        if (data.email && data.email !== user.email) changeDetails.push(`Email changed to ${data.email}`);
+        if (data.phone && data.phone !== user.phone) changeDetails.push(`Phone changed to ${data.phone}`);
+        
+        if (changeDetails.length > 0) {
+          sendAccountChangeNotification(
+            user.email,
+            user.phone,
+            user.firstName,
+            data.email ? 'email_updated' : 'phone_updated',
+            changeDetails.join('. '),
+            user.notifyEmail && user.emailAccountChanges,
+            user.notifySMS && user.smsAccountChanges
+          ).catch(console.error);
+        }
+      }
+
+      const updatedUser = await storage.getUser(userId);
+      const { password, ...userWithoutPassword } = updatedUser!;
+      res.json({ message: "Profile updated successfully", user: userWithoutPassword });
     } catch (error) {
       next(error);
     }

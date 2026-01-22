@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Bell, Mail, Phone, Moon, Sun, Shield, Save, AlertCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowLeft, Bell, Mail, Phone, Moon, Sun, Shield, Save, AlertCircle, User, MapPin, Loader2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -10,6 +13,16 @@ import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme } from "@/components/theme-provider";
+
+interface ProfileData {
+  firstName: string;
+  lastName: string;
+  username: string;
+  email: string;
+  phone: string;
+  bio: string;
+  location: string;
+}
 
 interface NotificationPreferences {
   emailContributions: boolean;
@@ -58,6 +71,60 @@ export default function Settings() {
     smsAccountChanges: false,
   });
   const [hasChanges, setHasChanges] = useState(false);
+
+  const [profile, setProfile] = useState<ProfileData>({
+    firstName: '',
+    lastName: '',
+    username: '',
+    email: '',
+    phone: '',
+    bio: '',
+    location: '',
+  });
+  const [hasProfileChanges, setHasProfileChanges] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        username: user.username || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        bio: user.bio || '',
+        location: user.location || '',
+      });
+    }
+  }, [user]);
+
+  const profileMutation = useMutation({
+    mutationFn: async (data: Partial<ProfileData>) => {
+      const res = await fetch("/api/user/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update profile");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ description: "Profile updated successfully" });
+      setHasProfileChanges(false);
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+    },
+    onError: (err: any) => {
+      toast({ description: err.message || "Failed to update profile", variant: "destructive" });
+    },
+  });
+
+  const handleProfileChange = (field: keyof ProfileData, value: string) => {
+    setProfile(prev => ({ ...prev, [field]: value }));
+    setHasProfileChanges(true);
+  };
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["notificationPrefs"],
@@ -175,6 +242,123 @@ export default function Settings() {
                 >
                   <Moon className="w-4 h-4" />
                 </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 rounded-2xl bg-card border border-white/5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold flex items-center gap-2">
+                <User className="w-4 h-4 text-purple-400" /> Profile Information
+              </h3>
+              {hasProfileChanges && (
+                <Button 
+                  size="sm"
+                  onClick={() => profileMutation.mutate(profile)} 
+                  disabled={profileMutation.isPending}
+                  data-testid="button-save-profile"
+                >
+                  {profileMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Profile
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="firstName" className="text-sm font-medium">First Name</Label>
+                  <Input
+                    id="firstName"
+                    value={profile.firstName}
+                    onChange={(e) => handleProfileChange('firstName', e.target.value)}
+                    placeholder="John"
+                    className="mt-1.5 bg-background/50 border-white/10"
+                    data-testid="input-firstName"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="lastName" className="text-sm font-medium">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    value={profile.lastName}
+                    onChange={(e) => handleProfileChange('lastName', e.target.value)}
+                    placeholder="Doe"
+                    className="mt-1.5 bg-background/50 border-white/10"
+                    data-testid="input-lastName"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="username" className="text-sm font-medium">Username</Label>
+                <div className="relative mt-1.5">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
+                  <Input
+                    id="username"
+                    value={profile.username}
+                    onChange={(e) => handleProfileChange('username', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                    placeholder="johndoe"
+                    className="pl-8 bg-background/50 border-white/10"
+                    data-testid="input-username"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={profile.email}
+                  onChange={(e) => handleProfileChange('email', e.target.value)}
+                  placeholder="john@example.com"
+                  className="mt-1.5 bg-background/50 border-white/10"
+                  data-testid="input-email"
+                />
+              </div>
+              <div>
+                <Label htmlFor="phone" className="text-sm font-medium">Phone</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={profile.phone}
+                  onChange={(e) => handleProfileChange('phone', e.target.value)}
+                  placeholder="+1 (555) 123-4567"
+                  className="mt-1.5 bg-background/50 border-white/10"
+                  data-testid="input-phone"
+                />
+              </div>
+              <div>
+                <Label htmlFor="location" className="text-sm font-medium flex items-center gap-2">
+                  <MapPin className="w-3 h-3" /> Location
+                </Label>
+                <Input
+                  id="location"
+                  value={profile.location}
+                  onChange={(e) => handleProfileChange('location', e.target.value)}
+                  placeholder="San Francisco, CA"
+                  className="mt-1.5 bg-background/50 border-white/10"
+                  data-testid="input-location"
+                />
+              </div>
+              <div>
+                <Label htmlFor="bio" className="text-sm font-medium">Bio</Label>
+                <Textarea
+                  id="bio"
+                  value={profile.bio}
+                  onChange={(e) => handleProfileChange('bio', e.target.value)}
+                  placeholder="Tell us about yourself..."
+                  rows={3}
+                  className="mt-1.5 bg-background/50 border-white/10 resize-none"
+                  data-testid="input-bio"
+                />
               </div>
             </div>
           </div>

@@ -222,9 +222,9 @@ export default function ApiDocs() {
 
               <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mt-8 mb-4">SDK References</h3>
               <nav className="space-y-1">
-                 <a href="#" className="block px-3 py-2 rounded-md hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors">Node.js</a>
-                 <a href="#" className="block px-3 py-2 rounded-md hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors">Python</a>
-                 <a href="#" className="block px-3 py-2 rounded-md hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors">React</a>
+                 <a href="#nodejs-sdk" className="block px-3 py-2 rounded-md hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors border-l-2 border-transparent">Node.js</a>
+                 <a href="#python-sdk" className="block px-3 py-2 rounded-md hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors border-l-2 border-transparent">Python</a>
+                 <a href="#react-sdk" className="block px-3 py-2 rounded-md hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors border-l-2 border-transparent">React</a>
               </nav>
            </div>
         </div>
@@ -368,6 +368,207 @@ export default function ApiDocs() {
 {"}"}
 </pre>
                  </div>
+              </div>
+           </section>
+
+           {/* Node.js SDK */}
+           <section id="nodejs-sdk" className="space-y-6 pt-8 border-t border-white/5">
+              <h2 className="text-3xl font-display font-bold">Node.js SDK</h2>
+              <p className="text-muted-foreground">Server-side integration for Node.js applications.</p>
+              
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
+                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+                    <span className="text-xs text-muted-foreground">Installation</span>
+                    <Terminal className="w-4 h-4 text-muted-foreground" />
+                 </div>
+                 <div className="p-6 overflow-x-auto">
+<pre className="text-gray-300">
+<span className="text-purple-400">npm</span> install <span className="text-blue-400">@chipin/node-sdk</span>
+</pre>
+                 </div>
+              </div>
+
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
+                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+                    <span className="text-xs text-muted-foreground">server.js</span>
+                    <Code2 className="w-4 h-4 text-muted-foreground" />
+                 </div>
+                 <div className="p-6 overflow-x-auto">
+<pre className="text-gray-300">
+<span className="text-purple-400">const</span> ChipIn = <span className="text-purple-400">require</span>(<span className="text-green-400">'@chipin/node-sdk'</span>);
+
+<span className="text-purple-400">const</span> chipin = <span className="text-purple-400">new</span> <span className="text-yellow-400">ChipIn</span>(<span className="text-green-400">'sk_live_your_secret_key'</span>);
+
+<span className="text-muted-foreground">// Create a checkout session</span>
+<span className="text-purple-400">const</span> session = <span className="text-purple-400">await</span> chipin.checkoutSessions.<span className="text-blue-400">create</span>({"{"}
+  <span className="text-blue-300">amount</span>: <span className="text-yellow-400">49900</span>,
+  <span className="text-blue-300">currency</span>: <span className="text-green-400">'usd'</span>,
+  <span className="text-blue-300">description</span>: <span className="text-green-400">'Group vacation booking'</span>,
+  <span className="text-blue-300">success_url</span>: <span className="text-green-400">'https://yoursite.com/success'</span>,
+  <span className="text-blue-300">cancel_url</span>: <span className="text-green-400">'https://yoursite.com/cancel'</span>,
+  <span className="text-blue-300">metadata</span>: {"{"} <span className="text-blue-300">order_id</span>: <span className="text-green-400">'ord_123'</span> {"}"}
+{"}"});
+
+console.<span className="text-blue-400">log</span>(session.url); <span className="text-muted-foreground">// Redirect user to this URL</span>
+</pre>
+                 </div>
+              </div>
+           </section>
+
+           {/* Python SDK */}
+           <section id="python-sdk" className="space-y-6 pt-8 border-t border-white/5">
+              <h2 className="text-3xl font-display font-bold">Python SDK</h2>
+              <p className="text-muted-foreground">Server-side integration for Python applications.</p>
+              
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
+                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+                    <span className="text-xs text-muted-foreground">Installation</span>
+                    <Terminal className="w-4 h-4 text-muted-foreground" />
+                 </div>
+                 <div className="p-6 overflow-x-auto">
+<pre className="text-gray-300">
+<span className="text-purple-400">pip</span> install <span className="text-blue-400">chipinpay</span>
+</pre>
+                 </div>
+              </div>
+
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
+                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+                    <span className="text-xs text-muted-foreground">app.py</span>
+                    <Code2 className="w-4 h-4 text-muted-foreground" />
+                 </div>
+                 <div className="p-6 overflow-x-auto">
+<pre className="text-gray-300">
+<span className="text-purple-400">import</span> chipinpay
+
+chipinpay.api_key = <span className="text-green-400">"sk_live_your_secret_key"</span>
+
+<span className="text-muted-foreground"># Create a checkout session</span>
+session = chipinpay.CheckoutSession.<span className="text-blue-400">create</span>(
+    <span className="text-blue-300">amount</span>=<span className="text-yellow-400">49900</span>,
+    <span className="text-blue-300">currency</span>=<span className="text-green-400">"usd"</span>,
+    <span className="text-blue-300">description</span>=<span className="text-green-400">"Group vacation booking"</span>,
+    <span className="text-blue-300">success_url</span>=<span className="text-green-400">"https://yoursite.com/success"</span>,
+    <span className="text-blue-300">cancel_url</span>=<span className="text-green-400">"https://yoursite.com/cancel"</span>,
+    <span className="text-blue-300">metadata</span>={"{"}
+        <span className="text-green-400">"order_id"</span>: <span className="text-green-400">"ord_123"</span>
+    {"}"}
+)
+
+<span className="text-blue-400">print</span>(session.url)  <span className="text-muted-foreground"># Redirect user to this URL</span>
+</pre>
+                 </div>
+              </div>
+           </section>
+
+           {/* React SDK */}
+           <section id="react-sdk" className="space-y-6 pt-8 border-t border-white/5">
+              <h2 className="text-3xl font-display font-bold">React SDK</h2>
+              <p className="text-muted-foreground">Client-side components for React applications.</p>
+              
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
+                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+                    <span className="text-xs text-muted-foreground">Installation</span>
+                    <Terminal className="w-4 h-4 text-muted-foreground" />
+                 </div>
+                 <div className="p-6 overflow-x-auto">
+<pre className="text-gray-300">
+<span className="text-purple-400">npm</span> install <span className="text-blue-400">@chipin/react</span>
+</pre>
+                 </div>
+              </div>
+
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
+                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+                    <span className="text-xs text-muted-foreground">Checkout.tsx</span>
+                    <Code2 className="w-4 h-4 text-muted-foreground" />
+                 </div>
+                 <div className="p-6 overflow-x-auto">
+<pre className="text-gray-300">
+<span className="text-purple-400">import</span> {"{ ChipInProvider, SplitPayButton, useChipIn }"} <span className="text-purple-400">from</span> <span className="text-green-400">'@chipin/react'</span>;
+
+<span className="text-purple-400">function</span> <span className="text-blue-400">App</span>() {"{"}
+  <span className="text-purple-400">return</span> (
+    <span className="text-gray-500">&lt;</span><span className="text-yellow-400">ChipInProvider</span> <span className="text-blue-300">publishableKey</span>=<span className="text-green-400">"pk_live_..."</span><span className="text-gray-500">&gt;</span>
+      <span className="text-gray-500">&lt;</span><span className="text-yellow-400">Checkout</span> <span className="text-gray-500">/&gt;</span>
+    <span className="text-gray-500">&lt;/</span><span className="text-yellow-400">ChipInProvider</span><span className="text-gray-500">&gt;</span>
+  );
+{"}"}
+
+<span className="text-purple-400">function</span> <span className="text-blue-400">Checkout</span>() {"{"}
+  <span className="text-purple-400">const</span> {"{ createSession }"} = <span className="text-blue-400">useChipIn</span>();
+  
+  <span className="text-purple-400">const</span> handleSplit = <span className="text-purple-400">async</span> () =&gt; {"{"}
+    <span className="text-purple-400">const</span> session = <span className="text-purple-400">await</span> <span className="text-blue-400">createSession</span>({"{"}
+      <span className="text-blue-300">amount</span>: <span className="text-yellow-400">49900</span>,
+      <span className="text-blue-300">currency</span>: <span className="text-green-400">'usd'</span>,
+      <span className="text-blue-300">productName</span>: <span className="text-green-400">'Group vacation booking'</span>,
+    {"}"});
+    window.location.href = session.url;
+  {"}"};
+
+  <span className="text-purple-400">return</span> (
+    <span className="text-gray-500">&lt;</span><span className="text-yellow-400">div</span><span className="text-gray-500">&gt;</span>
+      <span className="text-gray-500">&lt;</span><span className="text-yellow-400">h1</span><span className="text-gray-500">&gt;</span>Total: $499.00<span className="text-gray-500">&lt;/</span><span className="text-yellow-400">h1</span><span className="text-gray-500">&gt;</span>
+      
+      <span className="text-gray-500">{/* One-click split button */}</span>
+      <span className="text-gray-500">&lt;</span><span className="text-yellow-400">SplitPayButton</span>
+        <span className="text-blue-300">amount</span>={"{49900}"}
+        <span className="text-blue-300">currency</span>=<span className="text-green-400">"usd"</span>
+        <span className="text-blue-300">onSuccess</span>={"{(session) => console.log('Session:', session)}"}
+      <span className="text-gray-500">/&gt;</span>
+      
+      <span className="text-gray-500">{/* Or custom button */}</span>
+      <span className="text-gray-500">&lt;</span><span className="text-yellow-400">button</span> <span className="text-blue-300">onClick</span>={"{"}<span className="text-blue-400">handleSplit</span>{"}"}<span className="text-gray-500">&gt;</span>
+        Split with Friends
+      <span className="text-gray-500">&lt;/</span><span className="text-yellow-400">button</span><span className="text-gray-500">&gt;</span>
+    <span className="text-gray-500">&lt;/</span><span className="text-yellow-400">div</span><span className="text-gray-500">&gt;</span>
+  );
+{"}"}
+</pre>
+                 </div>
+              </div>
+
+              <div className="p-6 rounded-xl bg-card border border-white/5">
+                <h3 className="font-bold mb-3">Component Props</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/5">
+                        <th className="text-left py-2 px-3 text-muted-foreground font-medium">Prop</th>
+                        <th className="text-left py-2 px-3 text-muted-foreground font-medium">Type</th>
+                        <th className="text-left py-2 px-3 text-muted-foreground font-medium">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-muted-foreground">
+                      <tr className="border-b border-white/5">
+                        <td className="py-2 px-3 font-mono text-xs text-primary">amount</td>
+                        <td className="py-2 px-3 font-mono text-xs">number</td>
+                        <td className="py-2 px-3">Amount in cents (e.g., 4999 for $49.99)</td>
+                      </tr>
+                      <tr className="border-b border-white/5">
+                        <td className="py-2 px-3 font-mono text-xs text-primary">currency</td>
+                        <td className="py-2 px-3 font-mono text-xs">string</td>
+                        <td className="py-2 px-3">Three-letter currency code (usd, eur, gbp)</td>
+                      </tr>
+                      <tr className="border-b border-white/5">
+                        <td className="py-2 px-3 font-mono text-xs text-primary">onSuccess</td>
+                        <td className="py-2 px-3 font-mono text-xs">function</td>
+                        <td className="py-2 px-3">Callback when session is created</td>
+                      </tr>
+                      <tr className="border-b border-white/5">
+                        <td className="py-2 px-3 font-mono text-xs text-primary">onError</td>
+                        <td className="py-2 px-3 font-mono text-xs">function</td>
+                        <td className="py-2 px-3">Callback when an error occurs</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2 px-3 font-mono text-xs text-primary">metadata</td>
+                        <td className="py-2 px-3 font-mono text-xs">object</td>
+                        <td className="py-2 px-3">Custom key-value pairs for your reference</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
            </section>
         </div>
