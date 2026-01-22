@@ -20,6 +20,7 @@ interface User {
   createdAt?: string;
   kycStatus?: string;
   phoneVerified?: boolean;
+  role?: string;
   badges?: Array<{ id: string; name: string; icon: string; color: string; description?: string }>;
 }
 
