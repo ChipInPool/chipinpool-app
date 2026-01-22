@@ -99,6 +99,16 @@ Preferred communication style: Simple, everyday language.
     - Webhook system for real-time status updates
     - Customer checkout flow (`/chipinpay/checkout/:sessionId`)
     - Admin merchant management (approve/suspend)
+15. **Multi-Factor Authentication (MFA)** - TOTP-based 2FA with recovery codes:
+    - QR code setup via Google Authenticator or any TOTP app
+    - Recovery codes (8 codes) for account recovery
+    - MFA verification required during login when enabled
+    - Recovery code regeneration (requires current TOTP verification)
+16. **Expanded Notification System** - Per-channel per-category notification preferences:
+    - Categories: Pool Activity, Security Alerts, KYC Updates, Card Activity, Wallet Activity, Account Changes
+    - Channels: Email and SMS with independent per-category toggles
+    - Automatic notifications for: 2FA enable/disable, password reset, KYC verification, wallet withdrawals
+    - Global channel opt-out respected (notifyEmail/notifySMS gates all category notifications)
 
 ### ChipInPay Merchant API:
 - `POST /api/v1/merchant/checkout` - Create checkout session
