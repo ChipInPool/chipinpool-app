@@ -1248,7 +1248,14 @@ export async function registerRoutes(
       };
 
       res.json({ card: maskedCard });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[Virtual Card] Error:', error.message, error.raw?.message || error.code || '');
+      if (error.type === 'StripeInvalidRequestError' || error.raw) {
+        return res.status(400).json({ 
+          message: error.raw?.message || error.message || 'Failed to create virtual card',
+          code: error.code,
+        });
+      }
       next(error);
     }
   });
