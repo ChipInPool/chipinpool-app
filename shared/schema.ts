@@ -90,12 +90,19 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const badgeCategoryEnum = pgEnum('badge_category', ['contribution', 'pool', 'social', 'streak', 'milestone', 'special']);
+
 export const badges = pgTable("badges", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   icon: text("icon").notNull(),
   color: text("color").notNull(),
   description: text("description"),
+  category: badgeCategoryEnum("category").notNull().default('special'),
+  criteria: text("criteria"),
+  threshold: integer("threshold"),
+  pointsAwarded: integer("points_awarded").notNull().default(10),
+  rarity: text("rarity").notNull().default('common'),
 });
 
 export const userBadges = pgTable("user_badges", {
@@ -103,6 +110,29 @@ export const userBadges = pgTable("user_badges", {
   userId: varchar("user_id").references(() => users.id).notNull(),
   badgeId: varchar("badge_id").references(() => badges.id).notNull(),
   earnedAt: timestamp("earned_at").notNull().defaultNow(),
+});
+
+export const userPoints = pgTable("user_points", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  points: integer("points").notNull().default(0),
+  lifetimePoints: integer("lifetime_points").notNull().default(0),
+  currentStreak: integer("current_streak").notNull().default(0),
+  longestStreak: integer("longest_streak").notNull().default(0),
+  lastActivityDate: timestamp("last_activity_date"),
+  level: integer("level").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const pointTransactions = pgTable("point_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  points: integer("points").notNull(),
+  reason: text("reason").notNull(),
+  referenceType: text("reference_type"),
+  referenceId: varchar("reference_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const pools = pgTable("pools", {
@@ -735,3 +765,17 @@ export type UserSubscription = typeof userSubscriptions.$inferSelect;
 export type InsertUserSubscription = z.infer<typeof insertUserSubscriptionSchema>;
 export type SubscriptionHistory = typeof subscriptionHistory.$inferSelect;
 export type InsertSubscriptionHistory = z.infer<typeof insertSubscriptionHistorySchema>;
+
+export const insertBadgeSchema = createInsertSchema(badges).omit({ id: true });
+export const insertUserBadgeSchema = createInsertSchema(userBadges).omit({ id: true, earnedAt: true });
+export const insertUserPointsSchema = createInsertSchema(userPoints).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPointTransactionSchema = createInsertSchema(pointTransactions).omit({ id: true, createdAt: true });
+
+export type Badge = typeof badges.$inferSelect;
+export type InsertBadge = z.infer<typeof insertBadgeSchema>;
+export type UserBadge = typeof userBadges.$inferSelect;
+export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;
+export type UserPoints = typeof userPoints.$inferSelect;
+export type InsertUserPoints = z.infer<typeof insertUserPointsSchema>;
+export type PointTransaction = typeof pointTransactions.$inferSelect;
+export type InsertPointTransaction = z.infer<typeof insertPointTransactionSchema>;
