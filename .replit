@@ -50,3 +50,6 @@ integrations = ["stripe:2.0.0", "resend:1.0.0", "javascript_object_storage:2.0.0
 
 [userenv.shared]
 PLAID_ENV = "production"
+
+[objectStorage]
+defaultBucketID = "replit-objstore-47acf5b6-0f41-4b53-8d4e-69a68fdff347"

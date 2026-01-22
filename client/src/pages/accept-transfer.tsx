@@ -68,7 +68,7 @@ export default function AcceptTransfer() {
   });
 
   const transferRequest: TransferRequest | null = transferData?.request || null;
-  const bankAccounts: BankAccount[] = bankAccountsData?.accounts || [];
+  const bankAccounts: BankAccount[] = Array.isArray(bankAccountsData) ? bankAccountsData : (bankAccountsData?.accounts || []);
 
   useEffect(() => {
     if (bankAccounts.length > 0 && !selectedBankAccountId) {

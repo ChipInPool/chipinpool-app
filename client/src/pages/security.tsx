@@ -172,7 +172,7 @@ export default function Security() {
     enabled: isAuthenticated,
   });
 
-  const { data: bankAccounts, refetch: refetchBankAccounts } = useQuery({
+  const { data: bankAccountsData, refetch: refetchBankAccounts } = useQuery({
     queryKey: ["bankAccounts"],
     queryFn: async () => {
       const res = await fetch('/api/bank-accounts', { credentials: 'include' });
@@ -181,6 +181,8 @@ export default function Security() {
     },
     enabled: isAuthenticated,
   });
+  
+  const bankAccounts = bankAccountsData?.accounts || [];
 
   const [showBankDialog, setShowBankDialog] = useState(false);
   const [bankForm, setBankForm] = useState({
@@ -246,8 +248,8 @@ export default function Security() {
     toast({ description: error, variant: "destructive" });
   };
 
-  const bankAccountsList = bankAccounts?.filter((a: any) => a.payoutMethod === 'bank_account') || [];
-  const debitCardsList = bankAccounts?.filter((a: any) => a.payoutMethod === 'debit_card') || [];
+  const bankAccountsList = bankAccounts.filter((a: any) => a.payoutMethod === 'bank_account' || !a.payoutMethod);
+  const debitCardsList = bankAccounts.filter((a: any) => a.payoutMethod === 'debit_card');
 
   const sendEmailMutation = useMutation({
     mutationFn: api.security.sendEmailVerification,
