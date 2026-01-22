@@ -2423,6 +2423,7 @@ export async function registerRoutes(
         amount: z.string(),
         notes: z.string().optional(),
         bankAccountId: z.string().optional(),
+        payoutSpeed: z.enum(['standard', 'instant']).optional().default('standard'),
       });
 
       const data = transferSchema.parse(req.body);
@@ -2457,6 +2458,11 @@ export async function registerRoutes(
         // Use specified bank account or default
         const bankAccountId = data.bankAccountId || bankAccounts.find(a => a.isDefault)?.id || bankAccounts[0].id;
 
+        // Calculate fee for instant payout
+        const isInstant = data.payoutSpeed === 'instant';
+        const fee = isInstant ? transferAmount * 0.015 : 0;
+        const netAmount = transferAmount - fee;
+
         // For self transfer, mark as accepted immediately
         const transfer = await storage.createPoolTransferRequest({
           poolId,
@@ -2473,7 +2479,7 @@ export async function registerRoutes(
           acceptedAt: new Date(),
         });
 
-        // Process the transfer (in production, this would initiate Plaid Transfer)
+        // Process the transfer (in production, this would initiate Stripe Payout)
         // Deduct from pool
         const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
         await storage.updatePoolAmount(poolId, newPoolAmount);
@@ -2485,16 +2491,27 @@ export async function registerRoutes(
         });
 
         // Create transaction record
+        const bankAccountInfo = bankAccounts.find(a => a.id === bankAccountId);
         await storage.createTransaction({
           virtualCardId: null as any,
-          amount: data.amount,
-          merchant: `Bank Transfer to ${bankAccounts.find(a => a.id === bankAccountId)?.accountName || 'Bank Account'}`,
-          notes: data.notes || `Pool transfer to bank account`,
+          amount: netAmount.toFixed(2),
+          merchant: `Bank Transfer to ${bankAccountInfo?.accountName || 'Bank Account'}`,
+          notes: isInstant 
+            ? `Pool transfer (Instant) - Fee: $${fee.toFixed(2)}` 
+            : (data.notes || `Pool transfer to bank account`),
         });
 
+        const eta = isInstant ? 'within 30 minutes' : 'in 1-3 business days';
         res.json({ 
           transfer,
-          message: `Transfer of $${transferAmount.toFixed(2)} initiated. Funds will arrive in 1-3 business days.`,
+          payoutSpeed: data.payoutSpeed,
+          grossAmount: transferAmount.toFixed(2),
+          fee: fee.toFixed(2),
+          netAmount: netAmount.toFixed(2),
+          eta,
+          message: isInstant
+            ? `Instant transfer of $${netAmount.toFixed(2)} initiated. Fee: $${fee.toFixed(2)}. Funds will arrive ${eta}.`
+            : `Transfer of $${transferAmount.toFixed(2)} initiated. Funds will arrive ${eta}.`,
         });
       } else {
         // Transfer to contributor - create pending request

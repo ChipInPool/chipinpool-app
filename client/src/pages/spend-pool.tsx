@@ -48,6 +48,7 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
   const [recipientType, setRecipientType] = useState<"self" | "contributor">("self");
   const [selectedContributor, setSelectedContributor] = useState<Contributor | null>(null);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>("");
+  const [payoutSpeed, setPayoutSpeed] = useState<'standard' | 'instant'>('standard');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [notes, setNotes] = useState("");
 
@@ -82,7 +83,7 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
   }, [bankAccounts, selectedBankAccountId]);
 
   const transferMutation = useMutation({
-    mutationFn: async (data: { toUserId: string; amount: string; notes?: string; bankAccountId?: string }) => {
+    mutationFn: async (data: { toUserId: string; amount: string; notes?: string; bankAccountId?: string; payoutSpeed?: 'standard' | 'instant' }) => {
       const res = await fetch(`/api/pools/${poolId}/transfer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -144,7 +145,19 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
       amount: transferAmount,
       notes: notes || undefined,
       bankAccountId: recipientType === "self" ? selectedBankAccountId : undefined,
+      payoutSpeed: recipientType === "self" ? payoutSpeed : undefined,
     });
+  };
+
+  const getFeeAmount = () => {
+    const amount = parseFloat(transferAmount) || 0;
+    return payoutSpeed === 'instant' ? (amount * 0.015).toFixed(2) : '0.00';
+  };
+
+  const getNetAmount = () => {
+    const amount = parseFloat(transferAmount) || 0;
+    const fee = payoutSpeed === 'instant' ? amount * 0.015 : 0;
+    return (amount - fee).toFixed(2);
   };
 
   const getRecipientName = () => {
@@ -243,6 +256,88 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
                     )}
                   </button>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {recipientType === "self" && (
+          <div className="p-4 rounded-lg bg-white/5 border border-white/10 space-y-3">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-lime-400" />
+              <span className="text-sm font-medium">Payout Speed</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setPayoutSpeed('standard')}
+                className={`p-4 rounded-lg border text-left transition-all ${
+                  payoutSpeed === 'standard'
+                    ? "border-cyan-500 bg-cyan-500/10"
+                    : "border-white/10 hover:border-white/20"
+                }`}
+                data-testid="payout-speed-standard"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <RefreshCw className="w-4 h-4 text-cyan-400" />
+                  <span className="font-semibold text-sm">Standard</span>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Arrives in:</p>
+                  <p className="text-sm font-medium text-cyan-400">1-3 business days</p>
+                </div>
+                <div className="mt-2 pt-2 border-t border-white/10">
+                  <p className="text-xs text-muted-foreground">Fee:</p>
+                  <p className="text-sm font-bold text-green-400">Free</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPayoutSpeed('instant')}
+                className={`p-4 rounded-lg border text-left transition-all ${
+                  payoutSpeed === 'instant'
+                    ? "border-lime-500 bg-lime-500/10"
+                    : "border-white/10 hover:border-white/20"
+                }`}
+                data-testid="payout-speed-instant"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className="w-4 h-4 text-lime-400" />
+                  <span className="font-semibold text-sm">Instant</span>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Arrives in:</p>
+                  <p className="text-sm font-medium text-lime-400">~30 minutes</p>
+                </div>
+                <div className="mt-2 pt-2 border-t border-white/10">
+                  <p className="text-xs text-muted-foreground">Fee:</p>
+                  <p className="text-sm font-bold text-orange-400">1.5%</p>
+                </div>
+              </button>
+            </div>
+            
+            {transferAmount && parseFloat(transferAmount) > 0 && (
+              <div className={`p-3 rounded-lg ${payoutSpeed === 'instant' ? 'bg-lime-500/10 border border-lime-500/20' : 'bg-cyan-500/10 border border-cyan-500/20'}`}>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="text-muted-foreground">Transfer Amount:</span>
+                  <span className="font-medium">${parseFloat(transferAmount).toFixed(2)}</span>
+                </div>
+                {payoutSpeed === 'instant' && (
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-orange-400">Instant Fee (1.5%):</span>
+                    <span className="font-medium text-orange-400">-${getFeeAmount()}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between text-sm pt-1 border-t border-white/10">
+                  <span className={payoutSpeed === 'instant' ? 'text-lime-400 font-medium' : 'text-cyan-400 font-medium'}>You'll Receive:</span>
+                  <span className={`font-bold ${payoutSpeed === 'instant' ? 'text-lime-400' : 'text-cyan-400'}`}>${getNetAmount()}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {payoutSpeed === 'instant' 
+                    ? '⚡ Arrives within ~30 minutes to your debit card'
+                    : '🏦 Arrives in 1-3 business days to your bank account'
+                  }
+                </p>
               </div>
             )}
           </div>
@@ -407,6 +502,27 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
                 </span>
               </div>
             )}
+            {recipientType === "self" && (
+              <>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Payout Speed:</span>
+                  <span className={`font-medium flex items-center gap-1 ${payoutSpeed === 'instant' ? 'text-lime-400' : 'text-cyan-400'}`}>
+                    {payoutSpeed === 'instant' ? <Zap className="w-3 h-3" /> : <RefreshCw className="w-3 h-3" />}
+                    {payoutSpeed === 'instant' ? 'Instant' : 'Standard'}
+                  </span>
+                </div>
+                {payoutSpeed === 'instant' && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-orange-400">Fee (1.5%):</span>
+                    <span className="text-orange-400">-${getFeeAmount()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm border-t border-white/10 pt-2">
+                  <span className={payoutSpeed === 'instant' ? 'text-lime-400 font-medium' : 'text-cyan-400 font-medium'}>You'll Receive:</span>
+                  <span className={`font-bold text-lg ${payoutSpeed === 'instant' ? 'text-lime-400' : 'text-cyan-400'}`}>${getNetAmount()}</span>
+                </div>
+              </>
+            )}
             {notes && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Notes:</span>
@@ -417,8 +533,10 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
               <span className="text-muted-foreground">
                 {recipientType === "self" ? "Estimated Arrival:" : "Status:"}
               </span>
-              <span>
-                {recipientType === "self" ? "1-3 business days" : "Pending acceptance"}
+              <span className={recipientType === "self" ? (payoutSpeed === 'instant' ? 'text-lime-400' : 'text-cyan-400') : ''}>
+                {recipientType === "self" 
+                  ? (payoutSpeed === 'instant' ? '~30 minutes' : '1-3 business days') 
+                  : "Pending acceptance"}
               </span>
             </div>
           </div>
