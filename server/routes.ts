@@ -12,6 +12,7 @@ import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { sendPoolInviteEmail } from "./resendClient";
 import { sendPoolInviteSMS } from "./clicksendClient";
+import { awardContributionPoints, awardPoolCreationPoints, awardPoolCompletionPoints } from "./gamification";
 import { 
   generateOTP, 
   generate2FASecret, 
@@ -808,6 +809,11 @@ export async function registerRoutes(
         await storage.updateUserStats(req.session.userId!, user.poolsCreated + 1);
       }
 
+      // Award gamification points for pool creation
+      awardPoolCreationPoints(req.session.userId!, pool.id).catch(err => 
+        console.error('[Gamification] Error awarding pool creation points:', err)
+      );
+
       res.json({ pool });
     } catch (error) {
       next(error);
@@ -939,6 +945,18 @@ export async function registerRoutes(
           poolCreator.notifyEmail,
           poolCreator.notifySMS
         ).catch(err => console.error('[Notification] Contribution notification failed:', err));
+      }
+
+      // Award gamification points for contribution
+      awardContributionPoints(user.id, amount).catch(err => 
+        console.error('[Gamification] Error awarding contribution points:', err)
+      );
+
+      // Award pool completion points if goal reached
+      if (parseFloat(newPoolAmount) >= parseFloat(pool.targetAmount)) {
+        awardPoolCompletionPoints(pool.creatorId, pool.id, pool.title).catch(err => 
+          console.error('[Gamification] Error awarding pool completion points:', err)
+        );
       }
 
       res.json({ contribution });

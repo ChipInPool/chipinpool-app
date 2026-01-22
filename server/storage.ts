@@ -240,6 +240,10 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(contributions).where(eq(contributions.poolId, poolId)).orderBy(desc(contributions.createdAt));
   }
 
+  async getUserContributions(userId: string): Promise<Contribution[]> {
+    return await db.select().from(contributions).where(eq(contributions.userId, userId)).orderBy(desc(contributions.createdAt));
+  }
+
   async createContribution(insertContribution: InsertContribution): Promise<Contribution> {
     const [contribution] = await db.insert(contributions).values(insertContribution).returning();
     return contribution;
