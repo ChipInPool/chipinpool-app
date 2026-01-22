@@ -2600,8 +2600,9 @@ export async function registerRoutes(
       const requestId = req.params.id;
       const userId = req.session.userId!;
 
-      const { bankAccountId } = z.object({
+      const { bankAccountId, payoutSpeed } = z.object({
         bankAccountId: z.string(),
+        payoutSpeed: z.enum(['standard', 'instant']).default('standard'),
       }).parse(req.body);
 
       const transferRequest = await storage.getPoolTransferRequest(requestId);
@@ -2621,6 +2622,11 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid bank account" });
       }
 
+      // For instant payouts, must use a debit card
+      if (payoutSpeed === 'instant' && bankAccount.payoutMethod !== 'debit_card') {
+        return res.status(400).json({ error: "Instant payouts require a linked debit card" });
+      }
+
       // Verify pool still has sufficient funds
       const pool = await storage.getPool(transferRequest.poolId);
       if (!pool) {
@@ -2629,6 +2635,11 @@ export async function registerRoutes(
 
       const transferAmount = parseFloat(transferRequest.amount);
       const poolBalance = parseFloat(pool.currentAmount);
+
+      // Calculate fee for instant payouts (1.5%)
+      const instantFeeRate = 0.015;
+      const instantFee = payoutSpeed === 'instant' ? transferAmount * instantFeeRate : 0;
+      const netAmount = transferAmount - instantFee;
 
       if (transferAmount > poolBalance) {
         await storage.updatePoolTransferRequest(requestId, { status: 'failed' });
@@ -2656,24 +2667,28 @@ export async function registerRoutes(
       const stripe = await getUncachableStripeClient();
       try {
         const transfer = await stripe.transfers.create({
-          amount: Math.round(transferAmount * 100),
+          amount: Math.round(netAmount * 100),
           currency: 'usd',
           destination: recipient.stripeConnectId,
-          description: `Pool withdrawal: ${pool.name}`,
+          description: `Pool withdrawal: ${pool.title}`,
           metadata: {
             poolId: pool.id,
             transferRequestId: requestId,
             recipientUserId: userId,
+            payoutSpeed,
+            instantFee: instantFee.toFixed(2),
           },
         });
 
-        // Initiate payout to bank account
+        // Initiate payout - instant or standard
         await stripe.payouts.create({
-          amount: Math.round(transferAmount * 100),
+          amount: Math.round(netAmount * 100),
           currency: 'usd',
-          method: 'standard',
+          method: payoutSpeed === 'instant' ? 'instant' : 'standard',
+          destination: bankAccount.stripeExternalAccountId || undefined,
           metadata: {
             transferRequestId: requestId,
+            payoutSpeed,
           },
         }, {
           stripeAccount: recipient.stripeConnectId,
@@ -2701,13 +2716,19 @@ export async function registerRoutes(
           userId: creator.id,
           type: 'contribution',
           title: 'Transfer Accepted',
-          message: `${recipient.firstName} accepted the transfer of $${transferAmount.toFixed(2)}`,
+          message: `${recipient.firstName} accepted the transfer of $${transferAmount.toFixed(2)}${payoutSpeed === 'instant' ? ' (instant)' : ''}`,
           link: `/pool/${transferRequest.poolId}`,
         });
       }
 
+      const arrivalTime = payoutSpeed === 'instant' ? 'within 30 minutes' : 'in 1-3 business days';
+      const feeMessage = instantFee > 0 ? ` (1.5% fee: $${instantFee.toFixed(2)})` : '';
       res.json({ 
-        message: `Transfer accepted! $${transferAmount.toFixed(2)} will arrive in 1-3 business days.`,
+        message: `Transfer accepted! $${netAmount.toFixed(2)} will arrive ${arrivalTime}.${feeMessage}`,
+        payoutSpeed,
+        amount: transferAmount.toFixed(2),
+        fee: instantFee.toFixed(2),
+        netAmount: netAmount.toFixed(2),
       });
     } catch (error) {
       next(error);
