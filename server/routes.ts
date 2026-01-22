@@ -2548,6 +2548,12 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Pool no longer has sufficient funds" });
       }
 
+      // Get recipient user for Stripe Connect transfer
+      const recipient = await storage.getUser(userId);
+      if (!recipient?.stripeConnectId) {
+        return res.status(400).json({ error: "You need to link a bank account first" });
+      }
+
       // Update transfer request
       await storage.updatePoolTransferRequest(requestId, {
         status: 'accepted',
@@ -2559,23 +2565,56 @@ export async function registerRoutes(
       const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
       await storage.updatePoolAmount(transferRequest.poolId, newPoolAmount);
 
-      // In production, this would initiate the actual Plaid Transfer
-      // For now, mark as completed
-      await storage.updatePoolTransferRequest(requestId, {
-        status: 'completed',
-        completedAt: new Date(),
-      });
+      // Initiate Stripe transfer to connected account
+      const stripe = await getUncachableStripeClient();
+      try {
+        const transfer = await stripe.transfers.create({
+          amount: Math.round(transferAmount * 100),
+          currency: 'usd',
+          destination: recipient.stripeConnectId,
+          description: `Pool withdrawal: ${pool.name}`,
+          metadata: {
+            poolId: pool.id,
+            transferRequestId: requestId,
+            recipientUserId: userId,
+          },
+        });
+
+        // Initiate payout to bank account
+        await stripe.payouts.create({
+          amount: Math.round(transferAmount * 100),
+          currency: 'usd',
+          method: 'standard',
+          metadata: {
+            transferRequestId: requestId,
+          },
+        }, {
+          stripeAccount: recipient.stripeConnectId,
+        });
+
+        await storage.updatePoolTransferRequest(requestId, {
+          status: 'completed',
+          completedAt: new Date(),
+        });
+      } catch (stripeError: any) {
+        console.error('[Transfer] Stripe error:', stripeError.message);
+        await storage.updatePoolTransferRequest(requestId, {
+          status: 'failed',
+        });
+        // Refund pool
+        await storage.updatePoolAmount(transferRequest.poolId, poolBalance.toFixed(2));
+        return res.status(400).json({ error: 'Failed to process payout. Please try again.' });
+      }
 
       // Notify pool creator
       const creator = await storage.getUser(transferRequest.fromUserId);
-      const recipient = await storage.getUser(userId);
       
       if (creator) {
         await storage.createNotification({
           userId: creator.id,
           type: 'contribution',
           title: 'Transfer Accepted',
-          message: `${recipient?.firstName || 'Contributor'} accepted the transfer of $${transferAmount.toFixed(2)}`,
+          message: `${recipient.firstName} accepted the transfer of $${transferAmount.toFixed(2)}`,
           link: `/pool/${transferRequest.poolId}`,
         });
       }

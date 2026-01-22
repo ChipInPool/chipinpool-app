@@ -9,9 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Shield, Mail, Phone, Key, Smartphone, UserCheck, CheckCircle, XCircle, Loader2, Building } from "lucide-react";
+import { Shield, Mail, Phone, Key, Smartphone, UserCheck, CheckCircle, XCircle, Loader2, Building, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { usePlaidLink } from "react-plaid-link";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Security() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -37,61 +37,57 @@ export default function Security() {
     enabled: isAuthenticated,
   });
 
-  const { data: plaidStatus, refetch: refetchPlaidStatus } = useQuery({
-    queryKey: ["plaidStatus"],
-    queryFn: api.plaid.getStatus,
+  const { data: bankAccounts, refetch: refetchBankAccounts } = useQuery({
+    queryKey: ["bankAccounts"],
+    queryFn: async () => {
+      const res = await fetch('/api/bank-accounts', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch bank accounts');
+      return res.json();
+    },
     enabled: isAuthenticated,
   });
 
-  const [linkToken, setLinkToken] = useState<string | null>(null);
-  const [isGettingToken, setIsGettingToken] = useState(false);
+  const [showBankDialog, setShowBankDialog] = useState(false);
+  const [bankForm, setBankForm] = useState({
+    accountHolderName: '',
+    routingNumber: '',
+    accountNumber: '',
+    accountType: 'checking' as 'checking' | 'savings',
+  });
 
-  const exchangeTokenMutation = useMutation({
-    mutationFn: ({ publicToken, accountId }: { publicToken: string; accountId: string }) =>
-      api.plaid.exchangeToken(publicToken, accountId),
+  const linkBankMutation = useMutation({
+    mutationFn: async (data: typeof bankForm) => {
+      const res = await fetch('/api/bank-accounts/link', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to link bank account');
+      }
+      return res.json();
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["plaidStatus"] });
+      queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
       toast({ description: "Bank account linked successfully!" });
-      setLinkToken(null);
+      setShowBankDialog(false);
+      setBankForm({ accountHolderName: '', routingNumber: '', accountNumber: '', accountType: 'checking' });
     },
     onError: (error: any) => {
       toast({ description: error.message || "Failed to link bank account", variant: "destructive" });
     },
   });
 
-  const onPlaidSuccess = useCallback((publicToken: string, metadata: any) => {
-    const accountId = metadata.accounts?.[0]?.id;
-    if (accountId) {
-      exchangeTokenMutation.mutate({ publicToken, accountId });
+  const handleLinkBank = () => {
+    if (user) {
+      setBankForm(prev => ({
+        ...prev,
+        accountHolderName: `${user.firstName} ${user.lastName}`,
+      }));
     }
-  }, [exchangeTokenMutation]);
-
-  const onPlaidExit = useCallback(() => {
-    setLinkToken(null);
-  }, []);
-
-  const { open: openPlaidLink, ready: plaidReady } = usePlaidLink({
-    token: linkToken,
-    onSuccess: onPlaidSuccess,
-    onExit: onPlaidExit,
-  });
-
-  useEffect(() => {
-    if (linkToken && plaidReady) {
-      openPlaidLink();
-    }
-  }, [linkToken, plaidReady, openPlaidLink]);
-
-  const handleLinkBank = async () => {
-    setIsGettingToken(true);
-    try {
-      const { linkToken } = await api.plaid.getLinkToken();
-      setLinkToken(linkToken);
-    } catch (error: any) {
-      toast({ description: error.message || "Failed to initialize bank linking", variant: "destructive" });
-    } finally {
-      setIsGettingToken(false);
-    }
+    setShowBankDialog(true);
   };
 
   const sendEmailMutation = useMutation({
@@ -557,11 +553,11 @@ export default function Security() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Building className="w-5 h-5 text-cyan-400" />
-                  <CardTitle>Bank Account</CardTitle>
+                  <CardTitle>Bank Accounts</CardTitle>
                 </div>
-                {plaidStatus?.hasBankLinked ? (
+                {bankAccounts?.length > 0 ? (
                   <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                    <CheckCircle className="w-3 h-3 mr-1" /> Linked
+                    <CheckCircle className="w-3 h-3 mr-1" /> {bankAccounts.length} Linked
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="border-orange-500/30 text-orange-400">
@@ -569,25 +565,36 @@ export default function Security() {
                   </Badge>
                 )}
               </div>
-              <CardDescription>Link a bank account to withdraw funds to your bank</CardDescription>
+              <CardDescription>Link a bank account to withdraw funds</CardDescription>
             </CardHeader>
-            <CardContent>
-              {!plaidStatus?.hasBankLinked && (
-                <Button 
-                  onClick={handleLinkBank}
-                  disabled={isGettingToken || exchangeTokenMutation.isPending}
-                  className="bg-gradient-to-r from-cyan-500 to-blue-500"
-                  data-testid="button-link-bank"
-                >
-                  {(isGettingToken || exchangeTokenMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Link Bank Account
-                </Button>
+            <CardContent className="space-y-4">
+              {bankAccounts?.length > 0 && (
+                <div className="space-y-2">
+                  {bankAccounts.map((account: any) => (
+                    <div key={account.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Building className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">{account.institutionName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {account.accountType} ••••{account.accountMask}
+                            {account.isDefault && <span className="ml-2 text-cyan-400">(Default)</span>}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
-              {plaidStatus?.hasBankLinked && (
-                <p className="text-sm text-green-400">
-                  Your bank account is linked. You can withdraw funds from your wallet.
-                </p>
-              )}
+              <Button 
+                onClick={handleLinkBank}
+                variant={bankAccounts?.length > 0 ? "outline" : "default"}
+                className={bankAccounts?.length > 0 ? "" : "bg-gradient-to-r from-cyan-500 to-blue-500"}
+                data-testid="button-link-bank"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                {bankAccounts?.length > 0 ? "Add Another Account" : "Link Bank Account"}
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -709,6 +716,84 @@ export default function Security() {
               >
                 {regenerateCodesMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Regenerate
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBankDialog} onOpenChange={setShowBankDialog}>
+        <DialogContent className="bg-card border-white/10">
+          <DialogHeader>
+            <DialogTitle>Link Bank Account</DialogTitle>
+            <DialogDescription>
+              Enter your bank account details to enable withdrawals. Your information is securely stored by Stripe.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="accountHolderName">Account Holder Name</Label>
+              <Input
+                id="accountHolderName"
+                placeholder="John Doe"
+                value={bankForm.accountHolderName}
+                onChange={(e) => setBankForm(prev => ({ ...prev, accountHolderName: e.target.value }))}
+                data-testid="input-account-holder-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="routingNumber">Routing Number</Label>
+              <Input
+                id="routingNumber"
+                placeholder="9 digits"
+                value={bankForm.routingNumber}
+                onChange={(e) => setBankForm(prev => ({ ...prev, routingNumber: e.target.value.replace(/\D/g, '').slice(0, 9) }))}
+                maxLength={9}
+                data-testid="input-routing-number"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="accountNumber">Account Number</Label>
+              <Input
+                id="accountNumber"
+                placeholder="Account number"
+                value={bankForm.accountNumber}
+                onChange={(e) => setBankForm(prev => ({ ...prev, accountNumber: e.target.value.replace(/\D/g, '').slice(0, 17) }))}
+                data-testid="input-account-number"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Account Type</Label>
+              <Select
+                value={bankForm.accountType}
+                onValueChange={(value: 'checking' | 'savings') => setBankForm(prev => ({ ...prev, accountType: value }))}
+              >
+                <SelectTrigger data-testid="select-account-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="checking">Checking</SelectItem>
+                  <SelectItem value="savings">Savings</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2 justify-end pt-4">
+              <Button variant="outline" onClick={() => setShowBankDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => linkBankMutation.mutate(bankForm)}
+                disabled={
+                  !bankForm.accountHolderName ||
+                  bankForm.routingNumber.length !== 9 ||
+                  !bankForm.accountNumber ||
+                  linkBankMutation.isPending
+                }
+                className="bg-gradient-to-r from-cyan-500 to-blue-500"
+                data-testid="button-confirm-link-bank"
+              >
+                {linkBankMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Link Account
               </Button>
             </div>
           </div>
