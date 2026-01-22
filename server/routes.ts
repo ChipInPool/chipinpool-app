@@ -2252,13 +2252,11 @@ export async function registerRoutes(
   });
 
   // Link debit card via Stripe Connect for instant payouts
+  // Uses Stripe.js tokenization on frontend for PCI compliance
   app.post("/api/debit-cards/link", requireAuth, async (req, res, next) => {
     try {
-      const { cardNumber, expMonth, expYear, cvc, cardholderName } = z.object({
-        cardNumber: z.string().min(13).max(19),
-        expMonth: z.number().min(1).max(12),
-        expYear: z.number().min(2024).max(2050),
-        cvc: z.string().length(3),
+      const { token, cardholderName } = z.object({
+        token: z.string().min(1), // Stripe token ID from frontend (tok_xxx)
         cardholderName: z.string().min(1),
       }).parse(req.body);
 
@@ -2293,20 +2291,9 @@ export async function registerRoutes(
         await storage.updateUser(userId, { stripeConnectId: connectAccountId });
       }
 
-      // Create card token and attach as external account
-      const token = await stripe.tokens.create({
-        card: {
-          number: cardNumber,
-          exp_month: expMonth.toString(),
-          exp_year: expYear.toString(),
-          cvc: cvc,
-          name: cardholderName,
-          currency: 'usd',
-        },
-      });
-
+      // Use the token from Stripe.js (PCI compliant - raw card data never touches our server)
       const externalAccount = await stripe.accounts.createExternalAccount(connectAccountId, {
-        external_account: token.id,
+        external_account: token,
       });
 
       // Get existing accounts to check if this is the first one

@@ -12,6 +12,141 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Shield, Mail, Phone, Key, Smartphone, UserCheck, CheckCircle, XCircle, Loader2, Building, Plus, CreditCard, Zap } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+
+interface DebitCardFormProps {
+  cardholderName: string;
+  onCardholderNameChange: (name: string) => void;
+  onSuccess: () => void;
+  onError: (error: string) => void;
+  onCancel: () => void;
+}
+
+function DebitCardForm({ cardholderName, onCardholderNameChange, onSuccess, onError, onCancel }: DebitCardFormProps) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cardComplete, setCardComplete] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!stripe || !elements) {
+      onError("Stripe not loaded. Please try again.");
+      return;
+    }
+
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) {
+      onError("Card element not found. Please refresh and try again.");
+      return;
+    }
+
+    if (!cardholderName.trim()) {
+      onError("Please enter the cardholder name.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const { token, error } = await stripe.createToken(cardElement, {
+        name: cardholderName,
+        currency: 'usd',
+      });
+
+      if (error) {
+        onError(error.message || "Failed to process card.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!token) {
+        onError("Failed to create card token.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const res = await fetch('/api/debit-cards/link', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: token.id,
+          cardholderName: cardholderName,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        onError(err.error || 'Failed to link debit card');
+        setIsSubmitting(false);
+        return;
+      }
+
+      onSuccess();
+    } catch (err: any) {
+      onError(err.message || "An unexpected error occurred.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4 py-4">
+      <div className="space-y-2">
+        <Label htmlFor="cardholderName">Cardholder Name</Label>
+        <Input
+          id="cardholderName"
+          placeholder="Name on card"
+          value={cardholderName}
+          onChange={(e) => onCardholderNameChange(e.target.value)}
+          data-testid="input-cardholder-name"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Card Details</Label>
+        <div className="p-3 border border-white/10 rounded-md bg-background">
+          <CardElement
+            options={{
+              style: {
+                base: {
+                  fontSize: '16px',
+                  color: '#fff',
+                  '::placeholder': {
+                    color: '#6b7280',
+                  },
+                },
+                invalid: {
+                  color: '#ef4444',
+                },
+              },
+            }}
+            onChange={(event) => setCardComplete(event.complete)}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Your card details are securely handled by Stripe and never stored on our servers.
+        </p>
+      </div>
+      <div className="flex gap-2 justify-end pt-4">
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSubmit}
+          disabled={!cardholderName || !cardComplete || isSubmitting}
+          className="bg-gradient-to-r from-lime-500 to-green-500"
+          data-testid="button-confirm-link-debit-card"
+        >
+          {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+          Link Card
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export default function Security() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -91,53 +226,24 @@ export default function Security() {
   };
 
   const [showDebitCardDialog, setShowDebitCardDialog] = useState(false);
-  const [debitCardForm, setDebitCardForm] = useState({
-    cardholderName: '',
-    cardNumber: '',
-    expMonth: '',
-    expYear: '',
-    cvc: '',
-  });
-
-  const linkDebitCardMutation = useMutation({
-    mutationFn: async (data: typeof debitCardForm) => {
-      const res = await fetch('/api/debit-cards/link', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cardholderName: data.cardholderName,
-          cardNumber: data.cardNumber.replace(/\s/g, ''),
-          expMonth: parseInt(data.expMonth),
-          expYear: parseInt(data.expYear),
-          cvc: data.cvc,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to link debit card');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
-      toast({ description: "Debit card linked for instant payouts!" });
-      setShowDebitCardDialog(false);
-      setDebitCardForm({ cardholderName: '', cardNumber: '', expMonth: '', expYear: '', cvc: '' });
-    },
-    onError: (error: any) => {
-      toast({ description: error.message || "Failed to link debit card", variant: "destructive" });
-    },
-  });
+  const [debitCardholderName, setDebitCardholderName] = useState('');
 
   const handleLinkDebitCard = () => {
     if (user) {
-      setDebitCardForm(prev => ({
-        ...prev,
-        cardholderName: `${user.firstName} ${user.lastName}`,
-      }));
+      setDebitCardholderName(`${user.firstName} ${user.lastName}`);
     }
     setShowDebitCardDialog(true);
+  };
+
+  const handleDebitCardSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
+    toast({ description: "Debit card linked for instant payouts!" });
+    setShowDebitCardDialog(false);
+    setDebitCardholderName('');
+  };
+
+  const handleDebitCardError = (error: string) => {
+    toast({ description: error, variant: "destructive" });
   };
 
   const bankAccountsList = bankAccounts?.filter((a: any) => a.payoutMethod === 'bank_account') || [];
@@ -917,85 +1023,15 @@ export default function Security() {
               Get your money in 30 minutes with a 1.5% fee. Your card details are securely processed by Stripe.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="cardholderName">Cardholder Name</Label>
-              <Input
-                id="cardholderName"
-                placeholder="Name on card"
-                value={debitCardForm.cardholderName}
-                onChange={(e) => setDebitCardForm(prev => ({ ...prev, cardholderName: e.target.value }))}
-                data-testid="input-cardholder-name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cardNumber">Card Number</Label>
-              <Input
-                id="cardNumber"
-                placeholder="4242 4242 4242 4242"
-                value={debitCardForm.cardNumber}
-                onChange={(e) => setDebitCardForm(prev => ({ ...prev, cardNumber: e.target.value.replace(/\D/g, '').slice(0, 16) }))}
-                maxLength={16}
-                data-testid="input-card-number"
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="expMonth">Month</Label>
-                <Input
-                  id="expMonth"
-                  placeholder="MM"
-                  value={debitCardForm.expMonth}
-                  onChange={(e) => setDebitCardForm(prev => ({ ...prev, expMonth: e.target.value.replace(/\D/g, '').slice(0, 2) }))}
-                  maxLength={2}
-                  data-testid="input-exp-month"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="expYear">Year</Label>
-                <Input
-                  id="expYear"
-                  placeholder="YYYY"
-                  value={debitCardForm.expYear}
-                  onChange={(e) => setDebitCardForm(prev => ({ ...prev, expYear: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
-                  maxLength={4}
-                  data-testid="input-exp-year"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cvc">CVC</Label>
-                <Input
-                  id="cvc"
-                  placeholder="123"
-                  value={debitCardForm.cvc}
-                  onChange={(e) => setDebitCardForm(prev => ({ ...prev, cvc: e.target.value.replace(/\D/g, '').slice(0, 3) }))}
-                  maxLength={3}
-                  data-testid="input-cvc"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2 justify-end pt-4">
-              <Button variant="outline" onClick={() => setShowDebitCardDialog(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => linkDebitCardMutation.mutate(debitCardForm)}
-                disabled={
-                  !debitCardForm.cardholderName ||
-                  debitCardForm.cardNumber.length < 13 ||
-                  debitCardForm.expMonth.length !== 2 ||
-                  debitCardForm.expYear.length !== 4 ||
-                  debitCardForm.cvc.length !== 3 ||
-                  linkDebitCardMutation.isPending
-                }
-                className="bg-gradient-to-r from-lime-500 to-green-500"
-                data-testid="button-confirm-link-debit-card"
-              >
-                {linkDebitCardMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Link Card
-              </Button>
-            </div>
-          </div>
+          <Elements stripe={stripePromise}>
+            <DebitCardForm
+              cardholderName={debitCardholderName}
+              onCardholderNameChange={setDebitCardholderName}
+              onSuccess={handleDebitCardSuccess}
+              onError={handleDebitCardError}
+              onCancel={() => setShowDebitCardDialog(false)}
+            />
+          </Elements>
         </DialogContent>
       </Dialog>
     </Layout>
