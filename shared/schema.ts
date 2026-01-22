@@ -518,3 +518,169 @@ export type MerchantWebhookDelivery = typeof merchantWebhookDeliveries.$inferSel
 export type InsertMerchantWebhookDelivery = z.infer<typeof insertMerchantWebhookDeliverySchema>;
 export type MerchantPayout = typeof merchantPayouts.$inferSelect;
 export type InsertMerchantPayout = z.infer<typeof insertMerchantPayoutSchema>;
+
+// ============================================
+// Fraud Detection System Schema
+// ============================================
+
+export const fraudRiskLevelEnum = pgEnum('fraud_risk_level', ['low', 'medium', 'high', 'critical']);
+export const fraudAlertStatusEnum = pgEnum('fraud_alert_status', ['pending', 'reviewed', 'dismissed', 'confirmed']);
+
+export const fraudAlerts = pgTable("fraud_alerts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  transactionId: varchar("transaction_id").references(() => transactions.id),
+  contributionId: varchar("contribution_id").references(() => contributions.id),
+  riskLevel: fraudRiskLevelEnum("risk_level").notNull(),
+  riskScore: integer("risk_score").notNull(),
+  alertType: text("alert_type").notNull(),
+  description: text("description").notNull(),
+  indicators: text("indicators").notNull(),
+  status: fraudAlertStatusEnum("status").notNull().default('pending'),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  ipAddress: text("ip_address"),
+  deviceFingerprint: text("device_fingerprint"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const userRiskProfiles = pgTable("user_risk_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  riskScore: integer("risk_score").notNull().default(0),
+  riskLevel: fraudRiskLevelEnum("risk_level").notNull().default('low'),
+  totalAlerts: integer("total_alerts").notNull().default(0),
+  confirmedFrauds: integer("confirmed_frauds").notNull().default(0),
+  avgTransactionAmount: decimal("avg_transaction_amount", { precision: 10, scale: 2 }).default('0.00'),
+  maxTransactionAmount: decimal("max_transaction_amount", { precision: 10, scale: 2 }).default('0.00'),
+  transactionVelocity24h: integer("transaction_velocity_24h").default(0),
+  transactionVelocity7d: integer("transaction_velocity_7d").default(0),
+  unusualActivityFlags: text("unusual_activity_flags"),
+  lastActivityAt: timestamp("last_activity_at"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const velocityLogs = pgTable("velocity_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  actionType: text("action_type").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }),
+  ipAddress: text("ip_address"),
+  deviceFingerprint: text("device_fingerprint"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFraudAlertSchema = createInsertSchema(fraudAlerts).omit({ id: true, createdAt: true, status: true, reviewedBy: true, reviewedAt: true, reviewNotes: true });
+export const insertUserRiskProfileSchema = createInsertSchema(userRiskProfiles).omit({ id: true, updatedAt: true });
+export const insertVelocityLogSchema = createInsertSchema(velocityLogs).omit({ id: true, createdAt: true });
+
+export type FraudAlert = typeof fraudAlerts.$inferSelect;
+export type InsertFraudAlert = z.infer<typeof insertFraudAlertSchema>;
+export type UserRiskProfile = typeof userRiskProfiles.$inferSelect;
+export type InsertUserRiskProfile = z.infer<typeof insertUserRiskProfileSchema>;
+export type VelocityLog = typeof velocityLogs.$inferSelect;
+export type InsertVelocityLog = z.infer<typeof insertVelocityLogSchema>;
+
+// ============================================
+// MFA Recovery Codes Schema
+// ============================================
+
+export const mfaRecoveryCodes = pgTable("mfa_recovery_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  codeHash: text("code_hash").notNull(),
+  used: boolean("used").notNull().default(false),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const mfaLoginAttempts = pgTable("mfa_login_attempts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  success: boolean("success").notNull(),
+  method: text("method").notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertMfaRecoveryCodeSchema = createInsertSchema(mfaRecoveryCodes).omit({ id: true, createdAt: true, used: true, usedAt: true });
+export const insertMfaLoginAttemptSchema = createInsertSchema(mfaLoginAttempts).omit({ id: true, createdAt: true });
+
+export type MfaRecoveryCode = typeof mfaRecoveryCodes.$inferSelect;
+export type InsertMfaRecoveryCode = z.infer<typeof insertMfaRecoveryCodeSchema>;
+export type MfaLoginAttempt = typeof mfaLoginAttempts.$inferSelect;
+export type InsertMfaLoginAttempt = z.infer<typeof insertMfaLoginAttemptSchema>;
+
+// ============================================
+// Subscription System Schema
+// ============================================
+
+export const subscriptionTierEnum = pgEnum('subscription_tier', ['free', 'plus', 'pro']);
+export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', 'past_due', 'cancelled', 'expired']);
+
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tier: subscriptionTierEnum("tier").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }).notNull(),
+  yearlyPrice: decimal("yearly_price", { precision: 10, scale: 2 }).notNull(),
+  stripePriceIdMonthly: text("stripe_price_id_monthly"),
+  stripePriceIdYearly: text("stripe_price_id_yearly"),
+  maxPools: integer("max_pools").notNull(),
+  maxPoolAmount: decimal("max_pool_amount", { precision: 10, scale: 2 }).notNull(),
+  maxMonthlyContributions: integer("max_monthly_contributions").notNull(),
+  virtualCardLimit: integer("virtual_card_limit").notNull(),
+  prioritySupport: boolean("priority_support").notNull().default(false),
+  customBranding: boolean("custom_branding").notNull().default(false),
+  advancedAnalytics: boolean("advanced_analytics").notNull().default(false),
+  apiAccess: boolean("api_access").notNull().default(false),
+  features: text("features"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const userSubscriptions = pgTable("user_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  planId: varchar("plan_id").references(() => subscriptionPlans.id).notNull(),
+  tier: subscriptionTierEnum("tier").notNull().default('free'),
+  status: subscriptionStatusEnum("status").notNull().default('active'),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  stripeCustomerId: text("stripe_customer_id"),
+  billingCycle: text("billing_cycle").default('monthly'),
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  cancelledAt: timestamp("cancelled_at"),
+  poolsUsed: integer("pools_used").notNull().default(0),
+  monthlyContributionsUsed: integer("monthly_contributions_used").notNull().default(0),
+  virtualCardsUsed: integer("virtual_cards_used").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const subscriptionHistory = pgTable("subscription_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  fromTier: subscriptionTierEnum("from_tier"),
+  toTier: subscriptionTierEnum("to_tier").notNull(),
+  action: text("action").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }),
+  stripeInvoiceId: text("stripe_invoice_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true, createdAt: true, isActive: true });
+export const insertUserSubscriptionSchema = createInsertSchema(userSubscriptions).omit({ id: true, createdAt: true, updatedAt: true, status: true, poolsUsed: true, monthlyContributionsUsed: true, virtualCardsUsed: true });
+export const insertSubscriptionHistorySchema = createInsertSchema(subscriptionHistory).omit({ id: true, createdAt: true });
+
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
+export type UserSubscription = typeof userSubscriptions.$inferSelect;
+export type InsertUserSubscription = z.infer<typeof insertUserSubscriptionSchema>;
+export type SubscriptionHistory = typeof subscriptionHistory.$inferSelect;
+export type InsertSubscriptionHistory = z.infer<typeof insertSubscriptionHistorySchema>;

@@ -2,7 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
-import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants } from "@shared/schema";
+import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards } from "@shared/schema";
+import express from "express";
 import { db } from "./db";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcrypt";
@@ -3527,6 +3528,406 @@ export async function registerRoutes(
       });
 
       res.json({ message: "Merchant suspended", status: 'suspended' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ============================================
+  // Fraud Detection API Routes
+  // ============================================
+  
+  const { fraudDetection } = await import("./fraud-detection");
+
+  app.get("/api/admin/fraud/dashboard", requireAdmin, async (req, res, next) => {
+    try {
+      const stats = await fraudDetection.getDashboardStats();
+      res.json(stats);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/admin/fraud/alerts", requireAdmin, async (req, res, next) => {
+    try {
+      const { status, limit } = req.query;
+      const alerts = await fraudDetection.getAlerts(status as string, parseInt(limit as string) || 50);
+      
+      const alertsWithUsers = await Promise.all(alerts.map(async (alert) => {
+        if (alert.userId) {
+          const [user] = await db.select().from(users).where(eq(users.id, alert.userId));
+          return { ...alert, user: user ? { id: user.id, username: user.username, email: user.email, firstName: user.firstName, lastName: user.lastName } : null };
+        }
+        return { ...alert, user: null };
+      }));
+      
+      res.json({ alerts: alertsWithUsers });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/admin/fraud/alerts/:id", requireAdmin, async (req: any, res, next) => {
+    try {
+      const { id } = req.params;
+      const { status, notes } = req.body;
+      
+      if (!['reviewed', 'dismissed', 'confirmed'].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      
+      await fraudDetection.reviewAlert(id, req.adminUser.id, status, notes);
+      
+      await db.insert(adminAuditLogs).values({
+        adminId: req.adminUser.id,
+        action: 'review_fraud_alert',
+        targetType: 'fraud_alert',
+        targetId: id,
+        details: `Reviewed fraud alert: ${status}${notes ? ` - ${notes}` : ''}`,
+        ipAddress: req.ip,
+      });
+      
+      res.json({ message: "Alert updated" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/admin/fraud/user/:userId", requireAdmin, async (req, res, next) => {
+    try {
+      const { userId } = req.params;
+      const profile = await fraudDetection.getUserRiskProfile(userId);
+      res.json({ profile });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ============================================
+  // MFA API Routes
+  // ============================================
+  
+  const { mfaService } = await import("./mfa-service");
+
+  app.get("/api/mfa/status", requireAuth, async (req: any, res, next) => {
+    try {
+      const status = await mfaService.getMFAStatus(req.user!.id);
+      res.json(status);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/mfa/setup", requireAuth, async (req: any, res, next) => {
+    try {
+      const result = await mfaService.setupMFA(req.user!.id);
+      res.json({ qrCode: result.qrCode, recoveryCodes: result.recoveryCodes });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/mfa/enable", requireAuth, async (req: any, res, next) => {
+    try {
+      const { token } = req.body;
+      if (!token || token.length !== 6) {
+        return res.status(400).json({ error: "Invalid token" });
+      }
+      
+      const success = await mfaService.enableMFA(req.user!.id, token);
+      if (!success) {
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+      
+      res.json({ message: "MFA enabled successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/mfa/disable", requireAuth, async (req: any, res, next) => {
+    try {
+      const { token } = req.body;
+      if (!token || token.length !== 6) {
+        return res.status(400).json({ error: "Invalid token" });
+      }
+      
+      const success = await mfaService.disableMFA(req.user!.id, token);
+      if (!success) {
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+      
+      res.json({ message: "MFA disabled successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/mfa/verify", async (req, res, next) => {
+    try {
+      const { userId, token, recoveryCode } = req.body;
+      if (!userId) {
+        return res.status(400).json({ error: "User ID required" });
+      }
+      
+      const ipAddress = req.ip;
+      const userAgent = req.headers['user-agent'];
+      
+      let success = false;
+      if (recoveryCode) {
+        success = await mfaService.useRecoveryCode(userId, recoveryCode, ipAddress, userAgent);
+      } else if (token) {
+        success = await mfaService.verifyMFA(userId, token, ipAddress, userAgent);
+      } else {
+        return res.status(400).json({ error: "Token or recovery code required" });
+      }
+      
+      if (!success) {
+        return res.status(401).json({ error: "Invalid code" });
+      }
+      
+      res.json({ verified: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/mfa/regenerate-codes", requireAuth, async (req: any, res, next) => {
+    try {
+      const { token } = req.body;
+      if (!token || token.length !== 6) {
+        return res.status(400).json({ error: "Invalid token" });
+      }
+      
+      const [user] = await db.select().from(users).where(eq(users.id, req.user!.id));
+      if (!user?.twoFactorSecret) {
+        return res.status(400).json({ error: "MFA not enabled" });
+      }
+      
+      const { mfaService } = await import("./mfa-service");
+      const isValid = mfaService.verifyToken(token, user.twoFactorSecret);
+      if (!isValid) {
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+      
+      const recoveryCodes = await mfaService.generateRecoveryCodes(req.user!.id);
+      res.json({ recoveryCodes });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ============================================
+  // Subscription API Routes
+  // ============================================
+  
+  const { subscriptionService } = await import("./subscription-service");
+  
+  await subscriptionService.initializePlans();
+
+  app.get("/api/subscriptions/plans", async (req, res, next) => {
+    try {
+      const plans = await subscriptionService.getPlans();
+      res.json({ plans });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/subscriptions/current", requireAuth, async (req: any, res, next) => {
+    try {
+      const subscription = await subscriptionService.getUserSubscription(req.user!.id);
+      const limits = await subscriptionService.getUserLimits(req.user!.id);
+      res.json({ subscription, limits });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/subscriptions/limits", requireAuth, async (req: any, res, next) => {
+    try {
+      const limits = await subscriptionService.getUserLimits(req.user!.id);
+      res.json(limits);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/subscriptions/checkout", requireAuth, async (req: any, res, next) => {
+    try {
+      const { tier, billingCycle } = req.body;
+      
+      if (!['plus', 'pro'].includes(tier)) {
+        return res.status(400).json({ error: "Invalid tier" });
+      }
+      if (!['monthly', 'yearly'].includes(billingCycle)) {
+        return res.status(400).json({ error: "Invalid billing cycle" });
+      }
+      
+      const checkoutUrl = await subscriptionService.createCheckoutSession(req.user!.id, tier, billingCycle);
+      res.json({ url: checkoutUrl });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/subscriptions/cancel", requireAuth, async (req: any, res, next) => {
+    try {
+      await subscriptionService.cancelSubscription(req.user!.id);
+      res.json({ message: "Subscription will be cancelled at the end of the billing period" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/webhooks/stripe-subscription", express.raw({ type: 'application/json' }), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    
+    if (!endpointSecret || !sig) {
+      return res.status(400).send('Missing signature or secret');
+    }
+    
+    try {
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
+      const event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+      
+      switch (event.type) {
+        case 'customer.subscription.created':
+        case 'customer.subscription.updated':
+          const subscription = event.data.object as any;
+          await subscriptionService.handleSubscriptionCreated(subscription.id, subscription.customer as string);
+          break;
+        case 'customer.subscription.deleted':
+          const deletedSub = event.data.object as any;
+          await subscriptionService.handleSubscriptionCancelled(deletedSub.id);
+          break;
+      }
+      
+      res.json({ received: true });
+    } catch (error: any) {
+      console.error('Stripe webhook error:', error.message);
+      res.status(400).send(`Webhook Error: ${error.message}`);
+    }
+  });
+
+  // ============================================
+  // Virtual Card Analytics API Routes
+  // ============================================
+
+  app.get("/api/card-analytics", requireAuth, async (req: any, res, next) => {
+    try {
+      const userPools = await db.select().from(pools).where(eq(pools.creatorId, req.user!.id));
+      const poolIds = userPools.map(p => p.id);
+      
+      if (poolIds.length === 0) {
+        return res.json({
+          totalSpent: 0,
+          transactionCount: 0,
+          avgTransaction: 0,
+          cardCount: 0,
+          categoryBreakdown: [],
+          monthlySpending: [],
+          recentTransactions: [],
+        });
+      }
+      
+      const userCards = await db.select().from(virtualCards).where(sql`${virtualCards.poolId} IN ${poolIds}`);
+      const cardIds = userCards.map(c => c.id);
+      
+      if (cardIds.length === 0) {
+        return res.json({
+          totalSpent: 0,
+          transactionCount: 0,
+          avgTransaction: 0,
+          cardCount: 0,
+          categoryBreakdown: [],
+          monthlySpending: [],
+          recentTransactions: [],
+        });
+      }
+      
+      const allTransactions = await db.select()
+        .from(transactions)
+        .where(sql`${transactions.virtualCardId} IN ${cardIds}`)
+        .orderBy(desc(transactions.createdAt));
+      
+      const totalSpent = allTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      const transactionCount = allTransactions.length;
+      const avgTransaction = transactionCount > 0 ? totalSpent / transactionCount : 0;
+      
+      const categoryMap: Record<string, number> = {};
+      allTransactions.forEach(t => {
+        const category = t.merchant.split(' ')[0] || 'Other';
+        categoryMap[category] = (categoryMap[category] || 0) + parseFloat(t.amount);
+      });
+      
+      const categoryBreakdown = Object.entries(categoryMap)
+        .map(([category, amount]) => ({ category, amount }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 10);
+      
+      const monthlyMap: Record<string, number> = {};
+      allTransactions.forEach(t => {
+        const monthKey = new Date(t.createdAt).toISOString().slice(0, 7);
+        monthlyMap[monthKey] = (monthlyMap[monthKey] || 0) + parseFloat(t.amount);
+      });
+      
+      const monthlySpending = Object.entries(monthlyMap)
+        .map(([month, amount]) => ({ month, amount }))
+        .sort((a, b) => a.month.localeCompare(b.month))
+        .slice(-12);
+      
+      res.json({
+        totalSpent,
+        transactionCount,
+        avgTransaction,
+        cardCount: userCards.length,
+        categoryBreakdown,
+        monthlySpending,
+        recentTransactions: allTransactions.slice(0, 20),
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/card-analytics/pool/:poolId", requireAuth, async (req, res, next) => {
+    try {
+      const { poolId } = req.params;
+      
+      const [pool] = await db.select().from(pools).where(eq(pools.id, poolId));
+      if (!pool) {
+        return res.status(404).json({ error: "Pool not found" });
+      }
+      
+      const [card] = await db.select().from(virtualCards).where(eq(virtualCards.poolId, poolId));
+      if (!card) {
+        return res.json({
+          pool,
+          card: null,
+          transactions: [],
+          totalSpent: 0,
+          remainingBalance: 0,
+        });
+      }
+      
+      const poolTransactions = await db.select()
+        .from(transactions)
+        .where(eq(transactions.virtualCardId, card.id))
+        .orderBy(desc(transactions.createdAt));
+      
+      const totalSpent = poolTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      const remainingBalance = parseFloat(card.balance);
+      
+      res.json({
+        pool,
+        card: { id: card.id, lastFour: card.lastFour, isActive: card.isActive, balance: card.balance },
+        transactions: poolTransactions,
+        totalSpent,
+        remainingBalance,
+      });
     } catch (error) {
       next(error);
     }
