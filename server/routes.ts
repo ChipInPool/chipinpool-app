@@ -2146,6 +2146,465 @@ export async function registerRoutes(
     }
   });
 
+  // ========== POOL TRANSFER ROUTES ==========
+
+  // Get user's linked bank accounts
+  app.get("/api/bank-accounts", requireAuth, async (req, res, next) => {
+    try {
+      const accounts = await storage.getBankAccountsByUser(req.session.userId!);
+      res.json({ accounts });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Link bank account via Plaid and save to bank_accounts table
+  app.post("/api/bank-accounts/link", requireAuth, async (req, res, next) => {
+    try {
+      const { publicToken, accountId, institutionName, accountName, accountMask, accountType } = z.object({
+        publicToken: z.string(),
+        accountId: z.string(),
+        institutionName: z.string(),
+        accountName: z.string(),
+        accountMask: z.string(),
+        accountType: z.string(),
+      }).parse(req.body);
+
+      const userId = req.session.userId!;
+      const { PlaidApi, Configuration, PlaidEnvironments } = await import('plaid');
+      
+      const plaidClientId = process.env.PLAID_CLIENT_ID;
+      const plaidSecret = process.env.PLAID_SECRET;
+      
+      if (!plaidClientId || !plaidSecret) {
+        return res.status(400).json({ error: "Plaid not configured" });
+      }
+
+      const plaidEnvName = process.env.PLAID_ENV || 'production';
+      const plaidEnv = plaidEnvName === 'sandbox' ? PlaidEnvironments.sandbox : 
+                       plaidEnvName === 'development' ? PlaidEnvironments.development : 
+                       PlaidEnvironments.production;
+      
+      const configuration = new Configuration({
+        basePath: plaidEnv,
+        baseOptions: {
+          headers: {
+            'PLAID-CLIENT-ID': plaidClientId,
+            'PLAID-SECRET': plaidSecret,
+          },
+        },
+      });
+
+      const plaidClient = new PlaidApi(configuration);
+
+      const exchangeResponse = await plaidClient.itemPublicTokenExchange({
+        public_token: publicToken,
+      });
+
+      const accessToken = exchangeResponse.data.access_token;
+      
+      // Update user with access token
+      await storage.updateUser(userId, {
+        plaidAccessToken: accessToken,
+        plaidAccountId: accountId,
+      });
+
+      // Get existing accounts to check if this is the first one
+      const existingAccounts = await storage.getBankAccountsByUser(userId);
+      const isFirst = existingAccounts.length === 0;
+
+      // Create bank account record
+      const account = await storage.createBankAccount({
+        userId,
+        plaidAccountId: accountId,
+        institutionName,
+        accountName,
+        accountMask,
+        accountType,
+        isDefault: isFirst,
+      });
+
+      res.json({ account, message: "Bank account linked successfully" });
+    } catch (error: any) {
+      console.error('[Bank Link] Error:', error.message);
+      next(error);
+    }
+  });
+
+  // Set default bank account
+  app.put("/api/bank-accounts/:id/default", requireAuth, async (req, res, next) => {
+    try {
+      const accountId = req.params.id;
+      const userId = req.session.userId!;
+      
+      const account = await storage.getBankAccountById(accountId);
+      if (!account || account.userId !== userId) {
+        return res.status(404).json({ error: "Bank account not found" });
+      }
+
+      await storage.setDefaultBankAccount(userId, accountId);
+      res.json({ message: "Default bank account updated" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get pool contributors for transfer selection
+  app.get("/api/pools/:id/contributors", requireAuth, async (req, res, next) => {
+    try {
+      const poolId = req.params.id;
+      const pool = await storage.getPool(poolId);
+      
+      if (!pool) return res.status(404).json({ error: "Pool not found" });
+      if (pool.creatorId !== req.session.userId) {
+        return res.status(403).json({ error: "Only pool creator can view contributors for transfer" });
+      }
+
+      const contributions = await storage.getContributionsByPool(poolId);
+      
+      // Get unique contributors with their total contributions
+      const contributorMap = new Map<string, { userId: string; totalAmount: number; user?: any }>();
+      
+      for (const contrib of contributions) {
+        if (contrib.userId) {
+          const existing = contributorMap.get(contrib.userId);
+          const amount = parseFloat(contrib.amount);
+          if (existing) {
+            existing.totalAmount += amount;
+          } else {
+            contributorMap.set(contrib.userId, { userId: contrib.userId, totalAmount: amount });
+          }
+        }
+      }
+
+      // Fetch user details for each contributor
+      const contributors = [];
+      for (const [userId, data] of contributorMap) {
+        const user = await storage.getUser(userId);
+        if (user) {
+          contributors.push({
+            userId: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            username: user.username,
+            avatar: user.avatar,
+            totalContributed: data.totalAmount.toFixed(2),
+            hasBankLinked: !!(await storage.getBankAccountsByUser(userId)).length,
+          });
+        }
+      }
+
+      res.json({ contributors });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Create pool transfer request
+  app.post("/api/pools/:id/transfer", requireAuth, async (req, res, next) => {
+    try {
+      const poolId = req.params.id;
+      const userId = req.session.userId!;
+
+      const transferSchema = z.object({
+        toUserId: z.string(),
+        amount: z.string(),
+        notes: z.string().optional(),
+        bankAccountId: z.string().optional(),
+      });
+
+      const data = transferSchema.parse(req.body);
+      const pool = await storage.getPool(poolId);
+      
+      if (!pool) return res.status(404).json({ error: "Pool not found" });
+      if (pool.creatorId !== userId) {
+        return res.status(403).json({ error: "Only pool creator can initiate transfers" });
+      }
+
+      const transferAmount = parseFloat(data.amount);
+      const poolBalance = parseFloat(pool.currentAmount);
+      
+      if (transferAmount <= 0 || transferAmount > poolBalance) {
+        return res.status(400).json({ error: "Invalid transfer amount" });
+      }
+
+      const toUser = await storage.getUser(data.toUserId);
+      if (!toUser) {
+        return res.status(404).json({ error: "Recipient not found" });
+      }
+
+      // If transferring to self, check if bank is linked
+      const isSelfTransfer = data.toUserId === userId;
+      
+      if (isSelfTransfer) {
+        const bankAccounts = await storage.getBankAccountsByUser(userId);
+        if (bankAccounts.length === 0) {
+          return res.status(400).json({ error: "Please link a bank account first" });
+        }
+        
+        // Use specified bank account or default
+        const bankAccountId = data.bankAccountId || bankAccounts.find(a => a.isDefault)?.id || bankAccounts[0].id;
+
+        // For self transfer, mark as accepted immediately
+        const transfer = await storage.createPoolTransferRequest({
+          poolId,
+          fromUserId: userId,
+          toUserId: userId,
+          amount: data.amount,
+          notes: data.notes,
+          bankAccountId,
+        });
+
+        // Update to accepted status
+        await storage.updatePoolTransferRequest(transfer.id, {
+          status: 'accepted',
+          acceptedAt: new Date(),
+        });
+
+        // Process the transfer (in production, this would initiate Plaid Transfer)
+        // Deduct from pool
+        const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
+        await storage.updatePoolAmount(poolId, newPoolAmount);
+
+        // Mark as completed
+        await storage.updatePoolTransferRequest(transfer.id, {
+          status: 'completed',
+          completedAt: new Date(),
+        });
+
+        // Create transaction record
+        await storage.createTransaction({
+          virtualCardId: null as any,
+          amount: data.amount,
+          merchant: `Bank Transfer to ${bankAccounts.find(a => a.id === bankAccountId)?.accountName || 'Bank Account'}`,
+          status: 'completed',
+          notes: data.notes || `Pool transfer to bank account`,
+        });
+
+        res.json({ 
+          transfer,
+          message: `Transfer of $${transferAmount.toFixed(2)} initiated. Funds will arrive in 1-3 business days.`,
+        });
+      } else {
+        // Transfer to contributor - create pending request
+        const transfer = await storage.createPoolTransferRequest({
+          poolId,
+          fromUserId: userId,
+          toUserId: data.toUserId,
+          amount: data.amount,
+          notes: data.notes,
+        });
+
+        // Create notification for recipient
+        await storage.createNotification({
+          userId: data.toUserId,
+          type: 'contribution',
+          title: 'Transfer Request',
+          message: `You have a pending transfer of $${transferAmount.toFixed(2)} from the pool "${pool.title}". Tap to accept.`,
+          relatedId: transfer.id,
+        });
+
+        // Send notification via email/SMS if enabled
+        const user = await storage.getUser(userId);
+        if (toUser.notifyEmail) {
+          sendPoolActivityNotification(
+            toUser.email,
+            toUser.phone,
+            toUser.firstName,
+            `Transfer Request from ${user?.firstName || 'Pool Creator'}`,
+            `You have a pending transfer of $${transferAmount.toFixed(2)} from the pool "${pool.title}". Log in to accept.`,
+            true,
+            false
+          ).catch(console.error);
+        }
+
+        res.json({ 
+          transfer,
+          message: `Transfer request sent to ${toUser.firstName}. They will be notified to accept.`,
+        });
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get pending transfer requests for current user
+  app.get("/api/transfer-requests/pending", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const requests = await storage.getPendingTransferRequestsForUser(userId);
+      
+      // Enrich with pool and sender details
+      const enrichedRequests = await Promise.all(requests.map(async (request) => {
+        const pool = await storage.getPool(request.poolId);
+        const sender = await storage.getUser(request.fromUserId);
+        return {
+          ...request,
+          pool: pool ? { id: pool.id, title: pool.title, coverImage: pool.coverImage } : null,
+          sender: sender ? { 
+            id: sender.id, 
+            firstName: sender.firstName, 
+            lastName: sender.lastName,
+            avatar: sender.avatar 
+          } : null,
+        };
+      }));
+
+      res.json({ requests: enrichedRequests });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Accept transfer request
+  app.post("/api/transfer-requests/:id/accept", requireAuth, async (req, res, next) => {
+    try {
+      const requestId = req.params.id;
+      const userId = req.session.userId!;
+
+      const { bankAccountId } = z.object({
+        bankAccountId: z.string(),
+      }).parse(req.body);
+
+      const transferRequest = await storage.getPoolTransferRequest(requestId);
+      if (!transferRequest) {
+        return res.status(404).json({ error: "Transfer request not found" });
+      }
+      if (transferRequest.toUserId !== userId) {
+        return res.status(403).json({ error: "This transfer is not for you" });
+      }
+      if (transferRequest.status !== 'pending') {
+        return res.status(400).json({ error: "Transfer already processed" });
+      }
+
+      // Verify bank account belongs to user
+      const bankAccount = await storage.getBankAccountById(bankAccountId);
+      if (!bankAccount || bankAccount.userId !== userId) {
+        return res.status(400).json({ error: "Invalid bank account" });
+      }
+
+      // Verify pool still has sufficient funds
+      const pool = await storage.getPool(transferRequest.poolId);
+      if (!pool) {
+        return res.status(404).json({ error: "Pool not found" });
+      }
+
+      const transferAmount = parseFloat(transferRequest.amount);
+      const poolBalance = parseFloat(pool.currentAmount);
+
+      if (transferAmount > poolBalance) {
+        await storage.updatePoolTransferRequest(requestId, { status: 'failed' });
+        return res.status(400).json({ error: "Pool no longer has sufficient funds" });
+      }
+
+      // Update transfer request
+      await storage.updatePoolTransferRequest(requestId, {
+        status: 'accepted',
+        bankAccountId,
+        acceptedAt: new Date(),
+      });
+
+      // Deduct from pool
+      const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
+      await storage.updatePoolAmount(transferRequest.poolId, newPoolAmount);
+
+      // In production, this would initiate the actual Plaid Transfer
+      // For now, mark as completed
+      await storage.updatePoolTransferRequest(requestId, {
+        status: 'completed',
+        completedAt: new Date(),
+      });
+
+      // Notify pool creator
+      const creator = await storage.getUser(transferRequest.fromUserId);
+      const recipient = await storage.getUser(userId);
+      
+      if (creator) {
+        await storage.createNotification({
+          userId: creator.id,
+          type: 'contribution',
+          title: 'Transfer Accepted',
+          message: `${recipient?.firstName || 'Contributor'} accepted the transfer of $${transferAmount.toFixed(2)}`,
+          relatedId: requestId,
+        });
+      }
+
+      res.json({ 
+        message: `Transfer accepted! $${transferAmount.toFixed(2)} will arrive in 1-3 business days.`,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Decline transfer request
+  app.post("/api/transfer-requests/:id/decline", requireAuth, async (req, res, next) => {
+    try {
+      const requestId = req.params.id;
+      const userId = req.session.userId!;
+
+      const transferRequest = await storage.getPoolTransferRequest(requestId);
+      if (!transferRequest) {
+        return res.status(404).json({ error: "Transfer request not found" });
+      }
+      if (transferRequest.toUserId !== userId) {
+        return res.status(403).json({ error: "This transfer is not for you" });
+      }
+      if (transferRequest.status !== 'pending') {
+        return res.status(400).json({ error: "Transfer already processed" });
+      }
+
+      await storage.updatePoolTransferRequest(requestId, {
+        status: 'cancelled',
+      });
+
+      // Notify pool creator
+      const creator = await storage.getUser(transferRequest.fromUserId);
+      const recipient = await storage.getUser(userId);
+      
+      if (creator) {
+        await storage.createNotification({
+          userId: creator.id,
+          type: 'contribution',
+          title: 'Transfer Declined',
+          message: `${recipient?.firstName || 'Contributor'} declined the transfer of $${parseFloat(transferRequest.amount).toFixed(2)}`,
+          relatedId: requestId,
+        });
+      }
+
+      res.json({ message: "Transfer declined" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Cancel transfer request (by pool creator)
+  app.post("/api/transfer-requests/:id/cancel", requireAuth, async (req, res, next) => {
+    try {
+      const requestId = req.params.id;
+      const userId = req.session.userId!;
+
+      const transferRequest = await storage.getPoolTransferRequest(requestId);
+      if (!transferRequest) {
+        return res.status(404).json({ error: "Transfer request not found" });
+      }
+      if (transferRequest.fromUserId !== userId) {
+        return res.status(403).json({ error: "Only the sender can cancel this transfer" });
+      }
+      if (transferRequest.status !== 'pending') {
+        return res.status(400).json({ error: "Transfer already processed" });
+      }
+
+      await storage.updatePoolTransferRequest(requestId, {
+        status: 'cancelled',
+      });
+
+      res.json({ message: "Transfer cancelled" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // ========== SECURITY ROUTES ==========
 
   // Send email verification code
