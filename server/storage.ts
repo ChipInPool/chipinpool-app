@@ -2,6 +2,7 @@ import { db } from "./db";
 import { 
   users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites, walletDeposits, walletWithdrawals, verificationCodes, bankAccounts, recurringContributions, apiAccessRequests,
   merchants, merchantApiKeys, merchantCheckoutSessions, merchantWebhookDeliveries, merchantPayouts, poolTransferRequests,
+  userPoints, pointTransactions,
   type User, type InsertUser, type Pool, type InsertPool, type Contribution, type InsertContribution,
   type Comment, type InsertComment, type Notification, type InsertNotification,
   type VirtualCard, type InsertVirtualCard, type Transaction, type InsertTransaction,
@@ -11,7 +12,9 @@ import {
   type MerchantCheckoutSession, type InsertMerchantCheckoutSession,
   type MerchantWebhookDelivery, type InsertMerchantWebhookDelivery,
   type MerchantPayout, type InsertMerchantPayout,
-  type BankAccount, type InsertBankAccount, type PoolTransferRequest, type InsertPoolTransferRequest
+  type BankAccount, type InsertBankAccount, type PoolTransferRequest, type InsertPoolTransferRequest,
+  type Badge, type InsertBadge, type UserBadge, type InsertUserBadge,
+  type UserPoints, type InsertUserPoints, type PointTransaction, type InsertPointTransaction
 } from "@shared/schema";
 import { eq, desc, and, sql, gt, inArray } from "drizzle-orm";
 
@@ -63,6 +66,19 @@ export interface IStorage {
   
   // Badge operations
   getUserBadges(userId: string): Promise<any[]>;
+  getAllBadges(): Promise<Badge[]>;
+  getBadgeById(id: string): Promise<Badge | undefined>;
+  getBadgeByCriteria(criteria: string): Promise<Badge | undefined>;
+  createBadge(badge: InsertBadge): Promise<Badge>;
+  awardBadge(userId: string, badgeId: string): Promise<UserBadge | undefined>;
+  hasBadge(userId: string, badgeId: string): Promise<boolean>;
+  
+  // Points operations
+  getUserPoints(userId: string): Promise<UserPoints | undefined>;
+  createUserPoints(data: InsertUserPoints): Promise<UserPoints>;
+  addPoints(userId: string, points: number, reason: string, referenceType?: string, referenceId?: string): Promise<UserPoints>;
+  getPointTransactions(userId: string, limit?: number): Promise<PointTransaction[]>;
+  getLeaderboard(limit?: number): Promise<any[]>;
   
   // Follow operations
   followUser(followerId: string, followingId: string): Promise<void>;
@@ -721,6 +737,149 @@ export class DatabaseStorage implements IStorage {
       .where(eq(poolTransferRequests.id, id))
       .returning();
     return result;
+  }
+
+  // Badge operations
+  async getAllBadges(): Promise<Badge[]> {
+    return db.select().from(badges);
+  }
+
+  async getBadgeById(id: string): Promise<Badge | undefined> {
+    const [badge] = await db.select().from(badges).where(eq(badges.id, id));
+    return badge;
+  }
+
+  async getBadgeByCriteria(criteria: string): Promise<Badge | undefined> {
+    const [badge] = await db.select().from(badges).where(eq(badges.criteria, criteria));
+    return badge;
+  }
+
+  async createBadge(badge: InsertBadge): Promise<Badge> {
+    const [result] = await db.insert(badges).values(badge).returning();
+    return result;
+  }
+
+  async awardBadge(userId: string, badgeId: string): Promise<UserBadge | undefined> {
+    const exists = await this.hasBadge(userId, badgeId);
+    if (exists) return undefined;
+    
+    const [result] = await db.insert(userBadges).values({ userId, badgeId }).returning();
+    
+    const badge = await this.getBadgeById(badgeId);
+    if (badge?.pointsAwarded) {
+      await this.addPoints(userId, badge.pointsAwarded, `Earned badge: ${badge.name}`, 'badge', badgeId);
+    }
+    
+    return result;
+  }
+
+  async hasBadge(userId: string, badgeId: string): Promise<boolean> {
+    const [existing] = await db.select().from(userBadges)
+      .where(and(eq(userBadges.userId, userId), eq(userBadges.badgeId, badgeId)));
+    return !!existing;
+  }
+
+  // Points operations
+  async getUserPoints(userId: string): Promise<UserPoints | undefined> {
+    const [points] = await db.select().from(userPoints).where(eq(userPoints.userId, userId));
+    return points;
+  }
+
+  async createUserPoints(data: InsertUserPoints): Promise<UserPoints> {
+    const [result] = await db.insert(userPoints).values(data).returning();
+    return result;
+  }
+
+  async addPoints(userId: string, points: number, reason: string, referenceType?: string, referenceId?: string): Promise<UserPoints> {
+    let userPointsRecord = await this.getUserPoints(userId);
+    
+    if (!userPointsRecord) {
+      userPointsRecord = await this.createUserPoints({ userId, points: 0, lifetimePoints: 0, currentStreak: 0, longestStreak: 0, level: 1 });
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let newStreak = userPointsRecord.currentStreak;
+    if (userPointsRecord.lastActivityDate) {
+      const lastActivity = new Date(userPointsRecord.lastActivityDate);
+      lastActivity.setHours(0, 0, 0, 0);
+      const daysDiff = Math.floor((today.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysDiff === 1) {
+        newStreak = userPointsRecord.currentStreak + 1;
+      } else if (daysDiff > 1) {
+        newStreak = 1;
+      }
+    } else {
+      newStreak = 1;
+    }
+    
+    const newPoints = userPointsRecord.points + points;
+    const newLifetimePoints = userPointsRecord.lifetimePoints + points;
+    const newLevel = Math.floor(Math.sqrt(newLifetimePoints / 100)) + 1;
+    const newLongestStreak = Math.max(newStreak, userPointsRecord.longestStreak);
+    
+    const [updated] = await db.update(userPoints)
+      .set({
+        points: newPoints,
+        lifetimePoints: newLifetimePoints,
+        currentStreak: newStreak,
+        longestStreak: newLongestStreak,
+        lastActivityDate: new Date(),
+        level: newLevel,
+        updatedAt: new Date(),
+      })
+      .where(eq(userPoints.userId, userId))
+      .returning();
+    
+    await db.insert(pointTransactions).values({
+      userId,
+      points,
+      reason,
+      referenceType: referenceType || null,
+      referenceId: referenceId || null,
+    });
+    
+    return updated;
+  }
+
+  async getPointTransactions(userId: string, limit: number = 50): Promise<PointTransaction[]> {
+    return db.select().from(pointTransactions)
+      .where(eq(pointTransactions.userId, userId))
+      .orderBy(desc(pointTransactions.createdAt))
+      .limit(limit);
+  }
+
+  async getLeaderboard(limit: number = 10): Promise<any[]> {
+    const leaderboardData = await db.select({
+      userId: userPoints.userId,
+      points: userPoints.points,
+      lifetimePoints: userPoints.lifetimePoints,
+      level: userPoints.level,
+      currentStreak: userPoints.currentStreak,
+    })
+      .from(userPoints)
+      .orderBy(desc(userPoints.lifetimePoints))
+      .limit(limit);
+    
+    const usersData = await Promise.all(
+      leaderboardData.map(async (entry) => {
+        const user = await this.getUser(entry.userId);
+        return {
+          ...entry,
+          user: user ? {
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            username: user.username,
+            avatar: user.avatar,
+          } : null,
+        };
+      })
+    );
+    
+    return usersData;
   }
 }
 
