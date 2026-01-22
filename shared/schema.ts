@@ -459,6 +459,28 @@ export const merchantPayouts = pgTable("merchant_payouts", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Platform Products (for Stripe Connect marketplace)
+export const platformProducts = pgTable("platform_products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  merchantId: varchar("merchant_id").references(() => merchants.id).notNull(),
+  stripeProductId: text("stripe_product_id").notNull(),
+  stripePriceId: text("stripe_price_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  priceInCents: integer("price_in_cents").notNull(),
+  currency: text("currency").notNull().default('usd'),
+  imageUrl: text("image_url"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPlatformProductSchema = createInsertSchema(platformProducts).omit({ 
+  id: true, 
+  createdAt: true,
+});
+export type PlatformProduct = typeof platformProducts.$inferSelect;
+export type InsertPlatformProduct = z.infer<typeof insertPlatformProductSchema>;
+
 // Merchant Insert Schemas
 export const insertMerchantSchema = createInsertSchema(merchants).omit({ 
   id: true, 
