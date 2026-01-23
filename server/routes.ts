@@ -2403,16 +2403,7 @@ export async function registerRoutes(
           completedAt: new Date(),
         });
 
-        // Create transaction record
-        const bankAccountInfo = bankAccounts.find(a => a.id === bankAccountId);
-        await storage.createTransaction({
-          virtualCardId: null as any,
-          amount: netAmount.toFixed(2),
-          merchant: `Bank Transfer to ${bankAccountInfo?.accountName || 'Bank Account'}`,
-          notes: isInstant 
-            ? `Pool transfer (Instant) - Fee: $${fee.toFixed(2)}` 
-            : (data.notes || `Pool transfer to bank account`),
-        });
+        // Pool transfers are tracked via poolTransferRequests table, not transactions
 
         const eta = isInstant ? 'within 30 minutes' : 'in 1-3 business days';
         res.json({ 
