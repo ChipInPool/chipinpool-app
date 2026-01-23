@@ -2392,18 +2392,80 @@ export async function registerRoutes(
           acceptedAt: new Date(),
         });
 
-        // Process the transfer (in production, this would initiate Stripe Payout)
-        // Deduct from pool
-        const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
-        await storage.updatePoolAmount(poolId, newPoolAmount);
+        // Get user's Stripe Connect account and bank account info
+        const user = await storage.getUser(userId);
+        const bankAccount = bankAccounts.find(a => a.id === bankAccountId);
+        
+        if (!user?.stripeConnectId || !bankAccount?.stripeExternalAccountId) {
+          // Rollback transfer request
+          await storage.updatePoolTransferRequest(transfer.id, {
+            status: 'failed',
+          });
+          return res.status(400).json({ 
+            error: "Stripe Connect account or bank account not properly configured. Please re-link your bank account." 
+          });
+        }
 
-        // Mark as completed
-        await storage.updatePoolTransferRequest(transfer.id, {
-          status: 'completed',
-          completedAt: new Date(),
-        });
+        // For instant payouts, verify the account supports it (debit cards only)
+        if (isInstant && bankAccount.payoutMethod !== 'debit_card') {
+          await storage.updatePoolTransferRequest(transfer.id, {
+            status: 'failed',
+          });
+          return res.status(400).json({ 
+            error: "Instant payouts require a linked debit card. Please select standard payout or add a debit card." 
+          });
+        }
 
-        // Pool transfers are tracked via poolTransferRequests table, not transactions
+        const stripe = await getUncachableStripeClient();
+
+        try {
+          // Create transfer to user's Connect account
+          await stripe.transfers.create({
+            amount: Math.round(netAmount * 100),
+            currency: 'usd',
+            destination: user.stripeConnectId,
+            description: `Pool withdrawal: ${pool.title}`,
+            metadata: {
+              poolId: pool.id,
+              transferRequestId: transfer.id,
+              payoutSpeed: data.payoutSpeed,
+              fee: fee.toFixed(2),
+            },
+          });
+
+          // Initiate payout from Connect account to bank/debit card
+          await stripe.payouts.create({
+            amount: Math.round(netAmount * 100),
+            currency: 'usd',
+            method: isInstant ? 'instant' : 'standard',
+            destination: bankAccount.stripeExternalAccountId,
+            metadata: {
+              transferRequestId: transfer.id,
+              payoutSpeed: data.payoutSpeed,
+            },
+          }, {
+            stripeAccount: user.stripeConnectId,
+          });
+
+          // Deduct from pool
+          const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
+          await storage.updatePoolAmount(poolId, newPoolAmount);
+
+          // Mark as completed
+          await storage.updatePoolTransferRequest(transfer.id, {
+            status: 'completed',
+            completedAt: new Date(),
+          });
+
+        } catch (stripeError: any) {
+          console.error('Stripe payout error:', stripeError);
+          await storage.updatePoolTransferRequest(transfer.id, {
+            status: 'failed',
+          });
+          return res.status(400).json({ 
+            error: stripeError.message || "Failed to initiate payout. Please try again." 
+          });
+        }
 
         const eta = isInstant ? 'within 30 minutes' : 'in 1-3 business days';
         res.json({ 
