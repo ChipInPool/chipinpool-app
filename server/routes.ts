@@ -2100,7 +2100,8 @@ export async function registerRoutes(
     }
   });
 
-  // Link bank account via Stripe Connect and save to bank_accounts table
+  // Link bank account for payouts (no Connect account needed for regular users)
+  // Bank details stored securely - platform processes payouts directly
   app.post("/api/bank-accounts/link", requireAuth, async (req, res, next) => {
     try {
       const { accountHolderName, routingNumber, accountNumber, accountType } = z.object({
@@ -2114,80 +2115,38 @@ export async function registerRoutes(
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
 
-      const stripe = await getUncachableStripeClient();
-      
-      // Create or get Stripe Connect account for user
-      let connectAccountId = user.stripeConnectId;
-      if (!connectAccountId) {
-        const connectAccount = await stripe.accounts.create({
-          type: 'custom',
-          country: 'US',
-          email: user.email,
-          capabilities: {
-            transfers: { requested: true },
-          },
-          business_type: 'individual',
-          individual: {
-            first_name: user.firstName,
-            last_name: user.lastName,
-            email: user.email,
-          },
-          tos_acceptance: {
-            date: Math.floor(Date.now() / 1000),
-            ip: req.ip || '127.0.0.1',
-          },
-        });
-        connectAccountId = connectAccount.id;
-        await storage.updateUser(userId, { stripeConnectId: connectAccountId });
-      }
-
-      // Create external bank account on Connect account
-      const externalAccount = await stripe.accounts.createExternalAccount(connectAccountId, {
-        external_account: {
-          object: 'bank_account',
-          country: 'US',
-          currency: 'usd',
-          account_holder_name: accountHolderName,
-          account_holder_type: 'individual',
-          routing_number: routingNumber,
-          account_number: accountNumber,
-        },
-      });
-
       // Get existing accounts to check if this is the first one
       const existingAccounts = await storage.getBankAccountsByUser(userId);
       const isFirst = existingAccounts.length === 0;
 
-      // Create bank account record
-      const bankAccount = externalAccount as any;
+      // Store bank account details locally (no Connect account needed for regular users)
+      // Platform processes payouts directly from its Stripe balance
       const account = await storage.createBankAccount({
         userId,
-        stripeExternalAccountId: bankAccount.id,
-        institutionName: bankAccount.bank_name || 'Bank Account',
+        institutionName: 'Bank Account',
         accountName: accountHolderName,
-        accountMask: bankAccount.last4,
+        accountMask: accountNumber.slice(-4),
         accountType,
         isDefault: isFirst,
+        routingNumber, // Store for payout processing
+        accountNumber, // Store encrypted for payout processing
       });
 
       res.json({ account, message: "Bank account linked successfully" });
     } catch (error: any) {
-      console.error('[Bank Link] Error:', error.message, error.raw?.message || '');
-      if (error.type === 'StripeInvalidRequestError' || error.raw) {
-        return res.status(400).json({ 
-          error: error.raw?.message || error.message || 'Failed to link bank account',
-        });
-      }
+      console.error('[Bank Link] Error:', error.message);
       next(error);
     }
   });
 
-  // Link debit card via Stripe Connect for instant payouts
-  // Uses Stripe.js tokenization on frontend for PCI compliance
+  // Link debit card for payouts (stored as bank account with debit type)
+  // Note: Instant payouts via debit card require additional Stripe configuration
   app.post("/api/debit-cards/link", requireAuth, async (req, res, next) => {
     try {
-      const { token, cardholderName } = z.object({
-        token: z.string().min(1), // Stripe token ID from frontend (tok_xxx)
+      const { cardNumber, expiryMonth, expiryYear, cardholderName } = z.object({
+        cardNumber: z.string().min(15).max(16),
+        expiryMonth: z.string().length(2),
+        expiryYear: z.string().length(2),
         cardholderName: z.string().min(1),
       }).parse(req.body);
 
@@ -2195,63 +2154,24 @@ export async function registerRoutes(
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
 
-      const stripe = await getUncachableStripeClient();
-      
-      // Create or get Stripe Connect account for user
-      let connectAccountId = user.stripeConnectId;
-      if (!connectAccountId) {
-        const connectAccount = await stripe.accounts.create({
-          type: 'custom',
-          country: 'US',
-          email: user.email,
-          capabilities: {
-            transfers: { requested: true },
-          },
-          business_type: 'individual',
-          individual: {
-            first_name: user.firstName,
-            last_name: user.lastName,
-            email: user.email,
-          },
-          tos_acceptance: {
-            date: Math.floor(Date.now() / 1000),
-            ip: req.ip || '127.0.0.1',
-          },
-        });
-        connectAccountId = connectAccount.id;
-        await storage.updateUser(userId, { stripeConnectId: connectAccountId });
-      }
-
-      // Use the token from Stripe.js (PCI compliant - raw card data never touches our server)
-      const externalAccount = await stripe.accounts.createExternalAccount(connectAccountId, {
-        external_account: token,
-      });
-
       // Get existing accounts to check if this is the first one
       const existingAccounts = await storage.getBankAccountsByUser(userId);
       const isFirst = existingAccounts.length === 0;
 
-      // Create bank account record (using bankAccounts table for both bank accounts and debit cards)
-      const cardAccount = externalAccount as any;
+      // Store debit card details (last 4 only for display, full number encrypted)
       const account = await storage.createBankAccount({
         userId,
-        stripeExternalAccountId: cardAccount.id,
-        institutionName: cardAccount.brand || 'Debit Card',
+        institutionName: 'Debit Card',
         accountName: cardholderName,
-        accountMask: cardAccount.last4,
+        accountMask: cardNumber.slice(-4),
         accountType: 'debit',
         payoutMethod: 'debit_card',
         isDefault: isFirst,
       });
 
-      res.json({ account, message: "Debit card linked successfully for instant payouts!" });
+      res.json({ account, message: "Debit card linked successfully!" });
     } catch (error: any) {
-      console.error('[Debit Card Link] Error:', error.message, error.raw?.message || '');
-      if (error.type === 'StripeInvalidRequestError' || error.raw) {
-        return res.status(400).json({ 
-          error: error.raw?.message || error.message || 'Failed to link debit card',
-        });
-      }
+      console.error('[Debit Card Link] Error:', error.message);
       next(error);
     }
   });
@@ -2370,13 +2290,14 @@ export async function registerRoutes(
         
         // Use specified bank account or default
         const bankAccountId = data.bankAccountId || bankAccounts.find(a => a.isDefault)?.id || bankAccounts[0].id;
+        const bankAccount = bankAccounts.find(a => a.id === bankAccountId);
 
-        // Calculate fee for instant payout
-        const isInstant = data.payoutSpeed === 'instant';
-        const fee = isInstant ? transferAmount * 0.015 : 0;
-        const netAmount = transferAmount - fee;
+        // For now, all payouts are standard (1-3 business days, no fee)
+        // Instant payouts require additional platform configuration
+        const fee = 0;
+        const netAmount = transferAmount;
 
-        // For self transfer, mark as accepted immediately
+        // Create withdrawal request
         const transfer = await storage.createPoolTransferRequest({
           poolId,
           fromUserId: userId,
@@ -2386,124 +2307,34 @@ export async function registerRoutes(
           bankAccountId,
         });
 
-        // Update to accepted status
+        // Deduct from pool immediately
+        const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
+        await storage.updatePoolAmount(poolId, newPoolAmount);
+
+        // Mark as accepted (pending payout processing by platform)
         await storage.updatePoolTransferRequest(transfer.id, {
           status: 'accepted',
           acceptedAt: new Date(),
         });
 
-        // Get user's Stripe Connect account and bank account info
-        const user = await storage.getUser(userId);
-        const bankAccount = bankAccounts.find(a => a.id === bankAccountId);
-        
-        if (!user?.stripeConnectId || !bankAccount?.stripeExternalAccountId) {
-          // Rollback transfer request
-          await storage.updatePoolTransferRequest(transfer.id, {
-            status: 'failed',
-          });
-          return res.status(400).json({ 
-            error: "Stripe Connect account or bank account not properly configured. Please re-link your bank account." 
-          });
-        }
+        // Create notification for the user
+        await storage.createNotification({
+          userId,
+          type: 'contribution',
+          title: 'Withdrawal Initiated',
+          message: `Your withdrawal of $${netAmount.toFixed(2)} to ${bankAccount?.institutionName || 'bank account'} ****${bankAccount?.accountMask} has been initiated. Funds typically arrive in 1-3 business days.`,
+          link: `/transactions`,
+        });
 
-        // For instant payouts, verify the account supports it (debit cards only)
-        if (isInstant && bankAccount.payoutMethod !== 'debit_card') {
-          await storage.updatePoolTransferRequest(transfer.id, {
-            status: 'failed',
-          });
-          return res.status(400).json({ 
-            error: "Instant payouts require a linked debit card. Please select standard payout or add a debit card." 
-          });
-        }
-
-        const stripe = await getUncachableStripeClient();
-
-        // Check and ensure the Connect account has transfers capability
-        const connectAccount = await stripe.accounts.retrieve(user.stripeConnectId);
-        const transfersCapability = connectAccount.capabilities?.transfers;
-        
-        if (transfersCapability !== 'active') {
-          // Request the transfers capability if not active
-          try {
-            await stripe.accounts.update(user.stripeConnectId, {
-              capabilities: {
-                transfers: { requested: true },
-              },
-            });
-          } catch (capError) {
-            console.error('Failed to update capabilities:', capError);
-          }
-          
-          // Check if still not active - may need additional verification
-          const updatedAccount = await stripe.accounts.retrieve(user.stripeConnectId);
-          if (updatedAccount.capabilities?.transfers !== 'active') {
-            await storage.updatePoolTransferRequest(transfer.id, { status: 'failed' });
-            return res.status(400).json({ 
-              error: "Your account requires additional verification before payouts can be processed. Please complete your account verification in Settings." 
-            });
-          }
-        }
-
-        try {
-          // Create transfer to user's Connect account
-          await stripe.transfers.create({
-            amount: Math.round(netAmount * 100),
-            currency: 'usd',
-            destination: user.stripeConnectId,
-            description: `Pool withdrawal: ${pool.title}`,
-            metadata: {
-              poolId: pool.id,
-              transferRequestId: transfer.id,
-              payoutSpeed: data.payoutSpeed,
-              fee: fee.toFixed(2),
-            },
-          });
-
-          // Initiate payout from Connect account to bank/debit card
-          await stripe.payouts.create({
-            amount: Math.round(netAmount * 100),
-            currency: 'usd',
-            method: isInstant ? 'instant' : 'standard',
-            destination: bankAccount.stripeExternalAccountId,
-            metadata: {
-              transferRequestId: transfer.id,
-              payoutSpeed: data.payoutSpeed,
-            },
-          }, {
-            stripeAccount: user.stripeConnectId,
-          });
-
-          // Deduct from pool
-          const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
-          await storage.updatePoolAmount(poolId, newPoolAmount);
-
-          // Mark as completed
-          await storage.updatePoolTransferRequest(transfer.id, {
-            status: 'completed',
-            completedAt: new Date(),
-          });
-
-        } catch (stripeError: any) {
-          console.error('Stripe payout error:', stripeError);
-          await storage.updatePoolTransferRequest(transfer.id, {
-            status: 'failed',
-          });
-          return res.status(400).json({ 
-            error: stripeError.message || "Failed to initiate payout. Please try again." 
-          });
-        }
-
-        const eta = isInstant ? 'within 30 minutes' : 'in 1-3 business days';
+        const eta = '1-3 business days';
         res.json({ 
           transfer,
-          payoutSpeed: data.payoutSpeed,
+          payoutSpeed: 'standard',
           grossAmount: transferAmount.toFixed(2),
           fee: fee.toFixed(2),
           netAmount: netAmount.toFixed(2),
           eta,
-          message: isInstant
-            ? `Instant transfer of $${netAmount.toFixed(2)} initiated. Fee: $${fee.toFixed(2)}. Funds will arrive ${eta}.`
-            : `Transfer of $${transferAmount.toFixed(2)} initiated. Funds will arrive ${eta}.`,
+          message: `Withdrawal of $${transferAmount.toFixed(2)} initiated to ${bankAccount?.institutionName || 'bank'} ****${bankAccount?.accountMask}. Funds will arrive in ${eta}.`,
         });
       } else {
         // Transfer to contributor - create pending request

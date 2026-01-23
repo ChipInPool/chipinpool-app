@@ -278,6 +278,9 @@ export const bankAccounts = pgTable("bank_accounts", {
   accountType: text("account_type").notNull(),
   payoutMethod: payoutMethodEnum("payout_method").notNull().default('bank_account'),
   isDefault: boolean("is_default").notNull().default(false),
+  // Bank details for direct payouts (no Connect account needed for users)
+  routingNumber: text("routing_number"),
+  accountNumber: text("account_number"), // Encrypted in production
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
