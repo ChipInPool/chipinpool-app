@@ -67,7 +67,7 @@ Preferred communication style: Simple, everyday language.
 - `merchantCheckoutSessions`: Checkout sessions with reservation/hold logic
 - `merchantWebhookDeliveries`: Webhook delivery logs for merchants
 - `merchantPayouts`: Merchant payout history
-- `bankAccounts`: Linked bank accounts via Stripe Connect for payouts
+- `bankAccounts`: Linked bank accounts for payouts (stores routing/account numbers locally)
 - `poolTransferRequests`: Pool fund transfer requests with status tracking
 
 ## Recent Changes (January 2026)
@@ -111,14 +111,16 @@ Preferred communication style: Simple, everyday language.
     - Channels: Email and SMS with independent per-category toggles
     - Automatic notifications for: 2FA enable/disable, password reset, KYC verification, wallet withdrawals
     - Global channel opt-out respected (notifyEmail/notifySMS gates all category notifications)
-17. **Stripe Connect for Pool Withdrawals** - Bank withdrawal system via Stripe Connect & Payouts:
-    - Users link bank accounts via Stripe Connect (custom accounts with external bank accounts)
-    - Pool creators can transfer funds to their own linked bank account
+17. **Pool Withdrawals** - Simplified bank withdrawal system (platform-managed payouts):
+    - Users link bank accounts directly (routing/account numbers stored securely)
+    - Pool creators can withdraw funds to their own linked bank account
     - Pool creators can send transfer requests to any contributor
     - Contributors receive notifications and can accept/decline transfer requests
-    - Accept flow includes bank account selection (or add new bank via Stripe)
+    - Accept flow includes bank account selection
     - Transfer tracking with status: pending → accepted → completed/cancelled/failed
-    - Funds arrive in 1-3 business days via Stripe payouts
+    - Standard payouts only (1-3 business days, no fees)
+    - **Architecture**: Regular users do NOT use Stripe Connect - platform holds balances and processes payouts
+    - Only ChipInPay merchants use Stripe Connect (for automated daily payouts)
 
 ### ChipInPay Merchant API:
 - `POST /api/v1/merchant/checkout` - Create checkout session
