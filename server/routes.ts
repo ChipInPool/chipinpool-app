@@ -2418,6 +2418,32 @@ export async function registerRoutes(
 
         const stripe = await getUncachableStripeClient();
 
+        // Check and ensure the Connect account has transfers capability
+        const connectAccount = await stripe.accounts.retrieve(user.stripeConnectId);
+        const transfersCapability = connectAccount.capabilities?.transfers;
+        
+        if (transfersCapability !== 'active') {
+          // Request the transfers capability if not active
+          try {
+            await stripe.accounts.update(user.stripeConnectId, {
+              capabilities: {
+                transfers: { requested: true },
+              },
+            });
+          } catch (capError) {
+            console.error('Failed to update capabilities:', capError);
+          }
+          
+          // Check if still not active - may need additional verification
+          const updatedAccount = await stripe.accounts.retrieve(user.stripeConnectId);
+          if (updatedAccount.capabilities?.transfers !== 'active') {
+            await storage.updatePoolTransferRequest(transfer.id, { status: 'failed' });
+            return res.status(400).json({ 
+              error: "Your account requires additional verification before payouts can be processed. Please complete your account verification in Settings." 
+            });
+          }
+        }
+
         try {
           // Create transfer to user's Connect account
           await stripe.transfers.create({
