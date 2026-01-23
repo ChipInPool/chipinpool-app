@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Banknote, Building2, CheckCircle, XCircle, Loader2, AlertCircle, Shield, Clock, Zap, CreditCard } from "lucide-react";
+import { ArrowLeft, Banknote, Building2, CheckCircle, XCircle, Loader2, AlertCircle, Shield, Clock } from "lucide-react";
 import { Link, useRoute, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -39,7 +39,6 @@ export default function AcceptTransfer() {
   const { user, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>("");
-  const [payoutSpeed, setPayoutSpeed] = useState<'standard' | 'instant'>('standard');
   const [confirmDeclineOpen, setConfirmDeclineOpen] = useState(false);
 
   const requestId = params?.requestId;
@@ -78,7 +77,7 @@ export default function AcceptTransfer() {
   }, [bankAccounts, selectedBankAccountId]);
 
   const acceptMutation = useMutation({
-    mutationFn: async (data: { bankAccountId: string; payoutSpeed: 'standard' | 'instant' }) => {
+    mutationFn: async (data: { bankAccountId: string }) => {
       const res = await fetch(`/api/transfer-requests/${requestId}/accept`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -92,12 +91,9 @@ export default function AcceptTransfer() {
       return res.json();
     },
     onSuccess: (data) => {
-      const isInstant = data.payoutSpeed === 'instant';
       toast({
         title: "Transfer Accepted",
-        description: isInstant 
-          ? `$${data.netAmount} will arrive in your account within 30 minutes. (Fee: $${data.fee})`
-          : "The funds will be transferred to your bank account within 1-3 business days.",
+        description: "The funds will be transferred to your bank account within 1-3 business days.",
       });
       queryClient.invalidateQueries({ queryKey: ["transferRequest", requestId] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
@@ -153,18 +149,7 @@ export default function AcceptTransfer() {
       return;
     }
     
-    // Check if instant payout is selected but the account isn't a debit card
-    const selectedAccount = bankAccounts.find(a => a.id === selectedBankAccountId);
-    if (payoutSpeed === 'instant' && selectedAccount?.payoutMethod !== 'debit_card') {
-      toast({
-        title: "Instant Payout Unavailable",
-        description: "Instant payouts require a debit card. Please select a debit card or use standard payout.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    acceptMutation.mutate({ bankAccountId: selectedBankAccountId, payoutSpeed });
+    acceptMutation.mutate({ bankAccountId: selectedBankAccountId });
   };
 
   const handleDecline = () => {
@@ -299,60 +284,18 @@ export default function AcceptTransfer() {
                 </div>
               </div>
 
-              <div className="p-4 rounded-lg bg-white/5 border border-white/10 space-y-3">
+              <div className="p-4 rounded-lg bg-white/5 border border-white/10 space-y-2">
                 <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-lime-400" />
-                  <span className="text-sm font-medium">Choose Payout Speed</span>
+                  <Clock className="w-4 h-4 text-cyan-400" />
+                  <span className="text-sm font-medium">Standard Transfer</span>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPayoutSpeed('standard')}
-                    className={`p-3 rounded-lg border text-left transition-all ${
-                      payoutSpeed === 'standard'
-                        ? "border-cyan-500 bg-cyan-500/10"
-                        : "border-white/10 hover:border-white/20"
-                    }`}
-                    data-testid="payout-speed-standard"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <Clock className="w-4 h-4 text-cyan-400" />
-                      <span className="font-medium text-sm">Standard</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">1-3 business days</p>
-                    <p className="text-xs font-medium text-green-400 mt-1">Free</p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPayoutSpeed('instant')}
-                    className={`p-3 rounded-lg border text-left transition-all ${
-                      payoutSpeed === 'instant'
-                        ? "border-lime-500 bg-lime-500/10"
-                        : "border-white/10 hover:border-white/20"
-                    }`}
-                    data-testid="payout-speed-instant"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <Zap className="w-4 h-4 text-lime-400" />
-                      <span className="font-medium text-sm">Instant</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Within 30 minutes</p>
-                    <p className="text-xs font-medium text-orange-400 mt-1">1.5% fee</p>
-                  </button>
-                </div>
+                <p className="text-xs text-muted-foreground">Funds will arrive in 1-3 business days. No fees.</p>
               </div>
 
               <div className="p-4 rounded-lg bg-white/5 border border-white/10 space-y-3">
                 <div className="flex items-center gap-2">
-                  {payoutSpeed === 'instant' ? (
-                    <CreditCard className="w-4 h-4 text-lime-400" />
-                  ) : (
-                    <Building2 className="w-4 h-4 text-primary" />
-                  )}
-                  <span className="text-sm font-medium">
-                    {payoutSpeed === 'instant' ? 'Select Debit Card' : 'Select Bank Account'}
-                  </span>
+                  <Building2 className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">Select Bank Account</span>
                 </div>
 
                 {loadingBankAccounts ? (
@@ -362,17 +305,15 @@ export default function AcceptTransfer() {
                 ) : bankAccounts.length === 0 ? (
                   <div className="text-center py-4">
                     <p className="text-sm text-muted-foreground mb-3">
-                      You need to link a {payoutSpeed === 'instant' ? 'debit card' : 'bank account'} to receive this transfer
+                      You need to link a bank account to receive this transfer
                     </p>
                     <Button size="sm" asChild>
-                      <Link href="/security">Link {payoutSpeed === 'instant' ? 'Debit Card' : 'Bank Account'}</Link>
+                      <Link href="/security">Link Bank Account</Link>
                     </Button>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {bankAccounts
-                      .filter(a => payoutSpeed === 'instant' ? a.payoutMethod === 'debit_card' : a.payoutMethod === 'bank_account')
-                      .map((account) => (
+                    {bankAccounts.map((account) => (
                       <button
                         key={account.id}
                         type="button"
@@ -385,11 +326,7 @@ export default function AcceptTransfer() {
                         data-testid={`bank-account-${account.id}`}
                       >
                         <div className="flex items-center gap-3">
-                          {account.payoutMethod === 'debit_card' ? (
-                            <CreditCard className="w-4 h-4 text-lime-400" />
-                          ) : (
-                            <Building2 className="w-4 h-4 text-cyan-400" />
-                          )}
+                          <Building2 className="w-4 h-4 text-cyan-400" />
                           <div>
                             <div className="font-medium text-sm">{account.institutionName}</div>
                             <div className="text-xs text-muted-foreground">
@@ -402,39 +339,9 @@ export default function AcceptTransfer() {
                         )}
                       </button>
                     ))}
-                    {bankAccounts.filter(a => payoutSpeed === 'instant' ? a.payoutMethod === 'debit_card' : a.payoutMethod === 'bank_account').length === 0 && (
-                      <div className="text-center py-4">
-                        <p className="text-sm text-muted-foreground mb-3">
-                          No {payoutSpeed === 'instant' ? 'debit cards' : 'bank accounts'} linked
-                        </p>
-                        <Button size="sm" asChild>
-                          <Link href="/security">Link {payoutSpeed === 'instant' ? 'Debit Card' : 'Bank Account'}</Link>
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
-
-              {payoutSpeed === 'instant' && transferRequest && (
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-lime-500/10 border border-lime-500/20">
-                  <Zap className="w-4 h-4 text-lime-400 flex-shrink-0 mt-0.5" />
-                  <div className="text-xs text-lime-400">
-                    <p className="font-medium">Instant payout selected</p>
-                    <p>Fee: ${(parseFloat(transferRequest.amount) * 0.015).toFixed(2)} (1.5%)</p>
-                    <p>You'll receive: ${(parseFloat(transferRequest.amount) * 0.985).toFixed(2)} within 30 minutes</p>
-                  </div>
-                </div>
-              )}
-
-              {payoutSpeed === 'standard' && (
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                  <Clock className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-blue-500">
-                    Once accepted, funds typically arrive in your bank account within 1-3 business days. No fees.
-                  </p>
-                </div>
-              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <Button
