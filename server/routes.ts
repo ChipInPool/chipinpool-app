@@ -2149,7 +2149,12 @@ export async function registerRoutes(
   app.get("/api/bank-accounts", requireAuth, async (req, res, next) => {
     try {
       const accounts = await storage.getBankAccountsByUser(req.session.userId!);
-      res.json({ accounts });
+      // Add flag indicating if account can be used for payouts (has Plaid credentials)
+      const accountsWithPayoutStatus = accounts.map(account => ({
+        ...account,
+        canReceivePayouts: !!(account.plaidAccessToken && account.plaidAccountId),
+      }));
+      res.json({ accounts: accountsWithPayoutStatus });
     } catch (error) {
       next(error);
     }

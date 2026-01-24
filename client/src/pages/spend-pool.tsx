@@ -29,6 +29,7 @@ interface BankAccount {
   accountMask: string;
   accountType: string;
   isDefault: boolean;
+  canReceivePayouts: boolean;
 }
 
 interface Contributor {
@@ -76,7 +77,11 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
     },
   });
 
-  const bankAccounts: BankAccount[] = bankAccountsData?.accounts || [];
+  const allBankAccounts: BankAccount[] = bankAccountsData?.accounts || [];
+  // Only show accounts that can receive payouts (have Plaid credentials)
+  const bankAccounts = allBankAccounts.filter(a => a.canReceivePayouts);
+  const hasNonPayableAccounts = allBankAccounts.length > 0 && bankAccounts.length === 0;
+  
   const contributors: Contributor[] = (contributorsData?.contributors || []).filter(
     (c: Contributor) => c.userId !== user?.id
   );
@@ -240,10 +245,27 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
               </div>
             ) : bankAccounts.length === 0 ? (
               <div className="text-center py-4">
-                <p className="text-sm text-muted-foreground mb-3">No bank accounts linked yet</p>
-                <Button variant="outline" size="sm" className="border-white/10" asChild>
-                  <Link href="/security">Link Bank Account</Link>
-                </Button>
+                {hasNonPayableAccounts ? (
+                  <>
+                    <div className="flex items-center justify-center gap-2 text-amber-500 mb-2">
+                      <AlertCircle className="w-4 h-4" />
+                      <span className="text-sm font-medium">Bank needs re-linking</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Your existing bank account needs to be re-linked via Plaid to receive payouts.
+                    </p>
+                    <Button variant="outline" size="sm" className="border-amber-500/30 text-amber-500 hover:bg-amber-500/10" asChild>
+                      <Link href="/security">Re-link Bank Account</Link>
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground mb-3">No bank accounts linked yet</p>
+                    <Button variant="outline" size="sm" className="border-white/10" asChild>
+                      <Link href="/security">Link Bank Account</Link>
+                    </Button>
+                  </>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
