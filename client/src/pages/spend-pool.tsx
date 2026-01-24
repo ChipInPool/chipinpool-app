@@ -28,6 +28,7 @@ interface BankAccount {
   accountName: string;
   accountMask: string;
   accountType: string;
+  payoutMethod: 'bank_account' | 'debit_card';
   isDefault: boolean;
   canReceivePayouts: boolean;
 }
@@ -86,12 +87,34 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
     (c: Contributor) => c.userId !== user?.id
   );
 
+  // Get the currently selected bank account
+  const selectedAccount = bankAccounts.find(a => a.id === selectedBankAccountId);
+  const isDebitCard = selectedAccount?.payoutMethod === 'debit_card';
+
+  // Auto-select default bank account and set appropriate payout speed
   useEffect(() => {
     if (bankAccounts.length > 0 && !selectedBankAccountId) {
       const defaultAccount = bankAccounts.find(a => a.isDefault) || bankAccounts[0];
       setSelectedBankAccountId(defaultAccount.id);
+      // Debit cards are always instant, bank accounts default to standard
+      if (defaultAccount.payoutMethod === 'debit_card') {
+        setPayoutSpeed('instant');
+      }
     }
   }, [bankAccounts, selectedBankAccountId]);
+
+  // Handle bank account selection - auto-set payout speed based on account type
+  const handleBankAccountSelect = (accountId: string) => {
+    const account = bankAccounts.find(a => a.id === accountId);
+    setSelectedBankAccountId(accountId);
+    if (account?.payoutMethod === 'debit_card') {
+      // Debit cards always use instant (push-to-card)
+      setPayoutSpeed('instant');
+    } else {
+      // Bank accounts default to standard but can choose instant
+      setPayoutSpeed('standard');
+    }
+  };
 
   const transferMutation = useMutation({
     mutationFn: async (data: { toUserId: string; amount: string; notes?: string; bankAccountId?: string; payoutSpeed?: 'standard' | 'instant' }) => {
@@ -273,7 +296,7 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
                   <button
                     key={account.id}
                     type="button"
-                    onClick={() => setSelectedBankAccountId(account.id)}
+                    onClick={() => handleBankAccountSelect(account.id)}
                     className={`w-full p-3 rounded-lg border text-left transition-all flex items-center justify-between ${
                       selectedBankAccountId === account.id
                         ? "border-primary bg-primary/5"
@@ -281,15 +304,27 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
                     }`}
                     data-testid={`bank-account-${account.id}`}
                   >
-                    <div>
-                      <div className="font-medium text-sm">{account.institutionName}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {account.accountName} ****{account.accountMask}
+                    <div className="flex items-center gap-2">
+                      {account.payoutMethod === 'debit_card' ? (
+                        <CreditCard className="w-4 h-4 text-yellow-500" />
+                      ) : (
+                        <Building2 className="w-4 h-4 text-cyan-400" />
+                      )}
+                      <div>
+                        <div className="font-medium text-sm">{account.institutionName}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {account.accountName} ****{account.accountMask}
+                        </div>
                       </div>
                     </div>
-                    {account.isDefault && (
-                      <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">Default</span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {account.payoutMethod === 'debit_card' && (
+                        <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded">INSTANT</span>
+                      )}
+                      {account.isDefault && (
+                        <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">Default</span>
+                      )}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -304,80 +339,112 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
               <span className="text-sm font-medium">Payout Speed</span>
             </div>
             
-            {/* Standard Option */}
-            <button
-              type="button"
-              onClick={() => setPayoutSpeed('standard')}
-              className={`w-full p-4 rounded-lg border text-left transition-all ${
-                payoutSpeed === 'standard'
-                  ? "border-primary bg-primary/5"
-                  : "border-white/10 hover:border-white/20"
-              }`}
-              data-testid="payout-speed-standard"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <RefreshCw className="w-5 h-5 text-cyan-400" />
-                  <div>
-                    <div className="font-medium text-sm">Standard</div>
-                    <div className="text-xs text-muted-foreground">1-3 business days</div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-medium text-sm text-green-500">Free</div>
-                  <div className="text-xs text-muted-foreground">
-                    You receive ${transferAmountNum.toFixed(2)}
-                  </div>
-                </div>
-              </div>
-            </button>
-
-            {/* Instant Option */}
-            <button
-              type="button"
-              onClick={() => setPayoutSpeed('instant')}
-              className={`w-full p-4 rounded-lg border text-left transition-all ${
-                payoutSpeed === 'instant'
-                  ? "border-primary bg-primary/5"
-                  : "border-white/10 hover:border-white/20"
-              }`}
-              data-testid="payout-speed-instant"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Zap className="w-5 h-5 text-yellow-500" />
-                  <div>
-                    <div className="font-medium text-sm flex items-center gap-2">
-                      Instant
-                      <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded">FAST</span>
+            {/* For Debit Cards - Always Instant, no choice */}
+            {isDebitCard ? (
+              <div className="p-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CreditCard className="w-5 h-5 text-yellow-500" />
+                    <div>
+                      <div className="font-medium text-sm flex items-center gap-2">
+                        Instant to Card
+                        <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded">PUSH-TO-CARD</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">Funds arrive in seconds</div>
                     </div>
-                    <div className="text-xs text-muted-foreground">Arrives instantly</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-medium text-sm text-yellow-500">1.5% fee</div>
+                    <div className="text-xs text-muted-foreground">
+                      You receive ${(transferAmountNum - (transferAmountNum * INSTANT_FEE_RATE)).toFixed(2)}
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-medium text-sm text-yellow-500">1.5% fee</div>
-                  <div className="text-xs text-muted-foreground">
-                    You receive ${(transferAmountNum - (transferAmountNum * INSTANT_FEE_RATE)).toFixed(2)}
-                  </div>
-                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Debit card payouts are always instant via push-to-card.
+                </p>
               </div>
-              {payoutSpeed === 'instant' && transferAmountNum > 0 && (
-                <div className="mt-2 pt-2 border-t border-white/10 text-xs text-muted-foreground">
-                  <div className="flex justify-between">
-                    <span>Amount:</span>
-                    <span>${transferAmountNum.toFixed(2)}</span>
+            ) : (
+              <>
+                {/* Standard Option - Bank Account */}
+                <button
+                  type="button"
+                  onClick={() => setPayoutSpeed('standard')}
+                  className={`w-full p-4 rounded-lg border text-left transition-all ${
+                    payoutSpeed === 'standard'
+                      ? "border-primary bg-primary/5"
+                      : "border-white/10 hover:border-white/20"
+                  }`}
+                  data-testid="payout-speed-standard"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <RefreshCw className="w-5 h-5 text-cyan-400" />
+                      <div>
+                        <div className="font-medium text-sm">Standard ACH</div>
+                        <div className="text-xs text-muted-foreground">1-3 business days</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium text-sm text-green-500">Free</div>
+                      <div className="text-xs text-muted-foreground">
+                        You receive ${transferAmountNum.toFixed(2)}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-yellow-500">
-                    <span>Instant fee (1.5%):</span>
-                    <span>-${instantFee.toFixed(2)}</span>
+                </button>
+
+                {/* Instant Option - Bank Account via RTP */}
+                <button
+                  type="button"
+                  onClick={() => setPayoutSpeed('instant')}
+                  className={`w-full p-4 rounded-lg border text-left transition-all ${
+                    payoutSpeed === 'instant'
+                      ? "border-primary bg-primary/5"
+                      : "border-white/10 hover:border-white/20"
+                  }`}
+                  data-testid="payout-speed-instant"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Zap className="w-5 h-5 text-yellow-500" />
+                      <div>
+                        <div className="font-medium text-sm flex items-center gap-2">
+                          Instant RTP
+                          <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded">FAST</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">Arrives in seconds</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium text-sm text-yellow-500">1.5% fee</div>
+                      <div className="text-xs text-muted-foreground">
+                        You receive ${(transferAmountNum - (transferAmountNum * INSTANT_FEE_RATE)).toFixed(2)}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between font-medium text-foreground">
-                    <span>You receive:</span>
-                    <span>${netAmountCalc.toFixed(2)}</span>
-                  </div>
-                </div>
-              )}
-            </button>
+                  {payoutSpeed === 'instant' && transferAmountNum > 0 && (
+                    <div className="mt-2 pt-2 border-t border-white/10 text-xs text-muted-foreground">
+                      <div className="flex justify-between">
+                        <span>Amount:</span>
+                        <span>${transferAmountNum.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-yellow-500">
+                        <span>Instant fee (1.5%):</span>
+                        <span>-${instantFee.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between font-medium text-foreground">
+                        <span>You receive:</span>
+                        <span>${netAmountCalc.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+                </button>
+                <p className="text-xs text-muted-foreground">
+                  Note: Instant RTP may not be available for all banks. If unavailable, we'll use standard ACH.
+                </p>
+              </>
+            )}
             
             {transferAmount && parseFloat(transferAmount) > 0 && (
               <div className={`p-3 rounded-lg border ${payoutSpeed === 'instant' ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-cyan-500/10 border-cyan-500/20'}`}>
@@ -525,8 +592,10 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
             </>
           ) : (
             <>
-              <Banknote className="w-4 h-4 mr-2" />
-              {recipientType === "self" ? "Transfer to Bank" : "Send Transfer Request"}
+              {isDebitCard ? <CreditCard className="w-4 h-4 mr-2" /> : <Banknote className="w-4 h-4 mr-2" />}
+              {recipientType === "self" 
+                ? (isDebitCard ? "Transfer to Card" : "Transfer to Bank") 
+                : "Send Transfer Request"}
             </>
           )}
         </Button>
@@ -556,8 +625,15 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
             </div>
             {recipientType === "self" && getSelectedBankAccount() && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Bank Account:</span>
-                <span className="font-mono">
+                <span className="text-muted-foreground">
+                  {isDebitCard ? 'Debit Card:' : 'Bank Account:'}
+                </span>
+                <span className="font-mono flex items-center gap-2">
+                  {isDebitCard ? (
+                    <CreditCard className="w-3 h-3 text-yellow-500" />
+                  ) : (
+                    <Building2 className="w-3 h-3 text-cyan-400" />
+                  )}
                   {getSelectedBankAccount()?.institutionName} ****{getSelectedBankAccount()?.accountMask}
                 </span>
               </div>
@@ -566,14 +642,34 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
               <>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Payout Speed:</span>
-                  <span className="font-medium flex items-center gap-1 text-cyan-400">
-                    <RefreshCw className="w-3 h-3" />
-                    Standard
+                  <span className={`font-medium flex items-center gap-1 ${payoutSpeed === 'instant' || isDebitCard ? 'text-yellow-400' : 'text-cyan-400'}`}>
+                    {isDebitCard ? (
+                      <>
+                        <CreditCard className="w-3 h-3" />
+                        Instant to Card
+                      </>
+                    ) : payoutSpeed === 'instant' ? (
+                      <>
+                        <Zap className="w-3 h-3" />
+                        Instant RTP
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-3 h-3" />
+                        Standard ACH
+                      </>
+                    )}
                   </span>
                 </div>
+                {(payoutSpeed === 'instant' || isDebitCard) && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-yellow-500">Instant Fee (1.5%):</span>
+                    <span className="text-yellow-500">-${getFeeAmount()}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm border-t border-white/10 pt-2">
-                  <span className="text-cyan-400 font-medium">You'll Receive:</span>
-                  <span className="font-bold text-lg text-cyan-400">${getNetAmount()}</span>
+                  <span className={`font-medium ${payoutSpeed === 'instant' || isDebitCard ? 'text-yellow-400' : 'text-cyan-400'}`}>You'll Receive:</span>
+                  <span className={`font-bold text-lg ${payoutSpeed === 'instant' || isDebitCard ? 'text-yellow-400' : 'text-cyan-400'}`}>${getNetAmount()}</span>
                 </div>
               </>
             )}
@@ -587,8 +683,10 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
               <span className="text-muted-foreground">
                 {recipientType === "self" ? "Estimated Arrival:" : "Status:"}
               </span>
-              <span className={recipientType === "self" ? 'text-cyan-400' : ''}>
-                {recipientType === "self" ? '1-3 business days' : "Pending acceptance"}
+              <span className={recipientType === "self" ? (payoutSpeed === 'instant' || isDebitCard ? 'text-yellow-400' : 'text-cyan-400') : ''}>
+                {recipientType === "self" 
+                  ? (isDebitCard || payoutSpeed === 'instant' ? 'Instant (seconds)' : '1-3 business days') 
+                  : "Pending acceptance"}
               </span>
             </div>
           </div>
