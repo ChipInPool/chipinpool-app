@@ -2349,6 +2349,10 @@ export async function registerRoutes(
         refresh_url: `${baseUrl}/security?refresh=true`,
         return_url: `${baseUrl}/security?success=true`,
         type: 'account_onboarding',
+        collection_options: {
+          fields: 'eventually_due',
+          future_requirements: 'omit',
+        },
       });
 
       res.json({ url: accountLink.url });
