@@ -246,11 +246,15 @@ export const walletDeposits = pgTable("wallet_deposits", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const payoutSpeedEnum = pgEnum('payout_speed', ['standard', 'instant']);
+
 export const walletWithdrawals = pgTable("wallet_withdrawals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
   bankAccountId: varchar("bank_account_id"),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  payoutSpeed: payoutSpeedEnum("payout_speed").notNull().default('standard'),
+  instantFee: decimal("instant_fee", { precision: 10, scale: 2 }),
   status: varchar("status", { length: 50 }).notNull().default("pending"),
   plaidTransferId: varchar("plaid_transfer_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Banknote, Building2, CheckCircle, XCircle, Loader2, AlertCircle, Shield, Clock } from "lucide-react";
+import { ArrowLeft, Banknote, Building2, CheckCircle, XCircle, Loader2, AlertCircle, Shield, Clock, Zap } from "lucide-react";
 import { Link, useRoute, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -39,6 +39,7 @@ export default function AcceptTransfer() {
   const { user, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>("");
+  const [payoutSpeed, setPayoutSpeed] = useState<'standard' | 'instant'>('standard');
   const [confirmDeclineOpen, setConfirmDeclineOpen] = useState(false);
 
   const requestId = params?.requestId;
@@ -69,6 +70,12 @@ export default function AcceptTransfer() {
   const transferRequest: TransferRequest | null = transferData?.request || null;
   const bankAccounts: BankAccount[] = Array.isArray(bankAccountsData) ? bankAccountsData : (bankAccountsData?.accounts || []);
 
+  // Calculate fees
+  const INSTANT_FEE_RATE = 0.015; // 1.5%
+  const rawAmount = transferRequest ? parseFloat(transferRequest.amount) : 0;
+  const instantFee = rawAmount * INSTANT_FEE_RATE;
+  const netAmount = payoutSpeed === 'instant' ? rawAmount - instantFee : rawAmount;
+
   useEffect(() => {
     if (bankAccounts.length > 0 && !selectedBankAccountId) {
       const defaultAccount = bankAccounts.find(a => a.isDefault) || bankAccounts[0];
@@ -77,7 +84,7 @@ export default function AcceptTransfer() {
   }, [bankAccounts, selectedBankAccountId]);
 
   const acceptMutation = useMutation({
-    mutationFn: async (data: { bankAccountId: string }) => {
+    mutationFn: async (data: { bankAccountId: string; payoutSpeed: 'standard' | 'instant' }) => {
       const res = await fetch(`/api/transfer-requests/${requestId}/accept`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -85,26 +92,41 @@ export default function AcceptTransfer() {
         body: JSON.stringify(data),
       });
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to accept transfer");
+        const errorData = await res.json();
+        const error: any = new Error(errorData.error || "Failed to accept transfer");
+        error.code = errorData.code; // Preserve structured error code
+        throw error;
       }
       return res.json();
     },
     onSuccess: (data) => {
+      const speedMsg = payoutSpeed === 'instant' 
+        ? "arriving instantly" 
+        : "arriving in 1-3 business days";
       toast({
         title: "Transfer Accepted",
-        description: "The funds will be transferred to your bank account within 1-3 business days.",
+        description: `$${netAmount.toFixed(2)} is ${speedMsg}.`,
       });
       queryClient.invalidateQueries({ queryKey: ["transferRequest", requestId] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       setLocation("/transactions");
     },
     onError: (error: any) => {
-      toast({
-        title: "Failed to Accept",
-        description: error.message,
-        variant: "destructive",
-      });
+      // Check if this is an RTP not supported error using structured code
+      if (error.code === 'RTP_NOT_SUPPORTED') {
+        // Switch to standard payout and show helpful message
+        setPayoutSpeed('standard');
+        toast({
+          title: "Instant Payout Unavailable",
+          description: "Your bank doesn't support instant payouts. We've switched to standard payout (1-3 business days, no fee).",
+        });
+      } else {
+        toast({
+          title: "Failed to Accept",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -149,7 +171,7 @@ export default function AcceptTransfer() {
       return;
     }
     
-    acceptMutation.mutate({ bankAccountId: selectedBankAccountId });
+    acceptMutation.mutate({ bankAccountId: selectedBankAccountId, payoutSpeed });
   };
 
   const handleDecline = () => {
@@ -284,12 +306,80 @@ export default function AcceptTransfer() {
                 </div>
               </div>
 
-              <div className="p-4 rounded-lg bg-white/5 border border-white/10 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-cyan-400" />
-                  <span className="text-sm font-medium">Standard Transfer</span>
-                </div>
-                <p className="text-xs text-muted-foreground">Funds will arrive in 1-3 business days. No fees.</p>
+              {/* Payout Speed Options */}
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Payout Speed</p>
+                
+                <button
+                  type="button"
+                  onClick={() => setPayoutSpeed('standard')}
+                  className={`w-full p-4 rounded-lg border text-left transition-all ${
+                    payoutSpeed === 'standard'
+                      ? "border-primary bg-primary/5"
+                      : "border-white/10 hover:border-white/20 bg-white/5"
+                  }`}
+                  data-testid="payout-speed-standard"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Clock className="w-5 h-5 text-cyan-400" />
+                      <div>
+                        <div className="font-medium text-sm">Standard</div>
+                        <div className="text-xs text-muted-foreground">1-3 business days</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium text-sm text-green-500">Free</div>
+                      <div className="text-xs text-muted-foreground">You receive ${rawAmount.toFixed(2)}</div>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPayoutSpeed('instant')}
+                  className={`w-full p-4 rounded-lg border text-left transition-all ${
+                    payoutSpeed === 'instant'
+                      ? "border-primary bg-primary/5"
+                      : "border-white/10 hover:border-white/20 bg-white/5"
+                  }`}
+                  data-testid="payout-speed-instant"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Zap className="w-5 h-5 text-yellow-500" />
+                      <div>
+                        <div className="font-medium text-sm flex items-center gap-2">
+                          Instant
+                          <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded">FAST</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">Arrives instantly</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium text-sm text-yellow-500">1.5% fee</div>
+                      <div className="text-xs text-muted-foreground">
+                        You receive ${(rawAmount - instantFee).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                  {payoutSpeed === 'instant' && (
+                    <div className="mt-2 pt-2 border-t border-white/10 text-xs text-muted-foreground">
+                      <div className="flex justify-between">
+                        <span>Amount:</span>
+                        <span>${rawAmount.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-yellow-500">
+                        <span>Instant fee (1.5%):</span>
+                        <span>-${instantFee.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between font-medium text-foreground">
+                        <span>You receive:</span>
+                        <span>${(rawAmount - instantFee).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+                </button>
               </div>
 
               <div className="p-4 rounded-lg bg-white/5 border border-white/10 space-y-3">

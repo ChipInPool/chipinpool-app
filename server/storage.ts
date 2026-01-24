@@ -429,11 +429,19 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async createWalletWithdrawal(userId: string, amount: string, bankAccountId?: string): Promise<{ id: string }> {
+  async createWalletWithdrawal(
+    userId: string, 
+    amount: string, 
+    bankAccountId?: string,
+    payoutSpeed: 'standard' | 'instant' = 'standard',
+    instantFee?: string
+  ): Promise<{ id: string }> {
     const [withdrawal] = await db.insert(walletWithdrawals).values({
       userId,
       amount,
       bankAccountId: bankAccountId || null,
+      payoutSpeed,
+      instantFee: instantFee || null,
       status: "pending",
     }).returning();
     return withdrawal;

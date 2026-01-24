@@ -2500,8 +2500,9 @@ export async function registerRoutes(
       const requestId = req.params.id;
       const userId = req.session.userId!;
 
-      const { bankAccountId } = z.object({
+      const { bankAccountId, payoutSpeed } = z.object({
         bankAccountId: z.string(),
+        payoutSpeed: z.enum(['standard', 'instant']).default('standard'),
       }).parse(req.body);
 
       const transferRequest = await storage.getPoolTransferRequest(requestId);
@@ -2530,8 +2531,10 @@ export async function registerRoutes(
       const transferAmount = parseFloat(transferRequest.amount);
       const poolBalance = parseFloat(pool.currentAmount);
 
-      // All payouts are standard (no fee)
-      const netAmount = transferAmount;
+      // Calculate instant payout fee (1.5% for instant, free for standard)
+      const INSTANT_FEE_RATE = 0.015; // 1.5%
+      const instantFee = payoutSpeed === 'instant' ? transferAmount * INSTANT_FEE_RATE : 0;
+      const netAmount = transferAmount - instantFee;
 
       if (transferAmount > poolBalance) {
         await storage.updatePoolTransferRequest(requestId, { status: 'failed' });
@@ -2552,7 +2555,9 @@ export async function registerRoutes(
       const withdrawal = await storage.createWalletWithdrawal(
         userId,
         netAmount.toFixed(2),
-        bankAccountId
+        bankAccountId,
+        payoutSpeed,
+        instantFee > 0 ? instantFee.toFixed(2) : undefined
       );
 
       // Execute payout via Plaid Transfer API
@@ -2594,39 +2599,62 @@ export async function registerRoutes(
           throw new Error('Bank account is not properly linked via Plaid for payouts. Please re-link your bank account.');
         }
 
+        // Determine network based on payout speed
+        // Instant: Use RTP (Real-Time Payments) - instant but requires bank support
+        // Standard: Use ACH - 1-3 business days but works with all banks
+        const transferNetwork = payoutSpeed === 'instant' ? TransferNetwork.Rtp : TransferNetwork.Ach;
+
         // Create transfer authorization first
-        const authResponse = await plaidClient.transferAuthorizationCreate({
+        const authRequest: any = {
           access_token: plaidAccessToken,
           account_id: plaidAccountId,
           type: TransferType.Credit, // Credit = send money TO user's bank
-          network: TransferNetwork.Ach, // Use ACH for standard transfers
+          network: transferNetwork,
           amount: netAmount.toFixed(2),
-          ach_class: ACHClass.Ppd, // PPD for personal payments
           user: {
             legal_name: `${recipient.firstName} ${recipient.lastName}`,
           },
-        });
+        };
+
+        // ACH requires ach_class, RTP does not
+        if (payoutSpeed === 'standard') {
+          authRequest.ach_class = ACHClass.Ppd;
+        }
+
+        const authResponse = await plaidClient.transferAuthorizationCreate(authRequest);
 
         const authorization = authResponse.data.authorization;
         
         if (authorization.decision !== 'approved') {
-          throw new Error(`Transfer not approved: ${authorization.decision_rationale?.description || 'Unknown reason'}`);
+          // If RTP fails, it might be because bank doesn't support it
+          const rationale = authorization.decision_rationale;
+          if (payoutSpeed === 'instant' && (rationale?.code === 'RTP_NOT_SUPPORTED' || rationale?.description?.toLowerCase().includes('rtp'))) {
+            const rtpError: any = new Error('Instant payout not available for this bank. Please use standard payout instead.');
+            rtpError.code = 'RTP_NOT_SUPPORTED';
+            throw rtpError;
+          }
+          throw new Error(`Transfer not approved: ${rationale?.description || 'Unknown reason'}`);
         }
 
         // Create the actual transfer
-        const transferResponse = await plaidClient.transferCreate({
+        const transferRequest: any = {
           authorization_id: authorization.id,
           access_token: plaidAccessToken,
           account_id: plaidAccountId,
           type: TransferType.Credit,
-          network: TransferNetwork.Ach,
+          network: transferNetwork,
           amount: netAmount.toFixed(2),
-          description: `ChipIn Pool Withdrawal`,
-          ach_class: ACHClass.Ppd,
+          description: `ChipIn Pool Withdrawal${payoutSpeed === 'instant' ? ' (Instant)' : ''}`,
           user: {
             legal_name: `${recipient.firstName} ${recipient.lastName}`,
           },
-        });
+        };
+
+        if (payoutSpeed === 'standard') {
+          transferRequest.ach_class = ACHClass.Ppd;
+        }
+
+        const transferResponse = await plaidClient.transferCreate(transferRequest);
 
         plaidTransferId = transferResponse.data.transfer.id;
         console.log(`[Payout] Plaid Transfer created: ${plaidTransferId} for $${netAmount.toFixed(2)} to user ${userId}`);
@@ -2643,6 +2671,23 @@ export async function registerRoutes(
         
         // Mark withdrawal as failed
         await storage.updateWalletWithdrawalStatus(withdrawal.id, 'failed');
+        
+        // Check if this is an RTP not supported error
+        if (plaidError.code === 'RTP_NOT_SUPPORTED') {
+          // Refund pool and return specific error
+          const refundedAmount = (parseFloat(newPoolAmount) + transferAmount).toFixed(2);
+          await storage.updatePoolAmount(transferRequest.poolId, refundedAmount);
+          
+          await storage.updatePoolTransferRequest(requestId, {
+            status: 'pending', // Keep pending so user can try again with standard
+            bankAccountId: null,
+          });
+          
+          return res.status(400).json({ 
+            error: 'Instant payout not available for this bank. Please use standard payout instead.',
+            code: 'RTP_NOT_SUPPORTED'
+          });
+        }
       }
 
       // Handle payout failure - refund pool
@@ -2668,11 +2713,13 @@ export async function registerRoutes(
       });
 
       // Create notification for recipient about pending payout
+      const speedDescription = payoutSpeed === 'instant' ? 'arriving instantly' : 'arriving in 1-3 business days';
+      const feeNote = instantFee > 0 ? ` (${INSTANT_FEE_RATE * 100}% instant fee: $${instantFee.toFixed(2)})` : '';
       await storage.createNotification({
         userId,
         type: 'contribution',
-        title: 'Withdrawal Pending',
-        message: `Your withdrawal of $${netAmount.toFixed(2)} to ${bankAccount.institutionName} ****${bankAccount.accountMask} is pending processing. You'll be notified when the transfer is complete.`,
+        title: payoutSpeed === 'instant' ? 'Instant Payout Processing' : 'Withdrawal Pending',
+        message: `Your ${payoutSpeed} payout of $${netAmount.toFixed(2)}${feeNote} to ${bankAccount.institutionName} ****${bankAccount.accountMask} is ${speedDescription}.`,
         link: `/transactions`,
       });
 
