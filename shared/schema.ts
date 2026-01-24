@@ -275,18 +275,21 @@ export const payoutMethodEnum = pgEnum('payout_method', ['bank_account', 'debit_
 export const bankAccounts = pgTable("bank_accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
+  // Stripe Financial Connections fields
+  stripeFinancialConnectionsAccountId: text("stripe_financial_connections_account_id"),
+  stripeExternalAccountId: text("stripe_external_account_id"),
+  // Legacy Plaid fields (deprecated)
   plaidAccountId: text("plaid_account_id"),
   plaidAccessToken: text("plaid_access_token"),
-  stripeExternalAccountId: text("stripe_external_account_id"),
   institutionName: text("institution_name").notNull(),
   accountName: text("account_name").notNull(),
   accountMask: text("account_mask").notNull(),
   accountType: text("account_type").notNull(),
   payoutMethod: payoutMethodEnum("payout_method").notNull().default('bank_account'),
   isDefault: boolean("is_default").notNull().default(false),
-  // Bank details for direct payouts (no Connect account needed for users)
+  // Bank details for direct payouts
   routingNumber: text("routing_number"),
-  accountNumber: text("account_number"), // Encrypted in production
+  accountNumber: text("account_number"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
