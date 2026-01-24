@@ -2554,17 +2554,109 @@ export async function registerRoutes(
         bankAccountId
       );
 
-      // Log the withdrawal for audit - actual payout requires manual processing or Plaid Transfer API
-      console.log(`[Payout] Withdrawal created: $${netAmount.toFixed(2)} to bank account ${bankAccountId} for user ${userId}, withdrawal ID: ${withdrawal.id}`);
-      console.log(`[Payout] Bank: ${bankAccount.institutionName} ****${bankAccount.accountMask}, Routing: ${bankAccount.routingNumber ? '****' + bankAccount.routingNumber.slice(-4) : 'N/A'}`);
+      // Execute payout via Plaid Transfer API
+      let plaidTransferId: string | null = null;
+      let payoutError: string | null = null;
       
-      // NOTE: In production, integrate with Plaid Transfer API or Stripe Treasury to execute actual bank transfers
-      // Current flow: withdrawal is marked as "pending" and requires manual admin processing
-      // To implement automated payouts:
-      // 1. Plaid Transfer: Use plaidClient.transferCreate() with the stored routing/account numbers
-      // 2. Stripe Treasury: Create OutboundPayment to external bank account
+      try {
+        const { PlaidApi, Configuration, PlaidEnvironments, TransferType, TransferNetwork, ACHClass } = await import('plaid');
+        
+        const plaidClientId = process.env.PLAID_CLIENT_ID;
+        const plaidSecret = process.env.PLAID_SECRET;
+        
+        if (!plaidClientId || !plaidSecret) {
+          throw new Error('Plaid not configured for payouts');
+        }
 
-      // Update transfer request status - marked as accepted but payout is pending
+        const plaidEnvName = process.env.PLAID_ENV || 'production';
+        const plaidEnv = plaidEnvName === 'sandbox' ? PlaidEnvironments.sandbox : 
+                         plaidEnvName === 'development' ? PlaidEnvironments.development : 
+                         PlaidEnvironments.production;
+        
+        const configuration = new Configuration({
+          basePath: plaidEnv,
+          baseOptions: {
+            headers: {
+              'PLAID-CLIENT-ID': plaidClientId,
+              'PLAID-SECRET': plaidSecret,
+            },
+          },
+        });
+
+        const plaidClient = new PlaidApi(configuration);
+
+        // Get user's Plaid access token for the linked bank account
+        if (!recipient.plaidAccessToken) {
+          throw new Error('User does not have a Plaid-linked bank account');
+        }
+
+        // Create transfer authorization first
+        const authResponse = await plaidClient.transferAuthorizationCreate({
+          access_token: recipient.plaidAccessToken,
+          account_id: bankAccount.plaidAccountId || recipient.plaidAccountId!,
+          type: TransferType.Credit, // Credit = send money TO user's bank
+          network: TransferNetwork.Ach, // Use ACH for standard transfers
+          amount: netAmount.toFixed(2),
+          ach_class: ACHClass.Ppd, // PPD for personal payments
+          user: {
+            legal_name: `${recipient.firstName} ${recipient.lastName}`,
+          },
+        });
+
+        const authorization = authResponse.data.authorization;
+        
+        if (authorization.decision !== 'approved') {
+          throw new Error(`Transfer not approved: ${authorization.decision_rationale?.description || 'Unknown reason'}`);
+        }
+
+        // Create the actual transfer
+        const transferResponse = await plaidClient.transferCreate({
+          authorization_id: authorization.id,
+          access_token: recipient.plaidAccessToken,
+          account_id: bankAccount.plaidAccountId || recipient.plaidAccountId!,
+          type: TransferType.Credit,
+          network: TransferNetwork.Ach,
+          amount: netAmount.toFixed(2),
+          description: `ChipIn Pool Withdrawal`,
+          ach_class: ACHClass.Ppd,
+          user: {
+            legal_name: `${recipient.firstName} ${recipient.lastName}`,
+          },
+        });
+
+        plaidTransferId = transferResponse.data.transfer.id;
+        console.log(`[Payout] Plaid Transfer created: ${plaidTransferId} for $${netAmount.toFixed(2)} to user ${userId}`);
+
+        // Update withdrawal with Plaid transfer ID
+        await storage.updateWalletWithdrawal(withdrawal.id, {
+          plaidTransferId,
+          status: 'pending', // Will be updated via webhook when transfer completes
+        });
+
+      } catch (plaidError: any) {
+        console.error('[Payout] Plaid Transfer error:', plaidError.response?.data || plaidError.message);
+        payoutError = plaidError.response?.data?.error_message || plaidError.message || 'Payout failed';
+        
+        // Mark withdrawal as failed
+        await storage.updateWalletWithdrawalStatus(withdrawal.id, 'failed');
+      }
+
+      // Handle payout failure - refund pool
+      if (payoutError) {
+        const refundedAmount = (parseFloat(newPoolAmount) + transferAmount).toFixed(2);
+        await storage.updatePoolAmount(transferRequest.poolId, refundedAmount);
+        
+        await storage.updatePoolTransferRequest(requestId, {
+          status: 'failed',
+          bankAccountId,
+        });
+        
+        return res.status(500).json({ 
+          error: `Payout failed: ${payoutError}. Pool balance has been restored.` 
+        });
+      }
+
+      // Update transfer request status
       await storage.updatePoolTransferRequest(requestId, {
         status: 'accepted',
         bankAccountId,

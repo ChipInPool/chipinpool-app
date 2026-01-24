@@ -252,6 +252,7 @@ export const walletWithdrawals = pgTable("wallet_withdrawals", {
   bankAccountId: varchar("bank_account_id"),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   status: varchar("status", { length: 50 }).notNull().default("pending"),
+  plaidTransferId: varchar("plaid_transfer_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -343,15 +343,6 @@ export class DatabaseStorage implements IStorage {
     return transaction;
   }
 
-  async getUserBadges(userId: string): Promise<any[]> {
-    const result = await db
-      .select({ badge: badges })
-      .from(userBadges)
-      .innerJoin(badges, eq(userBadges.badgeId, badges.id))
-      .where(eq(userBadges.userId, userId));
-    return result.map((r: any) => r.badge);
-  }
-
   async followUser(followerId: string, followingId: string): Promise<void> {
     await db.insert(follows).values({ followerId, followingId });
   }
@@ -450,6 +441,10 @@ export class DatabaseStorage implements IStorage {
 
   async updateWalletWithdrawalStatus(id: string, status: string): Promise<void> {
     await db.update(walletWithdrawals).set({ status }).where(eq(walletWithdrawals.id, id));
+  }
+
+  async updateWalletWithdrawal(id: string, data: { status?: string; plaidTransferId?: string }): Promise<void> {
+    await db.update(walletWithdrawals).set(data).where(eq(walletWithdrawals.id, id));
   }
 
   async getWalletHistory(userId: string): Promise<{ deposits: any[]; withdrawals: any[] }> {
