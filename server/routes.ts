@@ -2041,6 +2041,7 @@ export async function registerRoutes(
       const bankAccount = await storage.createBankAccount({
         userId,
         plaidAccountId: accountId,
+        plaidAccessToken: accessToken,
         institutionName: institutionName || account.official_name || account.name || 'Bank Account',
         accountName: account.name || 'Checking',
         accountMask: account.mask || numbers.account.slice(-4),
@@ -2585,15 +2586,18 @@ export async function registerRoutes(
 
         const plaidClient = new PlaidApi(configuration);
 
-        // Get user's Plaid access token for the linked bank account
-        if (!recipient.plaidAccessToken) {
-          throw new Error('User does not have a Plaid-linked bank account');
+        // Validate bank account has required Plaid data for transfers
+        const plaidAccessToken = bankAccount.plaidAccessToken || recipient.plaidAccessToken;
+        const plaidAccountId = bankAccount.plaidAccountId || recipient.plaidAccountId;
+        
+        if (!plaidAccessToken || !plaidAccountId) {
+          throw new Error('Bank account is not properly linked via Plaid for payouts. Please re-link your bank account.');
         }
 
         // Create transfer authorization first
         const authResponse = await plaidClient.transferAuthorizationCreate({
-          access_token: recipient.plaidAccessToken,
-          account_id: bankAccount.plaidAccountId || recipient.plaidAccountId!,
+          access_token: plaidAccessToken,
+          account_id: plaidAccountId,
           type: TransferType.Credit, // Credit = send money TO user's bank
           network: TransferNetwork.Ach, // Use ACH for standard transfers
           amount: netAmount.toFixed(2),
@@ -2612,8 +2616,8 @@ export async function registerRoutes(
         // Create the actual transfer
         const transferResponse = await plaidClient.transferCreate({
           authorization_id: authorization.id,
-          access_token: recipient.plaidAccessToken,
-          account_id: bankAccount.plaidAccountId || recipient.plaidAccountId!,
+          access_token: plaidAccessToken,
+          account_id: plaidAccountId,
           type: TransferType.Credit,
           network: TransferNetwork.Ach,
           amount: netAmount.toFixed(2),

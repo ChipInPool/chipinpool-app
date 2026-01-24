@@ -272,6 +272,7 @@ export const bankAccounts = pgTable("bank_accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
   plaidAccountId: text("plaid_account_id"),
+  plaidAccessToken: text("plaid_access_token"),
   stripeExternalAccountId: text("stripe_external_account_id"),
   institutionName: text("institution_name").notNull(),
   accountName: text("account_name").notNull(),
