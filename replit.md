@@ -112,14 +112,16 @@ Preferred communication style: Simple, everyday language.
     - Automatic notifications for: 2FA enable/disable, password reset, KYC verification, wallet withdrawals
     - Global channel opt-out respected (notifyEmail/notifySMS gates all category notifications)
 17. **Pool Withdrawals** - Simplified bank withdrawal system (platform-managed payouts):
-    - Users link bank accounts directly (routing/account numbers stored securely)
+    - Users link bank accounts via Plaid Link (secure bank login, verified account details)
+    - Plaid Auth API retrieves routing/account numbers after user authenticates
     - Pool creators can withdraw funds to their own linked bank account
     - Pool creators can send transfer requests to any contributor
     - Contributors receive notifications and can accept/decline transfer requests
     - Accept flow includes bank account selection
     - Transfer tracking with status: pending → accepted → completed/cancelled/failed
     - Standard payouts only (1-3 business days, no fees)
-    - **Architecture**: Regular users do NOT use Stripe Connect - platform holds balances and processes payouts
+    - **Architecture**: Regular users use Plaid for bank linking, NOT Stripe Connect
+    - Platform holds user balances and processes payouts using Plaid-verified account details
     - Only ChipInPay merchants use Stripe Connect (for automated daily payouts)
 
 ### ChipInPay Merchant API:
@@ -165,7 +167,8 @@ Preferred communication style: Simple, everyday language.
 ## External Dependencies
 
 ### Third-Party Services (Production APIs)
-- **Stripe**: Payments, Stripe Identity (KYC), Stripe Issuing (virtual cards), Stripe Connect (bank payouts)
+- **Plaid**: Bank account linking for regular users (Plaid Link for secure bank login and verification, Auth API for routing/account numbers)
+- **Stripe**: Payments, Stripe Identity (KYC), Stripe Issuing (virtual cards), Stripe Connect (ChipInPay merchants only)
 - **Resend**: Email invitations
 - **ClickSend**: SMS invitations
 - **Fonts**: Google Fonts (Inter, Plus Jakarta Sans)
@@ -180,6 +183,7 @@ Preferred communication style: Simple, everyday language.
 - `framer-motion`: Animations
 - `date-fns`: Date formatting
 - `lucide-react`: Icon library
+- `plaid` / `react-plaid-link`: Plaid SDK for bank account linking
 
 ### Build Tools
 - **Bundler**: Vite for frontend, esbuild for backend
