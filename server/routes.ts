@@ -2543,23 +2543,40 @@ export async function registerRoutes(
         return res.status(404).json({ error: "User not found" });
       }
 
-      // Update transfer request
+      // Deduct from pool first
+      const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
+      await storage.updatePoolAmount(transferRequest.poolId, newPoolAmount);
+
+      // Create wallet withdrawal record to track the payout
+      const withdrawal = await storage.createWalletWithdrawal(
+        userId,
+        netAmount.toFixed(2),
+        bankAccountId
+      );
+
+      // Log the withdrawal for audit - actual payout requires manual processing or Plaid Transfer API
+      console.log(`[Payout] Withdrawal created: $${netAmount.toFixed(2)} to bank account ${bankAccountId} for user ${userId}, withdrawal ID: ${withdrawal.id}`);
+      console.log(`[Payout] Bank: ${bankAccount.institutionName} ****${bankAccount.accountMask}, Routing: ${bankAccount.routingNumber ? '****' + bankAccount.routingNumber.slice(-4) : 'N/A'}`);
+      
+      // NOTE: In production, integrate with Plaid Transfer API or Stripe Treasury to execute actual bank transfers
+      // Current flow: withdrawal is marked as "pending" and requires manual admin processing
+      // To implement automated payouts:
+      // 1. Plaid Transfer: Use plaidClient.transferCreate() with the stored routing/account numbers
+      // 2. Stripe Treasury: Create OutboundPayment to external bank account
+
+      // Update transfer request status - marked as accepted but payout is pending
       await storage.updatePoolTransferRequest(requestId, {
         status: 'accepted',
         bankAccountId,
         acceptedAt: new Date(),
       });
 
-      // Deduct from pool
-      const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
-      await storage.updatePoolAmount(transferRequest.poolId, newPoolAmount);
-
       // Create notification for recipient about pending payout
       await storage.createNotification({
         userId,
         type: 'contribution',
-        title: 'Withdrawal Initiated',
-        message: `Your withdrawal of $${netAmount.toFixed(2)} to ${bankAccount.institutionName} ****${bankAccount.accountMask} has been initiated. Funds typically arrive in 1-3 business days.`,
+        title: 'Withdrawal Pending',
+        message: `Your withdrawal of $${netAmount.toFixed(2)} to ${bankAccount.institutionName} ****${bankAccount.accountMask} is pending processing. You'll be notified when the transfer is complete.`,
         link: `/transactions`,
       });
 
@@ -2576,13 +2593,26 @@ export async function registerRoutes(
         });
       }
 
-      const arrivalTime = '1-3 business days';
+      // Send wallet activity notification
+      const { sendWalletActivityNotification } = await import('./notificationService');
+      sendWalletActivityNotification(
+        recipient.email,
+        recipient.phone,
+        recipient.firstName,
+        'withdrawal',
+        netAmount.toFixed(2),
+        'pending',
+        recipient.notifyEmail && recipient.emailWalletActivity,
+        recipient.notifySMS && recipient.smsWalletActivity
+      ).catch(console.error);
+
       res.json({ 
-        message: `Transfer accepted! $${netAmount.toFixed(2)} will arrive in ${arrivalTime}.`,
-        payoutSpeed: 'standard',
+        message: `Transfer accepted! Your withdrawal of $${netAmount.toFixed(2)} is now pending. You'll be notified when the transfer completes.`,
+        status: 'pending',
         amount: transferAmount.toFixed(2),
         fee: '0.00',
         netAmount: netAmount.toFixed(2),
+        withdrawalId: withdrawal.id,
       });
     } catch (error) {
       next(error);
