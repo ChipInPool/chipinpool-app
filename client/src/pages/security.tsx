@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { usePlaidLink } from 'react-plaid-link';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
@@ -184,17 +185,12 @@ export default function Security() {
   
   const bankAccounts = bankAccountsData?.accounts || [];
 
-  const [showBankDialog, setShowBankDialog] = useState(false);
-  const [bankForm, setBankForm] = useState({
-    accountHolderName: '',
-    routingNumber: '',
-    accountNumber: '',
-    accountType: 'checking' as 'checking' | 'savings',
-  });
+  const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
+  const [plaidLoading, setPlaidLoading] = useState(false);
 
-  const linkBankMutation = useMutation({
-    mutationFn: async (data: typeof bankForm) => {
-      const res = await fetch('/api/bank-accounts/link', {
+  const exchangePlaidTokenMutation = useMutation({
+    mutationFn: async (data: { publicToken: string; accountId: string; institutionName?: string }) => {
+      const res = await fetch('/api/plaid/exchange-token', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -206,25 +202,62 @@ export default function Security() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
-      toast({ description: "Bank account linked successfully!" });
-      setShowBankDialog(false);
-      setBankForm({ accountHolderName: '', routingNumber: '', accountNumber: '', accountType: 'checking' });
+      toast({ description: "Bank account linked successfully via Plaid!" });
+      setPlaidLinkToken(null);
     },
     onError: (error: any) => {
       toast({ description: error.message || "Failed to link bank account", variant: "destructive" });
     },
   });
 
-  const handleLinkBank = () => {
-    if (user) {
-      setBankForm(prev => ({
-        ...prev,
-        accountHolderName: `${user.firstName} ${user.lastName}`,
-      }));
+  const { open: openPlaidLink, ready: plaidReady } = usePlaidLink({
+    token: plaidLinkToken,
+    onSuccess: (publicToken, metadata) => {
+      if (metadata.accounts && metadata.accounts.length > 0) {
+        const account = metadata.accounts[0];
+        exchangePlaidTokenMutation.mutate({
+          publicToken,
+          accountId: account.id,
+          institutionName: metadata.institution?.name,
+        });
+      }
+    },
+    onExit: (err) => {
+      if (err) {
+        console.error('[Plaid Link] Exit error:', err);
+        toast({ description: err.display_message || "Bank linking was cancelled", variant: "destructive" });
+      }
+      setPlaidLinkToken(null);
+    },
+  });
+
+  useEffect(() => {
+    if (plaidLinkToken && plaidReady) {
+      openPlaidLink();
     }
-    setShowBankDialog(true);
+  }, [plaidLinkToken, plaidReady, openPlaidLink]);
+
+  const handleLinkBank = async () => {
+    setPlaidLoading(true);
+    try {
+      const res = await fetch('/api/plaid/link-token', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || err.message || 'Failed to initiate bank linking');
+      }
+      const data = await res.json();
+      setPlaidLinkToken(data.linkToken);
+    } catch (error: any) {
+      toast({ description: error.message || "Failed to start bank linking", variant: "destructive" });
+    } finally {
+      setPlaidLoading(false);
+    }
   };
 
   const [showDebitCardDialog, setShowDebitCardDialog] = useState(false);
@@ -726,7 +759,7 @@ export default function Security() {
                   </Badge>
                 )}
               </div>
-              <CardDescription>Link a bank account for standard withdrawals (1-3 business days, free)</CardDescription>
+              <CardDescription>Securely link your bank via Plaid for verified withdrawals (1-3 business days, free)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {bankAccountsList.length > 0 && (
@@ -752,9 +785,11 @@ export default function Security() {
                 variant={bankAccountsList.length > 0 ? "outline" : "default"}
                 className={bankAccountsList.length > 0 ? "" : "bg-gradient-to-r from-cyan-500 to-blue-500"}
                 data-testid="button-link-bank"
+                disabled={plaidLoading || exchangePlaidTokenMutation.isPending}
               >
-                <Plus className="w-4 h-4 mr-2" />
-                {bankAccountsList.length > 0 ? "Add Another Account" : "Link Bank Account"}
+                {(plaidLoading || exchangePlaidTokenMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {!plaidLoading && !exchangePlaidTokenMutation.isPending && <Plus className="w-4 h-4 mr-2" />}
+                {plaidLoading ? "Connecting..." : exchangePlaidTokenMutation.isPending ? "Linking..." : bankAccountsList.length > 0 ? "Add Another Account" : "Link Bank Account"}
               </Button>
             </CardContent>
           </Card>
@@ -930,84 +965,6 @@ export default function Security() {
               >
                 {regenerateCodesMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Regenerate
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showBankDialog} onOpenChange={setShowBankDialog}>
-        <DialogContent className="bg-card border-white/10">
-          <DialogHeader>
-            <DialogTitle>Link Bank Account</DialogTitle>
-            <DialogDescription>
-              Enter your bank account details to enable withdrawals. Your information is securely stored by Stripe.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="accountHolderName">Account Holder Name</Label>
-              <Input
-                id="accountHolderName"
-                placeholder="John Doe"
-                value={bankForm.accountHolderName}
-                onChange={(e) => setBankForm(prev => ({ ...prev, accountHolderName: e.target.value }))}
-                data-testid="input-account-holder-name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="routingNumber">Routing Number</Label>
-              <Input
-                id="routingNumber"
-                placeholder="9 digits"
-                value={bankForm.routingNumber}
-                onChange={(e) => setBankForm(prev => ({ ...prev, routingNumber: e.target.value.replace(/\D/g, '').slice(0, 9) }))}
-                maxLength={9}
-                data-testid="input-routing-number"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="accountNumber">Account Number</Label>
-              <Input
-                id="accountNumber"
-                placeholder="Account number"
-                value={bankForm.accountNumber}
-                onChange={(e) => setBankForm(prev => ({ ...prev, accountNumber: e.target.value.replace(/\D/g, '').slice(0, 17) }))}
-                data-testid="input-account-number"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Account Type</Label>
-              <Select
-                value={bankForm.accountType}
-                onValueChange={(value: 'checking' | 'savings') => setBankForm(prev => ({ ...prev, accountType: value }))}
-              >
-                <SelectTrigger data-testid="select-account-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="checking">Checking</SelectItem>
-                  <SelectItem value="savings">Savings</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex gap-2 justify-end pt-4">
-              <Button variant="outline" onClick={() => setShowBankDialog(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => linkBankMutation.mutate(bankForm)}
-                disabled={
-                  !bankForm.accountHolderName ||
-                  bankForm.routingNumber.length !== 9 ||
-                  !bankForm.accountNumber ||
-                  linkBankMutation.isPending
-                }
-                className="bg-gradient-to-r from-cyan-500 to-blue-500"
-                data-testid="button-confirm-link-bank"
-              >
-                {linkBankMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Link Account
               </Button>
             </div>
           </div>
