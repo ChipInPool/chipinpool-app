@@ -144,6 +144,7 @@ export interface IStorage {
   getBankAccountById(id: string): Promise<BankAccount | undefined>;
   createBankAccount(account: InsertBankAccount): Promise<BankAccount>;
   setDefaultBankAccount(userId: string, accountId: string): Promise<void>;
+  deleteBankAccount(userId: string, accountId: string): Promise<void>;
 
   // Pool transfer request operations
   createPoolTransferRequest(request: InsertPoolTransferRequest): Promise<PoolTransferRequest>;
@@ -703,6 +704,11 @@ export class DatabaseStorage implements IStorage {
       .where(eq(bankAccounts.userId, userId));
     await db.update(bankAccounts)
       .set({ isDefault: true })
+      .where(and(eq(bankAccounts.id, accountId), eq(bankAccounts.userId, userId)));
+  }
+
+  async deleteBankAccount(userId: string, accountId: string): Promise<void> {
+    await db.delete(bankAccounts)
       .where(and(eq(bankAccounts.id, accountId), eq(bankAccounts.userId, userId)));
   }
 

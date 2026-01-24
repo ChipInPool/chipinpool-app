@@ -2499,6 +2499,24 @@ export async function registerRoutes(
     }
   });
 
+  // Delete bank account
+  app.delete("/api/bank-accounts/:id", requireAuth, async (req, res, next) => {
+    try {
+      const accountId = req.params.id;
+      const userId = req.session.userId!;
+      
+      const account = await storage.getBankAccountById(accountId);
+      if (!account || account.userId !== userId) {
+        return res.status(404).json({ error: "Bank account not found" });
+      }
+
+      await storage.deleteBankAccount(userId, accountId);
+      res.json({ message: "Bank account deleted" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Get pool contributors for transfer selection
   app.get("/api/pools/:id/contributors", requireAuth, async (req, res, next) => {
     try {

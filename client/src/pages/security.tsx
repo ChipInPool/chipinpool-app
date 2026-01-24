@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Shield, Mail, Phone, Key, Smartphone, UserCheck, CheckCircle, XCircle, Loader2, Building, Plus, CreditCard, Zap } from "lucide-react";
+import { Shield, Mail, Phone, Key, Smartphone, UserCheck, CheckCircle, XCircle, Loader2, Building, Plus, CreditCard, Zap, Trash2, Star } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { loadStripe, Stripe } from "@stripe/stripe-js";
@@ -226,6 +226,42 @@ export default function Security() {
       setConnectLoading(false);
     }
   };
+
+  const setDefaultMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      const res = await fetch(`/api/bank-accounts/${accountId}/default`, {
+        method: 'PUT',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to set default');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
+      toast({ description: "Default payout method updated" });
+    },
+    onError: () => {
+      toast({ description: "Failed to update default", variant: "destructive" });
+    },
+  });
+
+  const deleteBankAccountMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      const res = await fetch(`/api/bank-accounts/${accountId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to delete');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
+      toast({ description: "Payout method removed" });
+    },
+    onError: () => {
+      toast({ description: "Failed to remove payout method", variant: "destructive" });
+    },
+  });
 
   const [bankLinkLoading, setBankLinkLoading] = useState(false);
 
@@ -808,7 +844,31 @@ export default function Security() {
                             {account.accountType} ••••{account.accountMask}
                             {account.isDefault && <span className="ml-2 text-cyan-400">(Default)</span>}
                           </p>
+                          <p className="text-xs text-muted-foreground">Standard ACH (1-3 business days)</p>
                         </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!account.isDefault && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDefaultMutation.mutate(account.id)}
+                            disabled={setDefaultMutation.isPending}
+                            data-testid={`button-set-default-${account.id}`}
+                          >
+                            <Star className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteBankAccountMutation.mutate(account.id)}
+                          disabled={deleteBankAccountMutation.isPending}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          data-testid={`button-delete-bank-${account.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -916,7 +976,31 @@ export default function Security() {
                             ••••{account.accountMask}
                             {account.isDefault && <span className="ml-2 text-cyan-400">(Default)</span>}
                           </p>
+                          <p className="text-xs text-lime-400">Instant (seconds, 1.5% fee)</p>
                         </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!account.isDefault && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDefaultMutation.mutate(account.id)}
+                            disabled={setDefaultMutation.isPending}
+                            data-testid={`button-set-default-debit-${account.id}`}
+                          >
+                            <Star className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteBankAccountMutation.mutate(account.id)}
+                          disabled={deleteBankAccountMutation.isPending}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          data-testid={`button-delete-debit-${account.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
