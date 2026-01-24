@@ -1945,8 +1945,21 @@ export async function registerRoutes(
       const user = await storage.getUser(req.session.userId!);
       if (!user) return res.status(404).json({ error: "User not found" });
 
-      const host = process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS?.split(',')[0] || '';
+      // Use the production domain for redirect URI
+      const replitDomains = process.env.REPLIT_DOMAINS?.split(',') || [];
+      const devDomain = process.env.REPLIT_DEV_DOMAIN;
+      // Prefer the .replit.app domain (production) over dev domain
+      const prodDomain = replitDomains.find(d => d.includes('.replit.app')) || replitDomains[0];
+      const host = prodDomain || devDomain || '';
       const redirectUri = host ? `https://${host}/security` : undefined;
+      
+      console.log('[Plaid] Creating link token with:', {
+        plaidEnv: plaidEnvName,
+        host,
+        redirectUri,
+        replitDomains,
+        devDomain
+      });
       
       const linkTokenResponse = await plaidClient.linkTokenCreate({
         user: { client_user_id: user.id },
