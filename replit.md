@@ -112,17 +112,17 @@ Preferred communication style: Simple, everyday language.
     - Automatic notifications for: 2FA enable/disable, password reset, KYC verification, wallet withdrawals
     - Global channel opt-out respected (notifyEmail/notifySMS gates all category notifications)
 17. **Pool Withdrawals** - Simplified bank withdrawal system (platform-managed payouts):
-    - Users link bank accounts via Plaid Link (secure bank login, verified account details)
-    - Plaid Auth API retrieves routing/account numbers after user authenticates
+    - Users link bank accounts via Stripe Financial Connections (secure OAuth bank login)
     - Pool creators can withdraw funds to their own linked bank account
     - Pool creators can send transfer requests to any contributor
     - Contributors receive notifications and can accept/decline transfer requests
     - Accept flow includes bank account selection
     - Transfer tracking with status: pending → accepted → completed/cancelled/failed
-    - Standard payouts only (1-3 business days, no fees)
-    - **Architecture**: Regular users use Plaid for bank linking, NOT Stripe Connect
-    - Platform holds user balances and processes payouts using Plaid-verified account details
-    - Only ChipInPay merchants use Stripe Connect (for automated daily payouts)
+    - Standard payouts (1-3 business days, free) or instant payouts (1.5% fee)
+    - **Architecture**: Regular users use Stripe Financial Connections + Stripe Connect Express for payouts
+    - Platform transfers funds to user's Connect account, which handles payout to their bank
+    - ChipInPay merchants also use Stripe Connect (for automated daily payouts)
+    - Legacy Plaid-linked accounts still supported for existing users
 
 ### ChipInPay Merchant API:
 - `POST /api/v1/merchant/checkout` - Create checkout session
@@ -167,7 +167,9 @@ Preferred communication style: Simple, everyday language.
 ## External Dependencies
 
 ### Third-Party Services (Production APIs)
-- **Plaid**: Bank account linking for regular users (Plaid Link for secure bank login and verification, Auth API for routing/account numbers)
+- **Stripe Financial Connections**: Bank account linking and verification for regular users (OAuth-based secure bank login)
+- **Stripe Connect**: Payouts to users and merchants (Express accounts for users, Standard for merchants)
+- **Plaid** (legacy): Older bank account links still supported via Plaid Transfer API for payouts
 - **Stripe**: Payments, Stripe Identity (KYC), Stripe Issuing (virtual cards), Stripe Connect (ChipInPay merchants only)
 - **Resend**: Email invitations
 - **ClickSend**: SMS invitations
@@ -183,7 +185,7 @@ Preferred communication style: Simple, everyday language.
 - `framer-motion`: Animations
 - `date-fns`: Date formatting
 - `lucide-react`: Icon library
-- `plaid` / `react-plaid-link`: Plaid SDK for bank account linking
+- `plaid`: Plaid SDK for legacy bank account support
 
 ### Build Tools
 - **Bundler**: Vite for frontend, esbuild for backend

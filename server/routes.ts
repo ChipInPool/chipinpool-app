@@ -2156,16 +2156,248 @@ export async function registerRoutes(
     }
   });
 
+  // ========== STRIPE FINANCIAL CONNECTIONS ROUTES ==========
+
+  // Create a Financial Connections session for bank linking
+  app.post("/api/stripe/financial-connections/create-session", requireAuth, async (req, res, next) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Ensure user has a Stripe customer ID
+      let stripeCustomerId = user.stripeCustomerId;
+      if (!stripeCustomerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`,
+          metadata: { userId: user.id },
+        });
+        stripeCustomerId = customer.id;
+        await storage.updateUser(userId, { stripeCustomerId });
+      }
+
+      // Create Financial Connections session
+      const session = await stripe.financialConnections.sessions.create({
+        account_holder: {
+          type: 'customer',
+          customer: stripeCustomerId,
+        },
+        permissions: ['payment_method', 'balances', 'ownership'],
+        filters: {
+          countries: ['US'],
+        },
+      });
+
+      res.json({ 
+        clientSecret: session.client_secret,
+        sessionId: session.id,
+      });
+    } catch (error: any) {
+      console.error('[Stripe FC] Session creation error:', error.message);
+      next(error);
+    }
+  });
+
+  // Complete bank linking after user authorizes in Financial Connections
+  app.post("/api/stripe/financial-connections/complete", requireAuth, async (req, res, next) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const { accountId } = z.object({
+        accountId: z.string(), // Financial Connections account ID (fca_...)
+      }).parse(req.body);
+
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Retrieve the Financial Connections account
+      const fcAccount = await stripe.financialConnections.accounts.retrieve(accountId);
+      
+      // Validate ownership - ensure the FC account belongs to this user's Stripe customer
+      if (user.stripeCustomerId && fcAccount.account_holder) {
+        const accountHolder = fcAccount.account_holder as any;
+        if (accountHolder.customer && accountHolder.customer !== user.stripeCustomerId) {
+          return res.status(403).json({ error: "This account does not belong to you" });
+        }
+      }
+
+      // Check if already linked
+      const existingAccounts = await storage.getBankAccountsByUser(userId);
+      const alreadyLinked = existingAccounts.some(a => a.stripeFinancialConnectionsAccountId === accountId);
+      if (alreadyLinked) {
+        return res.status(400).json({ error: "This bank account is already linked" });
+      }
+
+      const isFirst = existingAccounts.length === 0;
+
+      // Determine account type
+      const accountSubtype = (fcAccount.subcategory as string) || 'checking';
+      const isDebitCard = accountSubtype === 'debit' || accountSubtype === 'prepaid';
+
+      // Create bank account record
+      const bankAccount = await storage.createBankAccount({
+        userId,
+        stripeFinancialConnectionsAccountId: accountId,
+        institutionName: fcAccount.institution_name || 'Bank Account',
+        accountName: fcAccount.display_name || 'Account',
+        accountMask: fcAccount.last4 || '****',
+        accountType: accountSubtype,
+        payoutMethod: isDebitCard ? 'debit_card' : 'bank_account',
+        isDefault: isFirst,
+      });
+
+      res.json({ 
+        message: "Bank account linked successfully",
+        account: {
+          id: bankAccount.id,
+          institutionName: bankAccount.institutionName,
+          accountMask: bankAccount.accountMask,
+          accountType: bankAccount.accountType,
+        }
+      });
+    } catch (error: any) {
+      console.error('[Stripe FC] Complete linking error:', error.message);
+      next(error);
+    }
+  });
+
+  // Get bank linking status
+  app.get("/api/stripe/bank-status", requireAuth, async (req, res, next) => {
+    try {
+      const accounts = await storage.getBankAccountsByUser(req.session.userId!);
+      const hasStripeLinkedAccount = accounts.some(a => a.stripeFinancialConnectionsAccountId);
+      
+      res.json({
+        hasBankLinked: accounts.length > 0,
+        hasStripeLinkedAccount,
+        accountCount: accounts.length,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Create Stripe Connect Express account for payouts (if needed)
+  app.post("/api/stripe/connect/create-account", requireAuth, async (req, res, next) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Check if user already has a Connect account
+      if (user.stripeConnectId) {
+        const account = await stripe.accounts.retrieve(user.stripeConnectId);
+        if (account) {
+          return res.json({ 
+            accountId: user.stripeConnectId,
+            chargesEnabled: account.charges_enabled,
+            payoutsEnabled: account.payouts_enabled,
+          });
+        }
+      }
+
+      // Create Express Connect account
+      const account = await stripe.accounts.create({
+        type: 'express',
+        country: 'US',
+        email: user.email,
+        capabilities: {
+          transfers: { requested: true },
+        },
+        business_type: 'individual',
+        individual: {
+          first_name: user.firstName,
+          last_name: user.lastName,
+          email: user.email,
+        },
+        metadata: { userId: user.id },
+      });
+
+      await storage.updateUser(userId, { stripeConnectId: account.id });
+
+      res.json({ 
+        accountId: account.id,
+        chargesEnabled: account.charges_enabled,
+        payoutsEnabled: account.payouts_enabled,
+      });
+    } catch (error: any) {
+      console.error('[Stripe Connect] Account creation error:', error.message);
+      next(error);
+    }
+  });
+
+  // Create Connect onboarding link
+  app.post("/api/stripe/connect/onboarding-link", requireAuth, async (req, res, next) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      if (!user.stripeConnectId) {
+        return res.status(400).json({ error: "No Connect account. Create one first." });
+      }
+
+      const host = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN || '';
+      const baseUrl = host ? `https://${host}` : 'http://localhost:5000';
+
+      const accountLink = await stripe.accountLinks.create({
+        account: user.stripeConnectId,
+        refresh_url: `${baseUrl}/security?refresh=true`,
+        return_url: `${baseUrl}/security?success=true`,
+        type: 'account_onboarding',
+      });
+
+      res.json({ url: accountLink.url });
+    } catch (error: any) {
+      console.error('[Stripe Connect] Onboarding link error:', error.message);
+      next(error);
+    }
+  });
+
+  // Get Connect account status
+  app.get("/api/stripe/connect/status", requireAuth, async (req, res, next) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      if (!user.stripeConnectId) {
+        return res.json({ 
+          hasConnectAccount: false,
+          chargesEnabled: false,
+          payoutsEnabled: false,
+        });
+      }
+
+      const account = await stripe.accounts.retrieve(user.stripeConnectId);
+      
+      res.json({
+        hasConnectAccount: true,
+        accountId: user.stripeConnectId,
+        chargesEnabled: account.charges_enabled,
+        payoutsEnabled: account.payouts_enabled,
+        detailsSubmitted: account.details_submitted,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // ========== POOL TRANSFER ROUTES ==========
 
   // Get user's linked bank accounts
   app.get("/api/bank-accounts", requireAuth, async (req, res, next) => {
     try {
       const accounts = await storage.getBankAccountsByUser(req.session.userId!);
-      // Add flag indicating if account can be used for payouts (has Plaid credentials)
+      // Add flag indicating if account can be used for payouts
+      // Now supports both Stripe Financial Connections and legacy Plaid
       const accountsWithPayoutStatus = accounts.map(account => ({
         ...account,
-        canReceivePayouts: !!(account.plaidAccessToken && account.plaidAccountId),
+        canReceivePayouts: !!(account.stripeFinancialConnectionsAccountId || (account.plaidAccessToken && account.plaidAccountId)),
       }));
       res.json({ accounts: accountsWithPayoutStatus });
     } catch (error) {
@@ -2398,119 +2630,179 @@ export async function registerRoutes(
           instantFee > 0 ? instantFee.toFixed(2) : undefined
         );
 
-        // Execute Plaid Transfer
-        let plaidTransferId: string | null = null;
+        // Execute payout - Stripe for new accounts, Plaid for legacy
+        let payoutTransferId: string | null = null;
         let payoutError: string | null = null;
+        const creator = await storage.getUser(userId);
         
-        try {
-          const { PlaidApi, Configuration, PlaidEnvironments, TransferType, TransferNetwork, ACHClass } = await import('plaid');
-          
-          const plaidClientId = process.env.PLAID_CLIENT_ID;
-          const plaidSecret = process.env.PLAID_SECRET;
-          
-          if (!plaidClientId || !plaidSecret) {
-            throw new Error('Plaid not configured for payouts');
-          }
-
-          const plaidEnvName = process.env.PLAID_ENV || 'production';
-          const plaidEnv = plaidEnvName === 'sandbox' ? PlaidEnvironments.sandbox : 
-                           plaidEnvName === 'development' ? PlaidEnvironments.development : 
-                           PlaidEnvironments.production;
-          
-          const configuration = new Configuration({
-            basePath: plaidEnv,
-            baseOptions: {
-              headers: {
-                'PLAID-CLIENT-ID': plaidClientId,
-                'PLAID-SECRET': plaidSecret,
-              },
-            },
-          });
-
-          const plaidClient = new PlaidApi(configuration);
-          const creator = await storage.getUser(userId);
-          
-          // Validate bank account has required Plaid data
-          const plaidAccessToken = bankAccount.plaidAccessToken || creator?.plaidAccessToken;
-          const plaidAccountId = bankAccount.plaidAccountId || creator?.plaidAccountId;
-          
-          if (!plaidAccessToken || !plaidAccountId) {
-            throw new Error('Bank account is not properly linked via Plaid for payouts');
-          }
-
-          // Determine network based on payout speed
-          const transferNetwork = payoutSpeed === 'instant' ? TransferNetwork.Rtp : TransferNetwork.Ach;
-
-          const authRequest: any = {
-            access_token: plaidAccessToken,
-            account_id: plaidAccountId,
-            type: TransferType.Credit,
-            network: transferNetwork,
-            amount: netAmount.toFixed(2),
-            user: {
-              legal_name: `${creator?.firstName || 'User'} ${creator?.lastName || ''}`,
-            },
-          };
-
-          if (payoutSpeed === 'standard') {
-            authRequest.ach_class = ACHClass.Ppd;
-          }
-
-          const authResponse = await plaidClient.transferAuthorizationCreate(authRequest);
-          const authorization = authResponse.data.authorization;
-          
-          if (authorization.decision !== 'approved') {
-            const rationale = authorization.decision_rationale;
-            const rationaleCode = rationale?.code as string | undefined;
-            if (payoutSpeed === 'instant' && (rationaleCode === 'RTP_NOT_SUPPORTED' || rationale?.description?.toLowerCase().includes('rtp'))) {
-              const rtpError: any = new Error('Instant payout not available for this bank');
-              rtpError.code = 'RTP_NOT_SUPPORTED';
-              throw rtpError;
+        // Check if this is a Stripe-linked account
+        const isStripeLinked = !!bankAccount.stripeFinancialConnectionsAccountId;
+        
+        if (isStripeLinked) {
+          // Use Stripe Connect for payouts
+          try {
+            const stripe = await getUncachableStripeClient();
+            
+            // Ensure user has a Connect account
+            if (!creator?.stripeConnectId) {
+              throw new Error('Please complete your payout setup first. Go to Security settings to set up payouts.');
             }
-            throw new Error(`Transfer not approved: ${rationale?.description || 'Unknown reason'}`);
-          }
-
-          // Create the actual transfer
-          const transferReq: any = {
-            authorization_id: authorization.id,
-            access_token: plaidAccessToken,
-            account_id: plaidAccountId,
-            type: TransferType.Credit,
-            network: transferNetwork,
-            amount: netAmount.toFixed(2),
-            description: `ChipIn Pool Withdrawal${payoutSpeed === 'instant' ? ' (Instant)' : ''}`,
-            user: {
-              legal_name: `${creator?.firstName || 'User'} ${creator?.lastName || ''}`,
-            },
-          };
-
-          if (payoutSpeed === 'standard') {
-            transferReq.ach_class = ACHClass.Ppd;
-          }
-
-          const transferResponse = await plaidClient.transferCreate(transferReq);
-          plaidTransferId = transferResponse.data.transfer.id;
-          
-          // Update withdrawal with Plaid transfer ID
-          await storage.updateWalletWithdrawal(withdrawal.id, {
-            plaidTransferId,
-            status: 'pending',
-          });
-
-        } catch (plaidError: any) {
-          console.error('[Payout] Plaid Transfer error:', plaidError.response?.data || plaidError.message);
-          payoutError = plaidError.response?.data?.error_message || plaidError.message || 'Payout failed';
-          
-          await storage.updateWalletWithdrawalStatus(withdrawal.id, 'failed');
-          
-          if (plaidError.code === 'RTP_NOT_SUPPORTED') {
-            // Refund pool and return error
-            await storage.updatePoolAmount(poolId, poolBalance.toFixed(2));
-            await storage.updatePoolTransferRequest(transfer.id, { status: 'pending' });
-            return res.status(400).json({ 
-              error: 'Instant payout not available for this bank. Please use standard payout.',
-              code: 'RTP_NOT_SUPPORTED'
+            
+            // Check Connect account status
+            const connectAccount = await stripe.accounts.retrieve(creator.stripeConnectId);
+            if (!connectAccount.payouts_enabled) {
+              throw new Error('Your payout account is not fully set up. Please complete onboarding in Security settings.');
+            }
+            
+            // Transfer funds from platform to Connect account
+            const stripeTransfer = await stripe.transfers.create({
+              amount: Math.round(netAmount * 100), // Convert to cents
+              currency: 'usd',
+              destination: creator.stripeConnectId,
+              description: `ChipIn Pool Withdrawal${payoutSpeed === 'instant' ? ' (Instant)' : ''}`,
+              metadata: {
+                poolId,
+                withdrawalId: withdrawal.id,
+                payoutSpeed,
+              },
             });
+            
+            payoutTransferId = stripeTransfer.id;
+            
+            // For instant payouts, request an instant payout on the Connect account
+            if (payoutSpeed === 'instant') {
+              try {
+                const payout = await stripe.payouts.create({
+                  amount: Math.round(netAmount * 100),
+                  currency: 'usd',
+                  method: 'instant',
+                }, {
+                  stripeAccount: creator.stripeConnectId,
+                });
+                console.log('[Payout] Instant payout created:', payout.id);
+              } catch (instantError: any) {
+                // Instant payout failed, will use standard timing
+                console.log('[Payout] Instant payout not available, using standard:', instantError.message);
+              }
+            }
+            
+            // Update withdrawal with transfer ID
+            await storage.updateWalletWithdrawal(withdrawal.id, {
+              plaidTransferId: payoutTransferId, // Reuse field for Stripe transfer ID
+              status: 'pending',
+            });
+            
+          } catch (stripeError: any) {
+            console.error('[Payout] Stripe Transfer error:', stripeError.message);
+            payoutError = stripeError.message || 'Payout failed';
+            await storage.updateWalletWithdrawalStatus(withdrawal.id, 'failed');
+          }
+        } else {
+          // Legacy: Use Plaid Transfer for older accounts
+          try {
+            const { PlaidApi, Configuration, PlaidEnvironments, TransferType, TransferNetwork, ACHClass } = await import('plaid');
+            
+            const plaidClientId = process.env.PLAID_CLIENT_ID;
+            const plaidSecret = process.env.PLAID_SECRET;
+            
+            if (!plaidClientId || !plaidSecret) {
+              throw new Error('Please link your bank account using the new method in Security settings.');
+            }
+
+            const plaidEnvName = process.env.PLAID_ENV || 'production';
+            const plaidEnv = plaidEnvName === 'sandbox' ? PlaidEnvironments.sandbox : 
+                             plaidEnvName === 'development' ? PlaidEnvironments.development : 
+                             PlaidEnvironments.production;
+            
+            const configuration = new Configuration({
+              basePath: plaidEnv,
+              baseOptions: {
+                headers: {
+                  'PLAID-CLIENT-ID': plaidClientId,
+                  'PLAID-SECRET': plaidSecret,
+                },
+              },
+            });
+
+            const plaidClient = new PlaidApi(configuration);
+            
+            const plaidAccessToken = bankAccount.plaidAccessToken || creator?.plaidAccessToken;
+            const plaidAccountId = bankAccount.plaidAccountId || creator?.plaidAccountId;
+            
+            if (!plaidAccessToken || !plaidAccountId) {
+              throw new Error('Bank account is not properly linked. Please re-link in Security settings.');
+            }
+
+            const transferNetwork = payoutSpeed === 'instant' ? TransferNetwork.Rtp : TransferNetwork.Ach;
+
+            const authRequest: any = {
+              access_token: plaidAccessToken,
+              account_id: plaidAccountId,
+              type: TransferType.Credit,
+              network: transferNetwork,
+              amount: netAmount.toFixed(2),
+              user: {
+                legal_name: `${creator?.firstName || 'User'} ${creator?.lastName || ''}`,
+              },
+            };
+
+            if (payoutSpeed === 'standard') {
+              authRequest.ach_class = ACHClass.Ppd;
+            }
+
+            const authResponse = await plaidClient.transferAuthorizationCreate(authRequest);
+            const authorization = authResponse.data.authorization;
+            
+            if (authorization.decision !== 'approved') {
+              const rationale = authorization.decision_rationale;
+              const rationaleCode = rationale?.code as string | undefined;
+              if (payoutSpeed === 'instant' && (rationaleCode === 'RTP_NOT_SUPPORTED' || rationale?.description?.toLowerCase().includes('rtp'))) {
+                const rtpError: any = new Error('Instant payout not available for this bank');
+                rtpError.code = 'RTP_NOT_SUPPORTED';
+                throw rtpError;
+              }
+              throw new Error(`Transfer not approved: ${rationale?.description || 'Unknown reason'}`);
+            }
+
+            const transferReq: any = {
+              authorization_id: authorization.id,
+              access_token: plaidAccessToken,
+              account_id: plaidAccountId,
+              type: TransferType.Credit,
+              network: transferNetwork,
+              amount: netAmount.toFixed(2),
+              description: `ChipIn Pool Withdrawal${payoutSpeed === 'instant' ? ' (Instant)' : ''}`,
+              user: {
+                legal_name: `${creator?.firstName || 'User'} ${creator?.lastName || ''}`,
+              },
+            };
+
+            if (payoutSpeed === 'standard') {
+              transferReq.ach_class = ACHClass.Ppd;
+            }
+
+            const transferResponse = await plaidClient.transferCreate(transferReq);
+            payoutTransferId = transferResponse.data.transfer.id;
+            
+            await storage.updateWalletWithdrawal(withdrawal.id, {
+              plaidTransferId: payoutTransferId,
+              status: 'pending',
+            });
+
+          } catch (plaidError: any) {
+            console.error('[Payout] Plaid Transfer error:', plaidError.response?.data || plaidError.message);
+            payoutError = plaidError.response?.data?.error_message || plaidError.message || 'Payout failed';
+            
+            await storage.updateWalletWithdrawalStatus(withdrawal.id, 'failed');
+            
+            if (plaidError.code === 'RTP_NOT_SUPPORTED') {
+              await storage.updatePoolAmount(poolId, poolBalance.toFixed(2));
+              await storage.updatePoolTransferRequest(transfer.id, { status: 'pending' });
+              return res.status(400).json({ 
+                error: 'Instant payout not available for this bank. Please use standard payout.',
+                code: 'RTP_NOT_SUPPORTED'
+              });
+            }
           }
         }
 

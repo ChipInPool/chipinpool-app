@@ -12,9 +12,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Shield, Mail, Phone, Key, Smartphone, UserCheck, CheckCircle, XCircle, Loader2, Building, Plus, CreditCard, Zap } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { loadStripe } from "@stripe/stripe-js";
+import { loadStripe, Stripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { usePlaidLink } from 'react-plaid-link';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
@@ -185,16 +184,15 @@ export default function Security() {
   
   const bankAccounts = bankAccountsData?.accounts || [];
 
-  const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
-  const [plaidLoading, setPlaidLoading] = useState(false);
+  const [bankLinkLoading, setBankLinkLoading] = useState(false);
 
-  const exchangePlaidTokenMutation = useMutation({
-    mutationFn: async (data: { publicToken: string; accountId: string; institutionName?: string }) => {
-      const res = await fetch('/api/plaid/exchange-token', {
+  const completeBankLinkMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      const res = await fetch('/api/stripe/financial-connections/complete', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ accountId }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -202,47 +200,19 @@ export default function Security() {
       }
       return res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
-      toast({ description: "Bank account linked successfully via Plaid!" });
-      setPlaidLinkToken(null);
+      toast({ description: "Bank account linked successfully!" });
     },
     onError: (error: any) => {
       toast({ description: error.message || "Failed to link bank account", variant: "destructive" });
     },
   });
 
-  const { open: openPlaidLink, ready: plaidReady } = usePlaidLink({
-    token: plaidLinkToken,
-    onSuccess: (publicToken, metadata) => {
-      if (metadata.accounts && metadata.accounts.length > 0) {
-        const account = metadata.accounts[0];
-        exchangePlaidTokenMutation.mutate({
-          publicToken,
-          accountId: account.id,
-          institutionName: metadata.institution?.name,
-        });
-      }
-    },
-    onExit: (err) => {
-      if (err) {
-        console.error('[Plaid Link] Exit error:', err);
-        toast({ description: err.display_message || "Bank linking was cancelled", variant: "destructive" });
-      }
-      setPlaidLinkToken(null);
-    },
-  });
-
-  useEffect(() => {
-    if (plaidLinkToken && plaidReady) {
-      openPlaidLink();
-    }
-  }, [plaidLinkToken, plaidReady, openPlaidLink]);
-
   const handleLinkBank = async () => {
-    setPlaidLoading(true);
+    setBankLinkLoading(true);
     try {
-      const res = await fetch('/api/plaid/link-token', {
+      const res = await fetch('/api/stripe/financial-connections/create-session', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -251,12 +221,33 @@ export default function Security() {
         const err = await res.json();
         throw new Error(err.error || err.message || 'Failed to initiate bank linking');
       }
-      const data = await res.json();
-      setPlaidLinkToken(data.linkToken);
+      const { clientSecret } = await res.json();
+      
+      const stripe = await stripePromise;
+      if (!stripe) {
+        throw new Error('Stripe not loaded');
+      }
+      
+      const result = await stripe.collectFinancialConnectionsAccounts({
+        clientSecret,
+      });
+      
+      if (result.error) {
+        throw new Error(result.error.message || 'Bank linking failed');
+      }
+      
+      if (result.financialConnectionsSession?.accounts && result.financialConnectionsSession.accounts.length > 0) {
+        const account = result.financialConnectionsSession.accounts[0];
+        completeBankLinkMutation.mutate(account.id);
+      } else {
+        toast({ description: "No accounts were selected", variant: "destructive" });
+      }
     } catch (error: any) {
-      toast({ description: error.message || "Failed to start bank linking", variant: "destructive" });
+      if (error.message !== 'Bank linking failed') {
+        toast({ description: error.message || "Failed to start bank linking", variant: "destructive" });
+      }
     } finally {
-      setPlaidLoading(false);
+      setBankLinkLoading(false);
     }
   };
 
@@ -759,7 +750,7 @@ export default function Security() {
                   </Badge>
                 )}
               </div>
-              <CardDescription>Securely link your bank via Plaid for verified withdrawals (1-3 business days, free)</CardDescription>
+              <CardDescription>Securely link your bank for verified withdrawals (1-3 business days, free)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {bankAccountsList.length > 0 && (
@@ -785,11 +776,11 @@ export default function Security() {
                 variant={bankAccountsList.length > 0 ? "outline" : "default"}
                 className={bankAccountsList.length > 0 ? "" : "bg-gradient-to-r from-cyan-500 to-blue-500"}
                 data-testid="button-link-bank"
-                disabled={plaidLoading || exchangePlaidTokenMutation.isPending}
+                disabled={bankLinkLoading || completeBankLinkMutation.isPending}
               >
-                {(plaidLoading || exchangePlaidTokenMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {!plaidLoading && !exchangePlaidTokenMutation.isPending && <Plus className="w-4 h-4 mr-2" />}
-                {plaidLoading ? "Connecting..." : exchangePlaidTokenMutation.isPending ? "Linking..." : bankAccountsList.length > 0 ? "Add Another Account" : "Link Bank Account"}
+                {(bankLinkLoading || completeBankLinkMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {!bankLinkLoading && !completeBankLinkMutation.isPending && <Plus className="w-4 h-4 mr-2" />}
+                {bankLinkLoading ? "Connecting..." : completeBankLinkMutation.isPending ? "Linking..." : bankAccountsList.length > 0 ? "Add Another Account" : "Link Bank Account"}
               </Button>
             </CardContent>
           </Card>
