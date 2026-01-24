@@ -48,8 +48,15 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
   const [recipientType, setRecipientType] = useState<"self" | "contributor">("self");
   const [selectedContributor, setSelectedContributor] = useState<Contributor | null>(null);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>("");
-    const [confirmOpen, setConfirmOpen] = useState(false);
+  const [payoutSpeed, setPayoutSpeed] = useState<'standard' | 'instant'>('standard');
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [notes, setNotes] = useState("");
+
+  // Fee calculation
+  const INSTANT_FEE_RATE = 0.015; // 1.5%
+  const transferAmountNum = parseFloat(transferAmount) || 0;
+  const instantFee = payoutSpeed === 'instant' ? transferAmountNum * INSTANT_FEE_RATE : 0;
+  const netAmountCalc = transferAmountNum - instantFee;
 
   const { data: bankAccountsData, isLoading: loadingBankAccounts } = useQuery({
     queryKey: ["bankAccounts"],
@@ -82,7 +89,7 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
   }, [bankAccounts, selectedBankAccountId]);
 
   const transferMutation = useMutation({
-    mutationFn: async (data: { toUserId: string; amount: string; notes?: string; bankAccountId?: string }) => {
+    mutationFn: async (data: { toUserId: string; amount: string; notes?: string; bankAccountId?: string; payoutSpeed?: 'standard' | 'instant' }) => {
       const res = await fetch(`/api/pools/${poolId}/transfer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -90,8 +97,10 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
         body: JSON.stringify(data),
       });
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || error.message || "Transfer failed");
+        const errorData = await res.json();
+        const error: any = new Error(errorData.error || errorData.message || "Transfer failed");
+        error.code = errorData.code;
+        throw error;
       }
       return res.json();
     },
@@ -107,11 +116,20 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
       onTransferComplete();
     },
     onError: (error: any) => {
-      toast({
-        title: "Transfer Failed",
-        description: error.message || "Could not process transfer",
-        variant: "destructive",
-      });
+      // Handle RTP not supported
+      if (error.code === 'RTP_NOT_SUPPORTED') {
+        setPayoutSpeed('standard');
+        toast({
+          title: "Instant Payout Unavailable",
+          description: "Your bank doesn't support instant payouts. We've switched to standard payout (1-3 business days, no fee).",
+        });
+      } else {
+        toast({
+          title: "Transfer Failed",
+          description: error.message || "Could not process transfer",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -144,17 +162,16 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
       amount: transferAmount,
       notes: notes || undefined,
       bankAccountId: recipientType === "self" ? selectedBankAccountId : undefined,
-          });
+      payoutSpeed: recipientType === "self" ? payoutSpeed : undefined,
+    });
   };
 
   const getFeeAmount = () => {
-    return '0.00';
+    return instantFee.toFixed(2);
   };
 
   const getNetAmount = () => {
-    const amount = parseFloat(transferAmount) || 0;
-    const fee = 0;
-    return (amount - fee).toFixed(2);
+    return netAmountCalc.toFixed(2);
   };
 
   const getRecipientName = () => {
@@ -264,30 +281,97 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
               <Zap className="w-4 h-4 text-lime-400" />
               <span className="text-sm font-medium">Payout Speed</span>
             </div>
-            <div className="p-4 rounded-lg border border-cyan-500/30 bg-cyan-500/10">
-              <div className="flex items-center gap-2 mb-2">
-                <RefreshCw className="w-4 h-4 text-cyan-400" />
-                <span className="font-semibold text-sm">Standard Transfer</span>
+            
+            {/* Standard Option */}
+            <button
+              type="button"
+              onClick={() => setPayoutSpeed('standard')}
+              className={`w-full p-4 rounded-lg border text-left transition-all ${
+                payoutSpeed === 'standard'
+                  ? "border-primary bg-primary/5"
+                  : "border-white/10 hover:border-white/20"
+              }`}
+              data-testid="payout-speed-standard"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <RefreshCw className="w-5 h-5 text-cyan-400" />
+                  <div>
+                    <div className="font-medium text-sm">Standard</div>
+                    <div className="text-xs text-muted-foreground">1-3 business days</div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-medium text-sm text-green-500">Free</div>
+                  <div className="text-xs text-muted-foreground">
+                    You receive ${transferAmountNum.toFixed(2)}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Arrival Time:</span>
-                <span className="font-medium text-cyan-400">1-3 business days</span>
+            </button>
+
+            {/* Instant Option */}
+            <button
+              type="button"
+              onClick={() => setPayoutSpeed('instant')}
+              className={`w-full p-4 rounded-lg border text-left transition-all ${
+                payoutSpeed === 'instant'
+                  ? "border-primary bg-primary/5"
+                  : "border-white/10 hover:border-white/20"
+              }`}
+              data-testid="payout-speed-instant"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Zap className="w-5 h-5 text-yellow-500" />
+                  <div>
+                    <div className="font-medium text-sm flex items-center gap-2">
+                      Instant
+                      <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded">FAST</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">Arrives instantly</div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-medium text-sm text-yellow-500">1.5% fee</div>
+                  <div className="text-xs text-muted-foreground">
+                    You receive ${(transferAmountNum - (transferAmountNum * INSTANT_FEE_RATE)).toFixed(2)}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center justify-between text-sm mt-1">
-                <span className="text-muted-foreground">Fee:</span>
-                <span className="font-bold text-green-400">Free</span>
-              </div>
-            </div>
+              {payoutSpeed === 'instant' && transferAmountNum > 0 && (
+                <div className="mt-2 pt-2 border-t border-white/10 text-xs text-muted-foreground">
+                  <div className="flex justify-between">
+                    <span>Amount:</span>
+                    <span>${transferAmountNum.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-yellow-500">
+                    <span>Instant fee (1.5%):</span>
+                    <span>-${instantFee.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-medium text-foreground">
+                    <span>You receive:</span>
+                    <span>${netAmountCalc.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+            </button>
             
             {transferAmount && parseFloat(transferAmount) > 0 && (
-              <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+              <div className={`p-3 rounded-lg border ${payoutSpeed === 'instant' ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-cyan-500/10 border-cyan-500/20'}`}>
                 <div className="flex items-center justify-between text-sm mb-1">
                   <span className="text-muted-foreground">Transfer Amount:</span>
                   <span className="font-medium">${parseFloat(transferAmount).toFixed(2)}</span>
                 </div>
+                {payoutSpeed === 'instant' && (
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-yellow-500">Instant Fee (1.5%):</span>
+                    <span className="text-yellow-500">-${getFeeAmount()}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-sm pt-1 border-t border-white/10">
-                  <span className="text-cyan-400 font-medium">You'll Receive:</span>
-                  <span className="font-bold text-cyan-400">${getNetAmount()}</span>
+                  <span className={`font-medium ${payoutSpeed === 'instant' ? 'text-yellow-400' : 'text-cyan-400'}`}>You'll Receive:</span>
+                  <span className={`font-bold ${payoutSpeed === 'instant' ? 'text-yellow-400' : 'text-cyan-400'}`}>${getNetAmount()}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   🏦 Arrives in 1-3 business days to your bank account
