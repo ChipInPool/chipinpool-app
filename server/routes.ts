@@ -1971,12 +1971,13 @@ export async function registerRoutes(
     }
   });
 
-  // Exchange public token for access token
+  // Exchange public token for access token and create bank account record
   app.post("/api/plaid/exchange-token", requireAuth, async (req, res, next) => {
     try {
-      const { publicToken, accountId } = z.object({
+      const { publicToken, accountId, institutionName } = z.object({
         publicToken: z.string(),
         accountId: z.string(),
+        institutionName: z.string().optional(),
       }).parse(req.body);
 
       const { PlaidApi, Configuration, PlaidEnvironments } = await import('plaid');
@@ -2004,22 +2005,75 @@ export async function registerRoutes(
       });
 
       const plaidClient = new PlaidApi(configuration);
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
 
+      // Exchange public token for access token
       const exchangeResponse = await plaidClient.itemPublicTokenExchange({
         public_token: publicToken,
       });
-
       const accessToken = exchangeResponse.data.access_token;
-      
-      // Store access token and account ID
-      await storage.updateUser(req.session.userId!, {
+
+      // Get account and routing numbers via Auth endpoint
+      const authResponse = await plaidClient.authGet({
+        access_token: accessToken,
+      });
+
+      // Find the specific account
+      const account = authResponse.data.accounts.find(a => a.account_id === accountId);
+      const numbers = authResponse.data.numbers.ach?.find(n => n.account_id === accountId);
+
+      if (!account || !numbers) {
+        return res.status(400).json({ error: "Could not retrieve bank account details" });
+      }
+
+      // Check if this account is already linked
+      const existingAccounts = await storage.getBankAccountsByUser(userId);
+      const alreadyLinked = existingAccounts.some(a => a.plaidAccountId === accountId);
+      if (alreadyLinked) {
+        return res.status(400).json({ error: "This bank account is already linked" });
+      }
+
+      const isFirst = existingAccounts.length === 0;
+
+      // Create bank account record with Plaid-verified details
+      const bankAccount = await storage.createBankAccount({
+        userId,
+        plaidAccountId: accountId,
+        institutionName: institutionName || account.official_name || account.name || 'Bank Account',
+        accountName: account.name || 'Checking',
+        accountMask: account.mask || numbers.account.slice(-4),
+        accountType: account.subtype || 'checking',
+        isDefault: isFirst,
+        routingNumber: numbers.routing,
+        accountNumber: numbers.account,
+      });
+
+      // Store access token on user for future API calls
+      await storage.updateUser(userId, {
         plaidAccessToken: accessToken,
         plaidAccountId: accountId,
       });
 
-      res.json({ message: "Bank account linked successfully" });
+      res.json({ 
+        message: "Bank account linked successfully via Plaid",
+        account: {
+          id: bankAccount.id,
+          institutionName: bankAccount.institutionName,
+          accountMask: bankAccount.accountMask,
+          accountType: bankAccount.accountType,
+        }
+      });
     } catch (error: any) {
-      console.error('[Plaid] Token exchange error:', error.message);
+      console.error('[Plaid] Token exchange error:', error.response?.data || error.message);
+      const plaidError = error.response?.data;
+      if (plaidError?.error_code) {
+        return res.status(400).json({ 
+          error: plaidError.error_message || 'Failed to link bank account',
+          code: plaidError.error_code 
+        });
+      }
       next(error);
     }
   });
