@@ -2,7 +2,27 @@ import Stripe from 'stripe';
 
 let connectionSettings: any;
 
+function isReplitEnvironment() {
+  return !!(process.env.REPLIT_CONNECTORS_HOSTNAME && (process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL));
+}
+
 async function getCredentials() {
+  // If not on Replit, use environment variables directly
+  if (!isReplitEnvironment()) {
+    const secretKey = process.env.STRIPE_SECRET_KEY;
+    const publishableKey = process.env.VITE_STRIPE_PUBLIC_KEY;
+    
+    if (!secretKey) {
+      throw new Error('STRIPE_SECRET_KEY environment variable not set');
+    }
+    
+    return {
+      publishableKey: publishableKey || '',
+      secretKey,
+    };
+  }
+
+  // On Replit, use connectors
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? 'repl ' + process.env.REPL_IDENTITY

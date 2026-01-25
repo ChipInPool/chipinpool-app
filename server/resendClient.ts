@@ -3,7 +3,26 @@ import { Resend } from 'resend';
 
 let connectionSettings: any;
 
+function isReplitEnvironment() {
+  return !!(process.env.REPLIT_CONNECTORS_HOSTNAME && (process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL));
+}
+
 async function getCredentials() {
+  // If not on Replit, use environment variables directly
+  if (!isReplitEnvironment()) {
+    const apiKey = process.env.RESEND_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('RESEND_API_KEY environment variable not set');
+    }
+    
+    return { 
+      apiKey, 
+      fromEmail: process.env.RESEND_FROM_EMAIL || 'noreply@chipin.app' 
+    };
+  }
+
+  // On Replit, use connectors
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY 
     ? 'repl ' + process.env.REPL_IDENTITY 
