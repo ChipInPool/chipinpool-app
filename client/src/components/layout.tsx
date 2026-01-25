@@ -64,9 +64,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <nav className="border-b border-white/5 bg-background/50 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 group cursor-pointer">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-background font-bold text-lg group-hover:scale-105 transition-transform">
-              C
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="ChipIn" 
+              className="w-8 h-8 rounded-lg group-hover:scale-105 transition-transform object-cover"
+            />
             <span className="font-display font-bold text-xl tracking-tight">ChipIn</span>
           </Link>
 
