@@ -1,0 +1,80 @@
+~/workspace$ DATABASE_URL="postgresql://chipinpool:bigzos-tabvEp2vejm@chipinpool-db.postgres.database.azure.com:5432/postgres?sslmode=require" npx tsx -e "
+import pg from 'pg';
+const client = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+await client.connect();
+const res = await client.query(\"SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'\");
+console.log('Tables:', res.rows.map(r => r.table_name));
+await client.end();
+"
+node:internal/process/promises:391
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+Error: Transform failed with 3 errors:
+/eval.ts:4:0: ERROR: Top-level await is currently not supported with the "cjs" output format
+/eval.ts:5:12: ERROR: Top-level await is currently not supported with the "cjs" output format
+/eval.ts:7:0: ERROR: Top-level await is currently not supported with the "cjs" output format
+    at failureErrorWithLog (/home/runner/workspace/node_modules/tsx/node_modules/esbuild/lib/main.js:1467:15)
+    at /home/runner/workspace/node_modules/tsx/node_modules/esbuild/lib/main.js:736:50
+    at responseCallbacks.<computed> (/home/runner/workspace/node_modules/tsx/node_modules/esbuild/lib/main.js:603:9)
+    at handleIncomingPacket (/home/runner/workspace/node_modules/tsx/node_modules/esbuild/lib/main.js:658:12)
+    at Socket.readFromStdout (/home/runner/workspace/node_modules/tsx/node_modules/esbuild/lib/main.js:581:7)
+    at Socket.emit (node:events:524:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:191:23) {
+  errors: [
+    {
+      detail: undefined,
+      id: '',
+      location: {
+        column: 0,
+        file: '/eval.ts',
+        length: 5,
+        line: 4,
+        lineText: 'await client.connect();',
+        namespace: '',
+        suggestion: ''
+      },
+      notes: [],
+      pluginName: '',
+      text: 'Top-level await is currently not supported with the "cjs" output format'
+    },
+    {
+      detail: undefined,
+      id: '',
+      location: {
+        column: 12,
+        file: '/eval.ts',
+        length: 5,
+        line: 5,
+        lineText: `const res = await client.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'");`,
+        namespace: '',
+        suggestion: ''
+      },
+      notes: [],
+      pluginName: '',
+      text: 'Top-level await is currently not supported with the "cjs" output format'
+    },
+    {
+      detail: undefined,
+      id: '',
+      location: {
+        column: 0,
+        file: '/eval.ts',
+        length: 5,
+        line: 7,
+        lineText: 'await client.end();',
+        namespace: '',
+        suggestion: ''
+      },
+      notes: [],
+      pluginName: '',
+      text: 'Top-level await is currently not supported with the "cjs" output format'
+    }
+  ],
+  warnings: []
+}
+
+Node.js v20.20.0
