@@ -69,11 +69,20 @@ async function getResendClient() {
 }
 
 function getBaseUrl(): string {
-  return process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-    : process.env.REPLIT_DOMAINS?.split(',')[0] 
-    ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-    : 'https://chipin.app';
+  // Support both Replit and Azure production environments
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  }
+  if (process.env.REPLIT_DOMAINS?.split(',')[0]) {
+    return `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
+  }
+  if (process.env.WEBSITE_HOSTNAME) {
+    return `https://${process.env.WEBSITE_HOSTNAME}`;
+  }
+  if (process.env.APP_URL) {
+    return process.env.APP_URL;
+  }
+  return 'https://chipin.app';
 }
 
 function formatPhoneNumber(phone: string): string {
