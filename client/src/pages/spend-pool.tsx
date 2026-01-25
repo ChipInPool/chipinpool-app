@@ -861,14 +861,8 @@ export default function SpendPool() {
     
     setCardDetailsLoading(true);
     try {
-      const stripeKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
-      if (!stripeKey) {
-        toast({ description: "Stripe is not configured", variant: "destructive" });
-        return;
-      }
-      
-      const { loadStripe } = await import('@stripe/stripe-js');
-      const stripe = await loadStripe(stripeKey);
+      const { getStripeInstance } = await import('@/lib/stripe');
+      const stripe = await getStripeInstance();
       
       if (!stripe) {
         toast({ description: "Failed to load Stripe", variant: "destructive" });

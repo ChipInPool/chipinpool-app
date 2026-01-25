@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAuth } from "@/lib/auth-context";
 import { api, queryKeys } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Wallet, Menu, Bell, Moon, Sun, LogOut, Shield, Settings } from "lucide-react";
+import { Plus, Wallet, Menu, Bell, Moon, Sun, LogOut, Shield, Settings, CreditCard } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -186,6 +186,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <Link href="/profile">My Profile</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
+                      <Link href="/payment-methods" className="flex items-center">
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Payment Methods
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
                       <Link href="/security" className="flex items-center">
                         <Shield className="w-4 h-4 mr-2" />
                         Security
@@ -248,6 +254,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <Link href="/split-calculator" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Split Calculator</Link>
                     <Link href="/rewards" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Rewards</Link>
                     <Link href="/profile" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>My Profile</Link>
+                    <Link href="/payment-methods" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}><CreditCard className="w-5 h-5" /> Payment Methods</Link>
                     <Link href="/settings" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Settings</Link>
                     <Link href="/api-docs" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>For Developers</Link>
                     

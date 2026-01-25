@@ -43,6 +43,7 @@ import AdminFraud from "@/pages/admin/fraud";
 import CardAnalyticsPage from "@/pages/card-analytics";
 import AcceptTransfer from "@/pages/accept-transfer";
 import Rewards from "@/pages/rewards";
+import PaymentMethods from "@/pages/payment-methods";
 
 function Router() {
   return (
@@ -57,6 +58,7 @@ function Router() {
       <Route path="/api-docs" component={ApiDocs} />
       <Route path="/profile" component={Profile} />
       <Route path="/security" component={Security} />
+      <Route path="/payment-methods" component={PaymentMethods} />
       <Route path="/user/:id" component={UserProfile} />
       <Route path="/pool/:id" component={PoolDetails} />
       <Route path="/pool/:id/spend" component={SpendPool} />

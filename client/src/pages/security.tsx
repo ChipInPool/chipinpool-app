@@ -12,10 +12,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Shield, Mail, Phone, Key, Smartphone, UserCheck, CheckCircle, XCircle, Loader2, Building, Plus, CreditCard, Zap, Trash2, Star, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { loadStripe, Stripe } from "@stripe/stripe-js";
+import { Stripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+import { getStripePromise, getStripeInstance } from "@/lib/stripe";
 
 interface DebitCardFormProps {
   cardholderName: string;
@@ -165,6 +164,11 @@ export default function Security() {
   const [showRecoveryCodesDialog, setShowRecoveryCodesDialog] = useState(false);
   const [phoneSent, setPhoneSent] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+
+  useEffect(() => {
+    setStripePromise(getStripePromise());
+  }, []);
 
   const { data: securityStatus, isLoading: statusLoading } = useQuery({
     queryKey: ["securityStatus"],
@@ -302,7 +306,7 @@ export default function Security() {
       }
       const { clientSecret } = await res.json();
       
-      const stripe = await stripePromise;
+      const stripe = await getStripeInstance();
       if (!stripe) {
         throw new Error('Stripe not loaded');
       }
@@ -1176,15 +1180,17 @@ export default function Security() {
               Get your money in 30 minutes with a 1.5% fee. Your card details are securely processed by Stripe.
             </DialogDescription>
           </DialogHeader>
-          <Elements stripe={stripePromise}>
-            <DebitCardForm
-              cardholderName={debitCardholderName}
-              onCardholderNameChange={setDebitCardholderName}
-              onSuccess={handleDebitCardSuccess}
-              onError={handleDebitCardError}
-              onCancel={() => setShowDebitCardDialog(false)}
-            />
-          </Elements>
+          {stripePromise && (
+            <Elements stripe={stripePromise}>
+              <DebitCardForm
+                cardholderName={debitCardholderName}
+                onCardholderNameChange={setDebitCardholderName}
+                onSuccess={handleDebitCardSuccess}
+                onError={handleDebitCardError}
+                onCancel={() => setShowDebitCardDialog(false)}
+              />
+            </Elements>
+          )}
         </DialogContent>
       </Dialog>
     </Layout>
