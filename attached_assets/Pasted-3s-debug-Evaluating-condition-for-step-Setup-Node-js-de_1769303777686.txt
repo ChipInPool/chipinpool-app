@@ -1,0 +1,66 @@
+3s
+##[debug]Evaluating condition for step: 'Setup Node.js'
+##[debug]Evaluating: success()
+##[debug]Evaluating success:
+##[debug]=> true
+##[debug]Result: true
+##[debug]Starting: Setup Node.js
+##[debug]Register post job cleanup for action: actions/setup-node@v4
+##[debug]Loading inputs
+##[debug]Evaluating: env.NODE_VERSION
+##[debug]Evaluating Index:
+##[debug]..Evaluating env:
+##[debug]..=> Object
+##[debug]..Evaluating String:
+##[debug]..=> 'NODE_VERSION'
+##[debug]=> '20.x'
+##[debug]Result: '20.x'
+##[debug]Evaluating: (((github.server_url == 'https://github.com') && github.token) || '')
+##[debug]Evaluating Or:
+##[debug]..Evaluating And:
+##[debug]....Evaluating Equal:
+##[debug]......Evaluating Index:
+##[debug]........Evaluating github:
+##[debug]........=> Object
+##[debug]........Evaluating String:
+##[debug]........=> 'server_url'
+##[debug]......=> 'https://github.com'
+##[debug]......Evaluating String:
+##[debug]......=> 'https://github.com'
+##[debug]....=> true
+##[debug]....Evaluating Index:
+##[debug]......Evaluating github:
+##[debug]......=> Object
+##[debug]......Evaluating String:
+##[debug]......=> 'token'
+##[debug]....=> '***'
+##[debug]..=> '***'
+##[debug]=> '***'
+##[debug]Expanded: ((('https://github.com' == 'https://github.com') && '***') || '')
+##[debug]Result: '***'
+##[debug]Loading env
+Run actions/setup-node@v4
+##[debug]isExplicit: 
+##[debug]explicit? false
+##[debug]isExplicit: 20.20.0
+##[debug]explicit? true
+##[debug]isExplicit: 22.22.0
+##[debug]explicit? true
+##[debug]isExplicit: 24.13.0
+##[debug]explicit? true
+##[debug]evaluating 3 versions
+##[debug]matched: 20.20.0
+##[debug]checking cache: /opt/hostedtoolcache/node/20.20.0/x64
+##[debug]Found tool in cache node 20.20.0 x64
+Found in cache @ /opt/hostedtoolcache/node/20.20.0/x64
+::group::Environment details
+Environment details
+/opt/hostedtoolcache/node/20.20.0/x64/bin/npm config get cache
+/home/runner/.npm
+##[debug]npm's cache folder "/home/runner/.npm" configured for the root directory
+Error: Dependencies lock file is not found in /home/runner/work/***-app/***-app. Supported file patterns: package-lock.json,npm-shrinkwrap.json,yarn.lock
+##[debug]Node Action run completed with exit code 1
+##[debug]Save intra-action state SETUP_NODE_CACHE_PACKAGE_MANAGER = npm
+##[debug]Save intra-action state CACHE_PATHS = ["/home/runner/.npm"]
+##[debug]Set output node-version = v20.20.0
+##[debug]Finishing: Setup Node.js
