@@ -28,9 +28,33 @@ jobs:
       - name: Build application
         run: npm run build
 
+      - name: Prepare deployment package
+        run: |
+          mkdir -p deploy
+          # Copy built files
+          cp -r dist/* deploy/
+          # Copy package files
+          cp package.json deploy/
+          cp package-lock.json deploy/
+          # Copy Azure config
+          cp web.config deploy/ 2>/dev/null || true
+          # Create a minimal package.json for production
+          cd deploy
+          # Install only production dependencies
+          npm ci --omit=dev --ignore-scripts || npm install --omit=dev --ignore-scripts
+          # Clean up unnecessary files
+          rm -rf node_modules/.cache 2>/dev/null || true
+          find node_modules -name "*.md" -delete 2>/dev/null || true
+          find node_modules -name "*.ts" -not -name "*.d.ts" -delete 2>/dev/null || true
+          
+      - name: Check package size
+        run: |
+          du -sh deploy/
+          du -sh deploy/node_modules/ || echo "No node_modules"
+          
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: .
+          package: deploy
