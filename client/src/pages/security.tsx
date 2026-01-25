@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Shield, Mail, Phone, Key, Smartphone, UserCheck, CheckCircle, XCircle, Loader2, Building, Plus, CreditCard, Zap, Trash2, Star } from "lucide-react";
+import { Shield, Mail, Phone, Key, Smartphone, UserCheck, CheckCircle, XCircle, Loader2, Building, Plus, CreditCard, Zap, Trash2, Star, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { loadStripe, Stripe } from "@stripe/stripe-js";
@@ -783,10 +783,33 @@ export default function Security() {
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">
                     {status.kycStatus === 'pending' 
-                      ? "Your verification is in progress. If you're stuck or need to restart, you can reset and try again."
+                      ? "Your verification is in progress. Click 'Refresh Status' to check if it's complete, or restart if needed."
                       : "Your verification failed. You can restart the process to try again."}
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    {status.kycStatus === 'pending' && (
+                      <Button 
+                        onClick={async () => {
+                          try {
+                            const res = await fetch('/api/security/kyc/refresh', {
+                              method: 'POST',
+                              credentials: 'include',
+                            });
+                            if (!res.ok) throw new Error('Failed to refresh');
+                            const data = await res.json();
+                            queryClient.invalidateQueries({ queryKey: ['securityStatus'] });
+                            queryClient.invalidateQueries({ queryKey: ['user'] });
+                            toast({ description: data.message || 'Status refreshed' });
+                          } catch {
+                            toast({ description: 'Failed to refresh status', variant: 'destructive' });
+                          }
+                        }}
+                        data-testid="button-refresh-kyc"
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Refresh Status
+                      </Button>
+                    )}
                     <Button 
                       variant="outline"
                       onClick={async () => {

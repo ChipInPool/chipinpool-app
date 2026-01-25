@@ -3528,9 +3528,16 @@ export async function registerRoutes(
 
       const stripe = await getUncachableStripeClient();
       
-      const baseUrl = process.env.REPLIT_DOMAINS 
-        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-        : 'http://localhost:5000';
+      // Support both Replit and Azure production environments
+      let baseUrl = 'http://localhost:5000';
+      if (process.env.REPLIT_DOMAINS) {
+        baseUrl = `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
+      } else if (process.env.WEBSITE_HOSTNAME) {
+        // Azure Web App
+        baseUrl = `https://${process.env.WEBSITE_HOSTNAME}`;
+      } else if (process.env.APP_URL) {
+        baseUrl = process.env.APP_URL;
+      }
       
       const verificationSession = await stripe.identity.verificationSessions.create({
         type: 'document',
@@ -3555,6 +3562,56 @@ export async function registerRoutes(
         clientSecret: verificationSession.client_secret,
         url: verificationSession.url,
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Refresh KYC status from Stripe (check if verification completed)
+  app.post("/api/security/kyc/refresh", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      if (user.kycStatus === 'verified') {
+        return res.json({ status: 'verified', message: "Already verified" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      
+      // Find verification sessions for this user
+      const sessions = await stripe.identity.verificationSessions.list({
+        limit: 10,
+      });
+      
+      const userSession = sessions.data.find(s => s.metadata?.userId === userId);
+      
+      if (!userSession) {
+        return res.json({ status: user.kycStatus, message: "No verification session found" });
+      }
+      
+      console.log('[KYC Refresh] Session status:', userSession.status, 'for user:', userId);
+      
+      if (userSession.status === 'verified') {
+        await storage.updateUser(userId, { kycStatus: 'verified' });
+        
+        // Send notification
+        sendKycStatusNotification(
+          user.email,
+          user.phone,
+          user.firstName,
+          'verified',
+          user.notifyEmail && user.emailKycUpdates,
+          user.notifySMS && user.smsKycUpdates
+        ).catch(console.error);
+        
+        return res.json({ status: 'verified', message: "Verification complete!" });
+      } else if (userSession.status === 'requires_input') {
+        await storage.updateUser(userId, { kycStatus: 'failed' });
+        return res.json({ status: 'failed', message: "Verification requires additional input" });
+      } else {
+        return res.json({ status: userSession.status, message: `Verification status: ${userSession.status}` });
+      }
     } catch (error) {
       next(error);
     }
