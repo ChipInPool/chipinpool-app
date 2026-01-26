@@ -4,10 +4,8 @@
     "slug": "chipinpool",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#001F3F"
     },
@@ -23,7 +21,6 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#001F3F"
       },
       "package": "com.chipinpool.app"
@@ -38,7 +35,6 @@
       ],
       "expo-secure-store"
     ],
-    "entryPoint": "./src/App.tsx",
     "scheme": "chipinpool",
     "extra": {
       "apiUrl": "https://chipinpool.azurewebsites.net",
