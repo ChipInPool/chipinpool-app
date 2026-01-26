@@ -191,3 +191,35 @@ Preferred communication style: Simple, everyday language.
 - **Bundler**: Vite for frontend, esbuild for backend
 - **TypeScript**: Strict mode, bundler module resolution
 - **PostCSS**: Tailwind CSS processing
+
+## Mobile App (Expo/React Native)
+
+A native mobile app is available in the `/mobile` folder, built with Expo and React Native.
+
+### Mobile Architecture
+- **Framework**: Expo SDK 51 with React Native 0.74
+- **Navigation**: React Navigation (native-stack + bottom-tabs)
+- **State Management**: TanStack React Query (same as web)
+- **Styling**: React Native StyleSheet with ChipInPool theme colors
+- **Payments**: @stripe/stripe-react-native for Apple Pay, Google Pay, cards
+- **Storage**: expo-secure-store for session cookies
+
+### Mobile Screens
+- **Auth Stack**: Welcome, Login, Register (with phone verification), 2FA
+- **App Tabs**: Home, Pools, Wallet, Cards, Profile
+- **Additional**: Pool Details, Create Pool, Payment Methods
+
+### Mobile Setup
+```bash
+cd mobile
+npm install
+npm start  # Expo dev server
+```
+
+For Stripe payments (Apple Pay, Google Pay), use EAS development builds:
+```bash
+eas build --profile development --platform ios
+```
+
+### API Connection
+Mobile connects to the same backend API at `chipinpool.azurewebsites.net`. Session cookies are persisted via SecureStore.

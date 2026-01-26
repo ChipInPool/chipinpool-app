@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "ChipInPool",
+    "slug": "chipinpool",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#001F3F"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.chipinpool.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "ChipInPool needs camera access to scan documents for identity verification.",
+        "NSPhotoLibraryUsageDescription": "ChipInPool needs photo library access to upload profile pictures.",
+        "NSFaceIDUsageDescription": "ChipInPool uses Face ID to securely authenticate you."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#001F3F"
+      },
+      "package": "com.chipinpool.app"
+    },
+    "plugins": [
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.chipinpool",
+          "enableGooglePay": true
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "entryPoint": "./src/App.tsx",
+    "scheme": "chipinpool",
+    "extra": {
+      "apiUrl": "https://chipinpool.azurewebsites.net",
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
+    }
+  }
+}
