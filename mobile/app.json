@@ -9,31 +9,13 @@
       "resizeMode": "contain",
       "backgroundColor": "#001F3F"
     },
-    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.chipinpool.app",
-      "infoPlist": {
-        "NSCameraUsageDescription": "ChipInPool needs camera access to scan documents for identity verification.",
-        "NSPhotoLibraryUsageDescription": "ChipInPool needs photo library access to upload profile pictures.",
-        "NSFaceIDUsageDescription": "ChipInPool uses Face ID to securely authenticate you."
-      }
+      "bundleIdentifier": "com.chipinpool.app"
     },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#001F3F"
-      },
       "package": "com.chipinpool.app"
     },
-    "plugins": [
-      "expo-secure-store"
-    ],
-    "scheme": "chipinpool",
-    "extra": {
-      "apiUrl": "https://chipinpool.azurewebsites.net",
-      "eas": {
-        "projectId": "your-eas-project-id"
-      }
-    }
+    "scheme": "chipinpool"
   }
 }
