@@ -26,13 +26,6 @@
       "package": "com.chipinpool.app"
     },
     "plugins": [
-      [
-        "@stripe/stripe-react-native",
-        {
-          "merchantIdentifier": "merchant.com.chipinpool",
-          "enableGooglePay": true
-        }
-      ],
       "expo-secure-store"
     ],
     "scheme": "chipinpool",
