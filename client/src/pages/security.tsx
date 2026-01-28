@@ -165,9 +165,15 @@ export default function Security() {
   const [phoneSent, setPhoneSent] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [stripeError, setStripeError] = useState<string | null>(null);
 
   useEffect(() => {
-    setStripePromise(getStripePromise());
+    const promise = getStripePromise();
+    promise.catch((error) => {
+      console.error('Failed to load Stripe:', error);
+      setStripeError(error.message || 'Failed to load payment system');
+    });
+    setStripePromise(promise);
   }, []);
 
   const { data: securityStatus, isLoading: statusLoading } = useQuery({

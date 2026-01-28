@@ -147,13 +147,19 @@ export default function PaymentMethods() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [stripeError, setStripeError] = useState<string | null>(null);
   const [bankLinkLoading, setBankLinkLoading] = useState(false);
   const [showDebitCardDialog, setShowDebitCardDialog] = useState(false);
   const [debitCardholderName, setDebitCardholderName] = useState('');
   const [connectLoading, setConnectLoading] = useState(false);
 
   useEffect(() => {
-    setStripePromise(getStripePromise());
+    const promise = getStripePromise();
+    promise.catch((error) => {
+      console.error('Failed to load Stripe:', error);
+      setStripeError(error.message || 'Failed to load payment system');
+    });
+    setStripePromise(promise);
   }, []);
 
   useEffect(() => {
