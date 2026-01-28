@@ -3564,15 +3564,21 @@ export async function registerRoutes(
       const stripe = await getUncachableStripeClient();
       
       // Support both Replit and Azure production environments
-      let baseUrl = 'http://localhost:5000';
-      if (process.env.REPLIT_DOMAINS) {
+      // Use request host as the most reliable fallback for production
+      const host = req.get('host');
+      const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+      let baseUrl = host ? `${protocol}://${host}` : 'http://localhost:5000';
+      
+      // Override with explicit environment variables if set
+      if (process.env.APP_URL) {
+        baseUrl = process.env.APP_URL;
+      } else if (process.env.REPLIT_DOMAINS) {
         baseUrl = `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
       } else if (process.env.WEBSITE_HOSTNAME) {
-        // Azure Web App
         baseUrl = `https://${process.env.WEBSITE_HOSTNAME}`;
-      } else if (process.env.APP_URL) {
-        baseUrl = process.env.APP_URL;
       }
+      
+      console.log('Stripe Identity baseUrl:', baseUrl, '| host:', host, '| WEBSITE_HOSTNAME:', process.env.WEBSITE_HOSTNAME);
       
       const verificationSession = await stripe.identity.verificationSessions.create({
         type: 'document',

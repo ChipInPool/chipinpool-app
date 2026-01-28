@@ -11,15 +11,19 @@ async function getCredentials() {
   // If not on Replit, use environment variables directly
   if (!isReplitEnvironment()) {
     const apiKey = process.env.RESEND_API_KEY;
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+    
+    console.log('Resend credentials check:', {
+      hasApiKey: !!apiKey,
+      fromEmail,
+      isReplit: false
+    });
     
     if (!apiKey) {
       throw new Error('RESEND_API_KEY environment variable not set');
     }
     
-    return { 
-      apiKey, 
-      fromEmail: process.env.RESEND_FROM_EMAIL || 'noreply@chipin.app' 
-    };
+    return { apiKey, fromEmail };
   }
 
   // On Replit, use connectors
@@ -95,7 +99,13 @@ export async function sendPoolInviteEmail(
     console.log(`Email invite sent to ${to} for pool "${poolTitle}"`);
     return true;
   } catch (error: any) {
-    console.error('Failed to send email invite:', error.message);
+    console.error('Failed to send email invite:', {
+      message: error.message,
+      name: error.name,
+      statusCode: error.statusCode,
+      to,
+      poolTitle
+    });
     return false;
   }
 }
