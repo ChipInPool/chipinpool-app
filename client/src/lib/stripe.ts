@@ -9,11 +9,12 @@ export async function getStripePublishableKey(): Promise<string> {
   }
 
   const envKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
-  if (envKey) {
+  if (envKey && typeof envKey === 'string' && envKey.startsWith('pk_')) {
     cachedPublishableKey = envKey;
     return envKey;
   }
 
+  // Fetch from server API
   const res = await fetch('/api/stripe/config', {
     credentials: 'include',
   });
@@ -23,6 +24,11 @@ export async function getStripePublishableKey(): Promise<string> {
   }
   
   const data = await res.json();
+  
+  if (!data.publishableKey || typeof data.publishableKey !== 'string') {
+    throw new Error('Invalid Stripe publishable key received from server');
+  }
+  
   cachedPublishableKey = data.publishableKey;
   return data.publishableKey;
 }
