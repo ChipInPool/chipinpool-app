@@ -10,14 +10,19 @@ async function getCredentials() {
   // If not on Replit, use environment variables directly
   if (!isReplitEnvironment()) {
     const secretKey = process.env.STRIPE_SECRET_KEY;
-    const publishableKey = process.env.VITE_STRIPE_PUBLIC_KEY;
+    // Check multiple possible env var names for the publishable key
+    const publishableKey = process.env.VITE_STRIPE_PUBLIC_KEY || process.env.STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLIC_KEY;
     
     if (!secretKey) {
       throw new Error('STRIPE_SECRET_KEY environment variable not set');
     }
     
+    if (!publishableKey) {
+      throw new Error('Stripe publishable key not set. Please set VITE_STRIPE_PUBLIC_KEY, STRIPE_PUBLISHABLE_KEY, or STRIPE_PUBLIC_KEY environment variable');
+    }
+    
     return {
-      publishableKey: publishableKey || '',
+      publishableKey,
       secretKey,
     };
   }
