@@ -1627,8 +1627,14 @@ export async function registerRoutes(
   app.get("/api/stripe/config", async (req, res, next) => {
     try {
       const publishableKey = await getStripePublishableKey();
+      if (!publishableKey) {
+        console.error('Stripe publishable key is undefined or empty');
+        return res.status(500).json({ error: 'Stripe configuration not available' });
+      }
+      console.log('Stripe config requested, key prefix:', publishableKey.substring(0, 7) + '...');
       res.json({ publishableKey });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Failed to get Stripe config:', error.message);
       next(error);
     }
   });
