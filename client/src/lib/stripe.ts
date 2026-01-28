@@ -40,7 +40,18 @@ export async function getStripeInstance(): Promise<Stripe | null> {
 
 export function getStripePromise(): Promise<Stripe | null> {
   if (!stripePromise) {
-    stripePromise = getStripePublishableKey().then(key => loadStripe(key));
+    stripePromise = getStripePublishableKey()
+      .then(key => {
+        if (!key || typeof key !== 'string' || !key.startsWith('pk_')) {
+          console.error('Invalid Stripe key received:', typeof key);
+          throw new Error('Invalid Stripe publishable key');
+        }
+        return loadStripe(key);
+      })
+      .catch(error => {
+        console.error('Failed to initialize Stripe:', error);
+        return null;
+      });
   }
   return stripePromise;
 }
