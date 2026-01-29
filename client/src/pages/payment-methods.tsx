@@ -151,7 +151,6 @@ export default function PaymentMethods() {
   const [bankLinkLoading, setBankLinkLoading] = useState(false);
   const [showDebitCardDialog, setShowDebitCardDialog] = useState(false);
   const [debitCardholderName, setDebitCardholderName] = useState('');
-  const [connectLoading, setConnectLoading] = useState(false);
 
   useEffect(() => {
     const promise = getStripePromise();
@@ -181,16 +180,9 @@ export default function PaymentMethods() {
   const bankAccounts = bankAccountsData?.accounts || [];
   const bankAccountsList = bankAccounts.filter((a: any) => a.accountType === 'checking' || a.accountType === 'savings');
   const debitCardsList = bankAccounts.filter((a: any) => a.accountType === 'debit');
-
-  const { data: connectStatus, refetch: refetchConnectStatus } = useQuery({
-    queryKey: ["stripeConnectStatus"],
-    queryFn: async () => {
-      const res = await fetch('/api/stripe/connect/status', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch Connect status');
-      return res.json();
-    },
-    enabled: isAuthenticated,
-  });
+  
+  // Check if user can receive payouts (has at least one linked bank or debit card)
+  const canReceivePayouts = bankAccountsList.length > 0 || debitCardsList.length > 0;
 
   const completeBankLinkMutation = useMutation({
     mutationFn: async (accountId: string) => {
@@ -302,42 +294,6 @@ export default function PaymentMethods() {
     }
   };
 
-  const handleSetupPayouts = async () => {
-    setConnectLoading(true);
-    try {
-      // First, ensure user has a Connect account
-      if (!connectStatus?.hasConnectAccount) {
-        const createRes = await fetch('/api/stripe/connect/create-account', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        if (!createRes.ok) {
-          const err = await createRes.json();
-          throw new Error(err.error || 'Failed to create payout account');
-        }
-        await refetchConnectStatus();
-      }
-      
-      // Now get the onboarding link
-      const res = await fetch('/api/stripe/connect/onboarding-link', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to start verification');
-      }
-      const { url } = await res.json();
-      window.location.href = url;
-    } catch (err: any) {
-      toast({ description: err.message, variant: 'destructive' });
-    } finally {
-      setConnectLoading(false);
-    }
-  };
-
   const handleDebitCardSuccess = () => {
     setShowDebitCardDialog(false);
     toast({ description: "Debit card linked successfully!" });
@@ -376,37 +332,27 @@ export default function PaymentMethods() {
             <div className="flex items-center gap-3">
               <Shield className="w-6 h-6 text-primary" />
               <div>
-                <CardTitle>Payout Verification</CardTitle>
-                <CardDescription>Required to receive withdrawals</CardDescription>
+                <CardTitle>Withdrawal Status</CardTitle>
+                <CardDescription>Link a bank account or debit card to receive funds</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            {connectStatus?.payoutsEnabled ? (
+            {canReceivePayouts ? (
               <div className="flex items-center gap-3 p-3 bg-green-500/10 rounded-lg border border-green-500/20">
                 <CheckCircle className="w-5 h-5 text-green-400" />
                 <div>
-                  <p className="text-sm font-medium text-green-400">Verified - Payouts Enabled</p>
-                  <p className="text-xs text-muted-foreground">You can receive withdrawals to your linked payment methods</p>
+                  <p className="text-sm font-medium text-green-400">Ready to Receive Payouts</p>
+                  <p className="text-xs text-muted-foreground">You can withdraw funds to your linked accounts</p>
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
-                {connectStatus?.hasConnectAccount ? (
-                  <p className="text-sm text-yellow-400">Your verification is incomplete. Please finish to receive payouts.</p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Complete verification once to enable all withdrawal methods.</p>
-                )}
-                <Button 
-                  onClick={handleSetupPayouts}
-                  className="bg-gradient-to-r from-primary to-accent"
-                  disabled={connectLoading}
-                  data-testid="button-setup-payouts"
-                >
-                  {connectLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  {connectStatus?.hasConnectAccount ? "Complete Verification" : "Verify for Payouts"}
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
+              <div className="flex items-center gap-3 p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                <Clock className="w-5 h-5 text-yellow-400" />
+                <div>
+                  <p className="text-sm font-medium text-yellow-400">Link a Payment Method</p>
+                  <p className="text-xs text-muted-foreground">Add a bank account for free ACH transfers or a debit card for instant payouts</p>
+                </div>
               </div>
             )}
           </CardContent>
