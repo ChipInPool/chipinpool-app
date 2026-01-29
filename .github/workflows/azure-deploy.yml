@@ -47,10 +47,14 @@ jobs:
           find node_modules -name "*.md" -delete 2>/dev/null || true
           find node_modules -name "*.ts" -not -name "*.d.ts" -delete 2>/dev/null || true
           
-      - name: Check package size
+      - name: Check package size and verify files
         run: |
           du -sh deploy/
           du -sh deploy/node_modules/ || echo "No node_modules"
+          echo "=== Checking deployed JS files ==="
+          ls -la deploy/public/assets/*.js || echo "No JS files found"
+          echo "=== Searching for Stripe error handling code ==="
+          grep -l "Failed to initialize Stripe" deploy/public/assets/*.js || echo "New Stripe code NOT found!"
           
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
