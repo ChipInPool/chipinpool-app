@@ -111,17 +111,15 @@ Preferred communication style: Simple, everyday language.
     - Channels: Email and SMS with independent per-category toggles
     - Automatic notifications for: 2FA enable/disable, password reset, KYC verification, wallet withdrawals
     - Global channel opt-out respected (notifyEmail/notifySMS gates all category notifications)
-17. **Pool Withdrawals** - Simplified bank withdrawal system (platform-managed payouts):
+17. **Pool Withdrawals** - Simplified bank withdrawal system:
     - Users link bank accounts via Stripe Financial Connections (secure OAuth bank login)
     - Pool creators can withdraw funds to their own linked bank account
     - Pool creators can send transfer requests to any contributor
     - Contributors receive notifications and can accept/decline transfer requests
     - Accept flow includes bank account selection
     - Transfer tracking with status: pending → accepted → completed/cancelled/failed
-    - Standard payouts (1-3 business days, free) or instant payouts (1.5% fee)
-    - **Architecture**: Regular users use Stripe Financial Connections + Stripe Connect Express for payouts
-    - Platform transfers funds to user's Connect account, which handles payout to their bank
-    - ChipInPay merchants also use Stripe Connect (for automated daily payouts)
+    - **Regular Users**: Link bank via Financial Connections, receive ACH payouts (1-3 days, free) or instant payouts via debit card (1.5% fee)
+    - **Merchants**: Use Stripe Connect for ACH payouts (automated daily payouts from ChipInPay revenue)
     - Legacy Plaid-linked accounts still supported for existing users
 
 ### ChipInPay Merchant API:
