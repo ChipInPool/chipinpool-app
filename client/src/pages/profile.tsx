@@ -107,8 +107,8 @@ export default function Profile() {
   };
 
   const handleWithdraw = async () => {
-    if (!plaidStatus?.hasBankLinked) {
-      toast({ description: "Please link a bank account first in Security settings", variant: "destructive" });
+    if (!hasBankLinked) {
+      toast({ description: "Please link a bank account first in Payment Methods", variant: "destructive" });
       return;
     }
     if (!amount || parseFloat(amount) <= 0) {
@@ -152,6 +152,19 @@ export default function Profile() {
     queryFn: api.plaid.getStatus,
     enabled: isAuthenticated,
   });
+
+  const { data: bankAccountsData } = useQuery({
+    queryKey: ["bankAccounts"],
+    queryFn: async () => {
+      const res = await fetch("/api/bank-accounts", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch bank accounts");
+      return res.json();
+    },
+    enabled: isAuthenticated,
+  });
+
+  const hasBankLinked = plaidStatus?.hasBankLinked || 
+    (bankAccountsData?.accounts?.some((a: any) => a.stripeFinancialConnectionsAccountId || a.canReceivePayouts));
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -629,7 +642,7 @@ export default function Profile() {
               </p>
             </div>
 
-            {!plaidStatus?.hasBankLinked ? (
+            {!hasBankLinked ? (
               <div className="space-y-4">
                 <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 text-center">
                   <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-3">
@@ -637,10 +650,10 @@ export default function Profile() {
                   </div>
                   <h4 className="font-medium text-orange-300 mb-1">No Bank Account Linked</h4>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Link your bank account to withdraw funds securely via Plaid.
+                    Link your bank account to withdraw funds securely.
                   </p>
                   <Button 
-                    onClick={() => { setWithdrawDialogOpen(false); setLocation("/security"); }}
+                    onClick={() => { setWithdrawDialogOpen(false); setLocation("/payment-methods"); }}
                     className="bg-orange-600 hover:bg-orange-700"
                     data-testid="button-link-bank-redirect"
                   >
@@ -657,7 +670,7 @@ export default function Profile() {
                   </div>
                   <div className="text-sm">
                     <p className="font-medium text-green-300">Bank Account Connected</p>
-                    <p className="text-muted-foreground text-xs">Linked via Plaid</p>
+                    <p className="text-muted-foreground text-xs">Ready for withdrawals</p>
                   </div>
                 </div>
 
@@ -732,7 +745,7 @@ export default function Profile() {
             <Button variant="ghost" onClick={() => { setWithdrawDialogOpen(false); setAmount(""); }}>
               Cancel
             </Button>
-            {plaidStatus?.hasBankLinked && (
+            {hasBankLinked && (
               <Button 
                 onClick={handleWithdraw} 
                 disabled={isProcessing || !amount || parseFloat(amount) <= 0 || parseFloat(amount) > parseFloat(user?.balance || '0')}
