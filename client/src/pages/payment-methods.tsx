@@ -305,14 +305,29 @@ export default function PaymentMethods() {
   const handleSetupPayouts = async () => {
     setConnectLoading(true);
     try {
-      const res = await fetch('/api/stripe/connect/onboard', {
+      // First, ensure user has a Connect account
+      if (!connectStatus?.hasConnectAccount) {
+        const createRes = await fetch('/api/stripe/connect/create-account', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!createRes.ok) {
+          const err = await createRes.json();
+          throw new Error(err.error || 'Failed to create payout account');
+        }
+        await refetchConnectStatus();
+      }
+      
+      // Now get the onboarding link
+      const res = await fetch('/api/stripe/connect/onboarding-link', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Failed to start onboarding');
+        throw new Error(err.error || 'Failed to start verification');
       }
       const { url } = await res.json();
       window.location.href = url;
