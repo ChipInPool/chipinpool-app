@@ -194,49 +194,6 @@ export default function Security() {
   
   const bankAccounts = bankAccountsData?.accounts || [];
 
-  const { data: connectStatus, refetch: refetchConnectStatus } = useQuery({
-    queryKey: ["stripeConnectStatus"],
-    queryFn: async () => {
-      const res = await fetch('/api/stripe/connect/status', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch Connect status');
-      return res.json();
-    },
-    enabled: isAuthenticated,
-  });
-
-  const [connectLoading, setConnectLoading] = useState(false);
-
-  const handleSetupPayouts = async () => {
-    setConnectLoading(true);
-    try {
-      if (!connectStatus?.hasConnectAccount) {
-        const createRes = await fetch('/api/stripe/connect/create-account', {
-          method: 'POST',
-          credentials: 'include',
-        });
-        if (!createRes.ok) {
-          const err = await createRes.json();
-          throw new Error(err.error || 'Failed to create payout account');
-        }
-      }
-      
-      const linkRes = await fetch('/api/stripe/connect/onboarding-link', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!linkRes.ok) {
-        const err = await linkRes.json();
-        throw new Error(err.error || 'Failed to get onboarding link');
-      }
-      const { url } = await linkRes.json();
-      window.location.href = url;
-    } catch (error: any) {
-      toast({ description: error.message || "Failed to start payout setup", variant: "destructive" });
-    } finally {
-      setConnectLoading(false);
-    }
-  };
-
   const setDefaultMutation = useMutation({
     mutationFn: async (accountId: string) => {
       const res = await fetch(`/api/bank-accounts/${accountId}/default`, {
@@ -918,59 +875,6 @@ export default function Security() {
                 {!bankLinkLoading && !completeBankLinkMutation.isPending && <Plus className="w-4 h-4 mr-2" />}
                 {bankLinkLoading ? "Connecting..." : completeBankLinkMutation.isPending ? "Linking..." : bankAccountsList.length > 0 ? "Add Another Account" : "Link Bank Account"}
               </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/[0.02] border-white/5">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Shield className="w-5 h-5 text-emerald-400" />
-                  <CardTitle>Payout Account</CardTitle>
-                </div>
-                {connectStatus?.payoutsEnabled ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                    <CheckCircle className="w-3 h-3 mr-1" /> Ready
-                  </Badge>
-                ) : connectStatus?.hasConnectAccount ? (
-                  <Badge variant="outline" className="border-yellow-500/30 text-yellow-400">
-                    <Loader2 className="w-3 h-3 mr-1" /> Incomplete
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="border-orange-500/30 text-orange-400">
-                    <XCircle className="w-3 h-3 mr-1" /> Not Set Up
-                  </Badge>
-                )}
-              </div>
-              <CardDescription>Complete verification to receive payouts to your bank account</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {connectStatus?.payoutsEnabled ? (
-                <div className="flex items-center gap-3 p-3 bg-green-500/10 rounded-lg border border-green-500/20">
-                  <CheckCircle className="w-5 h-5 text-green-400" />
-                  <div>
-                    <p className="text-sm font-medium text-green-400">Payouts Enabled</p>
-                    <p className="text-xs text-muted-foreground">You can receive withdrawals to your linked bank accounts</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    {connectStatus?.hasConnectAccount 
-                      ? "Your payout account setup is incomplete. Please finish verification to receive withdrawals."
-                      : "To receive withdrawals from pools, you need to complete a quick verification process."}
-                  </p>
-                  <Button 
-                    onClick={handleSetupPayouts}
-                    className="bg-gradient-to-r from-emerald-500 to-cyan-500"
-                    data-testid="button-setup-payouts"
-                    disabled={connectLoading}
-                  >
-                    {connectLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    {connectStatus?.hasConnectAccount ? "Complete Verification" : "Set Up Payouts"}
-                  </Button>
-                </div>
-              )}
             </CardContent>
           </Card>
 
