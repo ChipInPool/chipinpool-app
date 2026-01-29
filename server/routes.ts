@@ -2419,15 +2419,41 @@ export async function registerRoutes(
         });
       }
 
-      const account = await stripe.accounts.retrieve(user.stripeConnectId);
-      
-      res.json({
-        hasConnectAccount: true,
-        accountId: user.stripeConnectId,
-        chargesEnabled: account.charges_enabled,
-        payoutsEnabled: account.payouts_enabled,
-        detailsSubmitted: account.details_submitted,
-      });
+      // Validate stripeConnectId format before calling Stripe
+      if (!user.stripeConnectId.startsWith('acct_')) {
+        console.warn(`Invalid stripeConnectId format for user ${user.id}: ${user.stripeConnectId}`);
+        // Clear invalid Connect ID
+        await storage.updateUser(user.id, { stripeConnectId: null });
+        return res.json({ 
+          hasConnectAccount: false,
+          chargesEnabled: false,
+          payoutsEnabled: false,
+        });
+      }
+
+      try {
+        const account = await stripe.accounts.retrieve(user.stripeConnectId);
+        
+        res.json({
+          hasConnectAccount: true,
+          accountId: user.stripeConnectId,
+          chargesEnabled: account.charges_enabled,
+          payoutsEnabled: account.payouts_enabled,
+          detailsSubmitted: account.details_submitted,
+        });
+      } catch (stripeErr: any) {
+        // Handle case where Connect account doesn't exist
+        if (stripeErr.code === 'resource_missing' || stripeErr.type === 'invalid_request_error') {
+          console.warn(`Stripe Connect account not found for user ${user.id}, clearing ID`);
+          await storage.updateUser(user.id, { stripeConnectId: null });
+          return res.json({ 
+            hasConnectAccount: false,
+            chargesEnabled: false,
+            payoutsEnabled: false,
+          });
+        }
+        throw stripeErr;
+      }
     } catch (error) {
       next(error);
     }
