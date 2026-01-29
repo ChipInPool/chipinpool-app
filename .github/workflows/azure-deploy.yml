@@ -31,8 +31,8 @@ jobs:
       - name: Prepare deployment package
         run: |
           mkdir -p deploy
-          # Copy built files
-          cp -r dist/* deploy/
+          # Copy dist folder (keeping structure for npm start to work)
+          cp -r dist deploy/
           # Copy package files
           cp package.json deploy/
           cp package-lock.json deploy/
@@ -52,9 +52,9 @@ jobs:
           du -sh deploy/
           du -sh deploy/node_modules/ || echo "No node_modules"
           echo "=== Checking deployed JS files ==="
-          ls -la deploy/public/assets/*.js || echo "No JS files found"
+          ls -la deploy/dist/public/assets/*.js || echo "No JS files found"
           echo "=== Searching for Stripe error handling code ==="
-          grep -l "Failed to initialize Stripe" deploy/public/assets/*.js || echo "New Stripe code NOT found!"
+          grep -l "Failed to initialize Stripe" deploy/dist/public/assets/*.js || echo "New Stripe code NOT found!"
           
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
