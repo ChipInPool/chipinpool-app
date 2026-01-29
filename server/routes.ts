@@ -2192,7 +2192,7 @@ export async function registerRoutes(
 
   // ========== STRIPE FINANCIAL CONNECTIONS ROUTES ==========
 
-  // Create a Financial Connections session for bank linking
+  // Create a Financial Connections session for bank linking via SetupIntent
   app.post("/api/stripe/financial-connections/create-session", requireAuth, async (req, res, next) => {
     try {
       const stripe = await getUncachableStripeClient();
@@ -2212,21 +2212,22 @@ export async function registerRoutes(
         await storage.updateUser(userId, { stripeCustomerId });
       }
 
-      // Create Financial Connections session
-      const session = await stripe.financialConnections.sessions.create({
-        account_holder: {
-          type: 'customer',
-          customer: stripeCustomerId,
+      // Create SetupIntent with Financial Connections for bank account linking
+      const setupIntent = await stripe.setupIntents.create({
+        customer: stripeCustomerId,
+        payment_method_types: ['us_bank_account'],
+        payment_method_options: {
+          us_bank_account: {
+            financial_connections: {
+              permissions: ['payment_method', 'balances'],
+            },
+          },
         },
-        permissions: ['payment_method', 'balances', 'ownership'],
-        filters: {
-          countries: ['US'],
-        },
+        metadata: { userId: user.id.toString() },
       });
 
       res.json({ 
-        clientSecret: session.client_secret,
-        sessionId: session.id,
+        clientSecret: setupIntent.client_secret,
       });
     } catch (error: any) {
       console.error('[Stripe FC] Session creation error:', error.message);

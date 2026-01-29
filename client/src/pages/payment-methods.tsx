@@ -264,18 +264,37 @@ export default function PaymentMethods() {
         throw new Error('Stripe not loaded');
       }
       
-      const result = await stripe.collectFinancialConnectionsAccounts({
+      // Use collectBankAccountForSetup for SetupIntent-based Financial Connections
+      const result = await stripe.collectBankAccountForSetup({
         clientSecret,
+        params: {
+          payment_method_type: 'us_bank_account',
+          payment_method_data: {
+            billing_details: {
+              name: user?.firstName && user?.lastName 
+                ? `${user.firstName} ${user.lastName}` 
+                : 'Account Holder',
+              email: user?.email || undefined,
+            },
+          },
+        },
       });
       
       if (result.error) {
         throw new Error(result.error.message || 'Bank linking failed');
       }
       
-      if (result.financialConnectionsSession?.accounts && result.financialConnectionsSession.accounts.length > 0) {
-        const account = result.financialConnectionsSession.accounts[0];
-        completeBankLinkMutation.mutate(account.id);
+      // Confirm the SetupIntent to save the payment method
+      if (result.setupIntent?.status === 'requires_confirmation') {
+        const confirmResult = await stripe.confirmUsBankAccountSetup(clientSecret);
+        if (confirmResult.error) {
+          throw new Error(confirmResult.error.message || 'Failed to confirm bank account');
+        }
       }
+      
+      // Refresh bank accounts list
+      toast({ description: 'Bank account linked successfully!' });
+      refetchBankAccounts();
     } catch (err: any) {
       toast({ description: err.message || 'Failed to link bank account', variant: 'destructive' });
     } finally {
