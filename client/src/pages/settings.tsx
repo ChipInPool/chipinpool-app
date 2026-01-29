@@ -609,11 +609,36 @@ export default function Settings() {
             <h3 className="font-bold flex items-center gap-2 mb-4">
               <Shield className="w-4 h-4 text-red-400" /> Security & Privacy
             </h3>
-            <Button variant="outline" className="w-full border-white/10" asChild>
-              <Link href="/security">
-                Manage Security Settings
-              </Link>
-            </Button>
+            <div className="space-y-3">
+              <Button variant="outline" className="w-full border-white/10" asChild>
+                <Link href="/security">
+                  Manage Security Settings
+                </Link>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full border-white/10 text-yellow-500 hover:text-yellow-400"
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/user/reset-verification', {
+                      method: 'POST',
+                      credentials: 'include',
+                    });
+                    if (res.ok) {
+                      toast({ description: "Verification reset. You can now start fresh." });
+                    } else {
+                      const err = await res.json();
+                      toast({ description: err.error || "Failed to reset verification", variant: "destructive" });
+                    }
+                  } catch (err) {
+                    toast({ description: "Failed to reset verification", variant: "destructive" });
+                  }
+                }}
+                data-testid="button-reset-verification"
+              >
+                Reset Payout Verification
+              </Button>
+            </div>
           </div>
         </div>
       </div>

@@ -2459,6 +2459,17 @@ export async function registerRoutes(
     }
   });
 
+  // Reset user's Connect verification (clears stripeConnectId to start fresh)
+  app.post("/api/user/reset-verification", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      await storage.updateUser(userId, { stripeConnectId: null });
+      res.json({ success: true, message: "Verification reset successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // ========== POOL TRANSFER ROUTES ==========
 
   // Get user's linked bank accounts
