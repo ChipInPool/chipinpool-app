@@ -2528,13 +2528,11 @@ export async function registerRoutes(
   });
 
   // Link debit card for payouts (stored as bank account with debit type)
-  // Note: Instant payouts via debit card require additional Stripe configuration
+  // Accepts Stripe token from frontend card element
   app.post("/api/debit-cards/link", requireAuth, async (req, res, next) => {
     try {
-      const { cardNumber, expiryMonth, expiryYear, cardholderName } = z.object({
-        cardNumber: z.string().min(15).max(16),
-        expiryMonth: z.string().length(2),
-        expiryYear: z.string().length(2),
+      const { token, cardholderName } = z.object({
+        token: z.string().min(1),
         cardholderName: z.string().min(1),
       }).parse(req.body);
 
@@ -2542,16 +2540,26 @@ export async function registerRoutes(
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
 
+      // Retrieve token details from Stripe to get card info
+      const stripeToken = await stripe.tokens.retrieve(token);
+      if (!stripeToken.card) {
+        return res.status(400).json({ error: "Invalid card token" });
+      }
+
+      const card = stripeToken.card;
+      const cardBrand = card.brand || 'Card';
+      const last4 = card.last4 || '****';
+
       // Get existing accounts to check if this is the first one
       const existingAccounts = await storage.getBankAccountsByUser(userId);
       const isFirst = existingAccounts.length === 0;
 
-      // Store debit card details (last 4 only for display, full number encrypted)
+      // Store debit card details for display
       const account = await storage.createBankAccount({
         userId,
-        institutionName: 'Debit Card',
+        institutionName: `${cardBrand} Debit`,
         accountName: cardholderName,
-        accountMask: cardNumber.slice(-4),
+        accountMask: last4,
         accountType: 'debit',
         payoutMethod: 'debit_card',
         isDefault: isFirst,
