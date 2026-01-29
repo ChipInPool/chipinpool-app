@@ -248,7 +248,7 @@ export default function PaymentMethods() {
   const handleLinkBank = async () => {
     setBankLinkLoading(true);
     try {
-      const res = await fetch('/api/bank-accounts/link', {
+      const res = await fetch('/api/stripe/financial-connections/create-session', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
