@@ -109,12 +109,8 @@ export default function Profile() {
   };
 
   const handleWithdraw = async () => {
-    if (!hasBankLinked) {
-      toast({ description: "Please link a bank account first in Payment Methods", variant: "destructive" });
-      return;
-    }
-    if (!selectedAccountId) {
-      toast({ description: "Please select a payment method", variant: "destructive" });
+    if (!canWithdraw) {
+      toast({ description: "Please set up payouts first in Settings", variant: "destructive" });
       return;
     }
     if (!amount || parseFloat(amount) <= 0) {
@@ -129,22 +125,59 @@ export default function Profile() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount,
-          bankAccountId: selectedAccountId,
           payoutSpeed,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
+        if (data.code === 'CONNECT_NOT_SETUP' || data.code === 'CONNECT_SETUP_INCOMPLETE') {
+          toast({ description: "Please complete payout setup in Settings first", variant: "destructive" });
+          setWithdrawDialogOpen(false);
+          setLocation("/settings");
+          return;
+        }
         throw new Error(data.error || 'Withdrawal failed');
       }
       toast({ description: data.message || `Withdrawal initiated` });
       queryClient.invalidateQueries({ queryKey: queryKeys.user });
       setWithdrawDialogOpen(false);
       setAmount("");
-      setSelectedAccountId("");
       setPayoutSpeed('standard');
     } catch (error: any) {
       toast({ description: error.message || "Withdrawal failed", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+  
+  const handleSetupPayouts = async () => {
+    setIsProcessing(true);
+    try {
+      // Create Connect account if needed
+      const createRes = await fetch('/api/stripe/connect/create-account', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!createRes.ok) {
+        throw new Error('Failed to create payout account');
+      }
+      
+      // Get onboarding link
+      const linkRes = await fetch('/api/stripe/connect/onboarding-link', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const linkData = await linkRes.json();
+      if (!linkRes.ok || !linkData.url) {
+        throw new Error('Failed to get onboarding link');
+      }
+      
+      // Open onboarding in new tab
+      window.open(linkData.url, '_blank');
+      toast({ description: "Complete the payout setup in the new tab" });
+      setWithdrawDialogOpen(false);
+    } catch (error: any) {
+      toast({ description: error.message || "Failed to start payout setup", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -190,8 +223,20 @@ export default function Profile() {
     enabled: isAuthenticated,
   });
 
+  const { data: connectStatus, refetch: refetchConnectStatus } = useQuery({
+    queryKey: ["connectStatus"],
+    queryFn: async () => {
+      const res = await fetch("/api/stripe/connect/status", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch connect status");
+      return res.json();
+    },
+    enabled: isAuthenticated,
+  });
+
   const hasBankLinked = plaidStatus?.hasBankLinked || 
     (bankAccountsData?.accounts?.some((a: any) => a.stripeFinancialConnectionsAccountId || a.canReceivePayouts));
+  
+  const canWithdraw = connectStatus?.payoutsEnabled === true;
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -669,85 +714,72 @@ export default function Profile() {
               </p>
             </div>
 
-            {!hasBankLinked ? (
+            {!canWithdraw ? (
               <div className="space-y-4">
                 <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 text-center">
                   <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-3">
                     <Building className="w-6 h-6 text-orange-400" />
                   </div>
-                  <h4 className="font-medium text-orange-300 mb-1">No Bank Account Linked</h4>
+                  <h4 className="font-medium text-orange-300 mb-1">Set Up Payouts</h4>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Link your bank account to withdraw funds securely.
+                    Complete a quick 2-minute verification to receive withdrawals directly to your bank.
                   </p>
                   <Button 
-                    onClick={() => { setWithdrawDialogOpen(false); setLocation("/payment-methods"); }}
+                    onClick={handleSetupPayouts}
+                    disabled={isProcessing}
                     className="bg-orange-600 hover:bg-orange-700"
-                    data-testid="button-link-bank-redirect"
+                    data-testid="button-setup-payouts"
                   >
-                    <Building className="w-4 h-4 mr-2" />
-                    Link Bank Account
+                    {isProcessing ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Building className="w-4 h-4 mr-2" />
+                    )}
+                    Set Up Payouts
                   </Button>
                 </div>
               </div>
             ) : (
               <>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Withdraw to</label>
-                  <select
-                    value={selectedAccountId}
-                    onChange={(e) => {
-                      setSelectedAccountId(e.target.value);
-                      const acct = bankAccountsData?.accounts?.find((a: any) => a.id === e.target.value);
-                      if (acct?.payoutMethod === 'debit_card') {
-                        setPayoutSpeed('instant');
-                      } else {
-                        setPayoutSpeed('standard');
-                      }
-                    }}
-                    className="w-full h-12 px-3 rounded-lg border border-white/10 bg-background text-foreground"
-                    data-testid="select-withdraw-account"
-                  >
-                    <option value="">Select account...</option>
-                    {bankAccountsData?.accounts?.map((account: any) => (
-                      <option key={account.id} value={account.id}>
-                        {account.institutionName} ****{account.accountMask}
-                        {account.payoutMethod === 'debit_card' ? ' (Instant)' : ' (ACH)'}
-                      </option>
-                    ))}
-                  </select>
+                <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <Building className="w-4 h-4 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-green-300">Payouts Enabled</p>
+                    <p className="text-xs text-muted-foreground">Funds will go to your linked bank account</p>
+                  </div>
                 </div>
 
-                {selectedAccountId && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Payout Speed</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setPayoutSpeed('standard')}
-                        className={`p-3 rounded-lg border text-left ${payoutSpeed === 'standard' ? 'border-green-500 bg-green-500/10' : 'border-white/10'}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4" />
-                          <span className="font-medium text-sm">Standard</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">1-3 business days</p>
-                        <p className="text-xs text-green-400 mt-1">Free</p>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPayoutSpeed('instant')}
-                        className={`p-3 rounded-lg border text-left ${payoutSpeed === 'instant' ? 'border-yellow-500 bg-yellow-500/10' : 'border-white/10'}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <RefreshCw className="w-4 h-4" />
-                          <span className="font-medium text-sm">Instant</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">~30 minutes</p>
-                        <p className="text-xs text-yellow-400 mt-1">1.5% fee</p>
-                      </button>
-                    </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Payout Speed</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPayoutSpeed('standard')}
+                      className={`p-3 rounded-lg border text-left ${payoutSpeed === 'standard' ? 'border-green-500 bg-green-500/10' : 'border-white/10'}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        <span className="font-medium text-sm">Standard</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">1-2 business days</p>
+                      <p className="text-xs text-green-400 mt-1">Free</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPayoutSpeed('instant')}
+                      className={`p-3 rounded-lg border text-left ${payoutSpeed === 'instant' ? 'border-yellow-500 bg-yellow-500/10' : 'border-white/10'}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <RefreshCw className="w-4 h-4" />
+                        <span className="font-medium text-sm">Instant</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">~30 minutes</p>
+                      <p className="text-xs text-yellow-400 mt-1">1.5% fee</p>
+                    </button>
                   </div>
-                )}
+                </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Amount to withdraw</label>
@@ -843,7 +875,7 @@ export default function Profile() {
             <Button variant="ghost" onClick={() => { setWithdrawDialogOpen(false); setAmount(""); }}>
               Cancel
             </Button>
-            {hasBankLinked && (
+            {canWithdraw && (
               <Button 
                 onClick={handleWithdraw} 
                 disabled={isProcessing || !amount || parseFloat(amount) <= 0 || parseFloat(amount) > parseFloat(user?.balance || '0')}

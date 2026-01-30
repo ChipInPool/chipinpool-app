@@ -2192,23 +2192,17 @@ export async function registerRoutes(
     }
   });
 
-  // Unified wallet withdrawal endpoint supporting ACH via Mercury
+  // Unified wallet withdrawal endpoint - uses Stripe Connect for payouts
   app.post("/api/wallet/withdraw", requireAuth, async (req, res, next) => {
     try {
-      const { amount, bankAccountId, payoutSpeed } = z.object({
+      const { amount, payoutSpeed } = z.object({
         amount: z.string(),
-        bankAccountId: z.string(),
         payoutSpeed: z.enum(['standard', 'instant']).default('standard'),
       }).parse(req.body);
 
       const userId = req.session.userId!;
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
-
-      const bankAccount = await storage.getBankAccountById(bankAccountId);
-      if (!bankAccount || bankAccount.userId !== userId) {
-        return res.status(404).json({ error: "Bank account not found" });
-      }
 
       const withdrawAmount = parseFloat(amount);
       const currentBalance = parseFloat(user.balance);
@@ -2231,117 +2225,98 @@ export async function registerRoutes(
       let transferId: string | null = null;
       let arrivalTime = '1-3 business days';
 
-      // Determine transfer speed based on payout speed preference
-      const transferSpeed: TransferSpeed = payoutSpeed === 'instant' ? 'instant' : 'standard';
+      const stripe = await getUncachableStripeClient();
 
-      // Process payout via Plaid Transfer (preferred) or Mercury (fallback)
-      if (bankAccount.plaidAccessToken && bankAccount.plaidAccountId && hasPlaidCredentials()) {
-        // Use Plaid Transfer for Plaid-linked accounts
+      // PRIMARY METHOD: Stripe Connect Express (fully automated payouts)
+      if (user.stripeConnectId && user.stripeConnectId.startsWith('acct_')) {
         try {
-          const idempotencyKey = `withdraw-${userId}-${Date.now()}`;
-          const userName = `${user.firstName} ${user.lastName}`;
+          // Check if Connect account is ready for payouts
+          const connectAccount = await stripe.accounts.retrieve(user.stripeConnectId);
           
-          const result = await createPlaidPayout({
-            accessToken: bankAccount.plaidAccessToken,
-            accountId: bankAccount.plaidAccountId,
-            amount: netAmount,
-            userName,
-            description: 'ChipIn Wallet Withdrawal',
-            speed: transferSpeed,
-            idempotencyKey,
-          });
-
-          transferId = result.transferId;
-          payoutStatus = result.status;
-          arrivalTime = result.arrivalTime;
-          console.log(`[Wallet Withdraw] Plaid Transfer created: ${transferId}, status: ${payoutStatus}`);
-        } catch (plaidError: any) {
-          console.error('[Wallet Withdraw] Plaid Transfer error:', plaidError.message);
-          
-          // Check if it's a user action required error (bank reconnection needed)
-          if (plaidError.message.includes('Bank account connection needs to be refreshed')) {
-            return res.status(400).json({ 
-              error: 'Your bank connection has expired. Please re-link your bank account in Settings.',
-              code: 'BANK_RECONNECTION_REQUIRED'
+          if (connectAccount.payouts_enabled) {
+            // Transfer funds to the connected account first
+            const amountInCents = Math.round(netAmount * 100);
+            
+            const transfer = await stripe.transfers.create({
+              amount: amountInCents,
+              currency: 'usd',
+              destination: user.stripeConnectId,
+              metadata: {
+                userId: user.id,
+                type: 'wallet_withdrawal',
+                payoutSpeed,
+              },
             });
-          }
-          
-          // For other errors, try Mercury fallback
-          if (hasMercuryCredentials() && bankAccount.routingNumber && bankAccount.accountNumber) {
-            try {
-              const mercury = getMercuryClient();
-              const recipient = await mercury.findRecipientByBankAccount(
-                bankAccount.routingNumber,
-                bankAccount.accountNumber
-              );
 
-              if (recipient) {
-                const mercuryIdempotencyKey = `withdraw-${userId}-${Date.now()}`;
-                const paymentRequest = await mercury.requestSendMoney({
-                  recipientId: recipient.id,
-                  amount: netAmount,
-                  paymentMethod: 'ach',
-                  memo: `ChipIn Wallet Withdrawal - User ${user.username}`,
-                  idempotencyKey: mercuryIdempotencyKey,
-                });
-                transferId = paymentRequest.requestId;
-                payoutStatus = 'pending_approval';
-                arrivalTime = '1-3 business days (after approval)';
-                console.log(`[Wallet Withdraw] Fallback to Mercury: ${transferId}`);
-              } else {
-                payoutStatus = 'pending_review';
+            transferId = transfer.id;
+            
+            // Now trigger the payout from the connected account
+            if (payoutSpeed === 'instant') {
+              // For instant payouts, we need to create a payout on the connected account
+              try {
+                const payout = await stripe.payouts.create(
+                  {
+                    amount: amountInCents,
+                    currency: 'usd',
+                    method: 'instant',
+                  },
+                  { stripeAccount: user.stripeConnectId }
+                );
+                payoutStatus = payout.status;
+                arrivalTime = 'Within 30 minutes';
+                console.log(`[Wallet Withdraw] Stripe instant payout created: ${payout.id}`);
+              } catch (instantErr: any) {
+                // Instant payout failed, fall back to standard
+                console.warn(`[Wallet Withdraw] Instant payout failed, using standard: ${instantErr.message}`);
+                payoutStatus = 'pending';
+                arrivalTime = '1-2 business days';
               }
-            } catch (mercuryErr: any) {
-              console.error('[Wallet Withdraw] Mercury fallback error:', mercuryErr.message);
-              payoutStatus = 'pending_review';
+            } else {
+              // Standard payouts happen automatically on Stripe's schedule
+              payoutStatus = 'pending';
+              arrivalTime = '1-2 business days';
             }
+            
+            console.log(`[Wallet Withdraw] Stripe Connect transfer created: ${transferId}`);
           } else {
-            payoutStatus = 'pending_review';
-          }
-        }
-      } else if (hasMercuryCredentials() && bankAccount.routingNumber && bankAccount.accountNumber) {
-        // Use Mercury for non-Plaid accounts (Stripe Financial Connections, manual entry)
-        try {
-          const mercury = getMercuryClient();
-          const recipient = await mercury.findRecipientByBankAccount(
-            bankAccount.routingNumber,
-            bankAccount.accountNumber
-          );
-
-          if (recipient) {
-            const idempotencyKey = `withdraw-${userId}-${Date.now()}`;
-            const paymentRequest = await mercury.requestSendMoney({
-              recipientId: recipient.id,
-              amount: netAmount,
-              paymentMethod: 'ach',
-              memo: `ChipIn Wallet Withdrawal - User ${user.username}`,
-              idempotencyKey,
+            // Connect account exists but payouts not enabled yet
+            return res.status(400).json({ 
+              error: 'Please complete your payout setup first. Go to Settings to finish verification.',
+              code: 'CONNECT_SETUP_INCOMPLETE'
             });
-
-            transferId = paymentRequest.requestId;
-            payoutStatus = 'pending_approval';
-            arrivalTime = '1-3 business days (after approval)';
-            console.log(`[Wallet Withdraw] Mercury payment request created: ${transferId}`);
-          } else {
-            payoutStatus = 'pending_recipient_setup';
-            console.log(`[Wallet Withdraw] No matching Mercury recipient found`);
           }
-        } catch (mercuryError: any) {
-          console.error('[Wallet Withdraw] Mercury error:', mercuryError.message);
-          payoutStatus = 'pending_review';
+        } catch (connectError: any) {
+          console.error('[Wallet Withdraw] Stripe Connect error:', connectError.message);
+          
+          if (connectError.code === 'resource_missing') {
+            // Connect account was deleted, clear it
+            await storage.updateUser(userId, { stripeConnectId: null });
+            return res.status(400).json({ 
+              error: 'Your payout account was not found. Please set up payouts again in Settings.',
+              code: 'CONNECT_ACCOUNT_MISSING'
+            });
+          }
+          
+          return res.status(400).json({ 
+            error: 'Payout failed. Please try again or contact support.',
+            code: 'PAYOUT_FAILED'
+          });
         }
       } else {
-        // No payout method available
-        payoutStatus = 'pending_manual';
-        console.log(`[Wallet Withdraw] No automated payout method available, marking for manual processing`);
+        // No Connect account - prompt user to set up payouts
+        return res.status(400).json({ 
+          error: 'Please set up payouts first. Go to Settings and complete the quick 2-minute verification.',
+          code: 'CONNECT_NOT_SETUP',
+          setupRequired: true
+        });
       }
 
       // Deduct from user balance
       const newBalance = (currentBalance - totalDeduction).toFixed(2);
       await storage.updateUser(userId, { balance: newBalance });
 
-      // Log the withdrawal with payout status
-      const withdrawal = await storage.createWalletWithdrawal(userId, amount, bankAccountId);
+      // Log the withdrawal with payout status (null bankAccountId since using Connect)
+      const withdrawal = await storage.createWalletWithdrawal(userId, amount, undefined);
 
       // Send notification (map custom status to valid notification status)
       const notificationStatus = payoutStatus === 'pending_approval' || payoutStatus === 'pending_recipient_setup' 
@@ -2359,15 +2334,7 @@ export async function registerRoutes(
       ).catch(console.error);
 
       const feeNote = fee > 0 ? ` (Fee: $${fee.toFixed(2)})` : '';
-      
-      let message: string;
-      if (payoutStatus === 'pending_approval') {
-        message = `Withdrawal of $${netAmount.toFixed(2)} submitted${feeNote}. Awaiting approval - funds will arrive in ${arrivalTime}.`;
-      } else if (payoutStatus === 'pending_recipient_setup') {
-        message = `Withdrawal of $${netAmount.toFixed(2)} queued${feeNote}. Your bank account needs to be verified before processing.`;
-      } else {
-        message = `Withdrawal of $${netAmount.toFixed(2)} initiated${feeNote}. Processing will begin shortly.`;
-      }
+      const message = `Withdrawal of $${netAmount.toFixed(2)} initiated${feeNote}. Funds will arrive in ${arrivalTime}.`;
 
       res.json({
         success: true,
