@@ -2238,13 +2238,9 @@ export async function registerRoutes(
       if (!savedMethod.stripeFinancialConnectionsAccountId) {
         return res.status(400).json({ error: "Please link a verified bank account via Stripe" });
       }
-      
-      if (!savedMethod.routingNumber || !savedMethod.accountNumber) {
-        return res.status(400).json({ error: "Bank account is missing routing/account details" });
-      }
 
-      const finalRoutingNumber = savedMethod.routingNumber;
-      const finalAccountNumber = savedMethod.accountNumber;
+      const finalRoutingNumber = savedMethod.routingNumber || '';
+      const finalAccountNumber = savedMethod.accountNumber || '';
       const finalAccountHolderName = savedMethod.accountName;
       const finalAccountType = savedMethod.accountType;
       const bankAccountIdRef = savedMethod.id;
@@ -2670,6 +2666,7 @@ export async function registerRoutes(
 
       // Try to get routing number from the payment method attached to SetupIntent
       let routingNumber: string | undefined;
+      let accountNumber: string | undefined;
       
       if (setupIntentId) {
         try {
@@ -2686,6 +2683,9 @@ export async function registerRoutes(
           console.log('[Stripe FC] Could not retrieve payment method:', e.message);
         }
       }
+      
+      // Note: Full account numbers require a webhook listener for financial_connections.account.refreshed_account_numbers
+      // For now, we save without full account number - admin will process via manual verification
 
       // Create bank account record with routing number if available
       const bankAccount = await storage.createBankAccount({
@@ -2697,6 +2697,7 @@ export async function registerRoutes(
         accountType: accountSubtype,
         payoutMethod: isDebitCard ? 'debit_card' : 'bank_account',
         routingNumber: routingNumber,
+        accountNumber: accountNumber,
         isDefault: isFirst,
       });
 
