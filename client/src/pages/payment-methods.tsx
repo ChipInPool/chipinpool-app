@@ -284,17 +284,24 @@ export default function PaymentMethods() {
         }
       }
       
-      // Get the Financial Connections account ID from the setup intent
-      const setupIntent = result.setupIntent;
-      const linkedAccounts = (setupIntent as any)?.payment_method?.us_bank_account?.financial_connections_account;
+      // Always retrieve from server to get the Financial Connections account ID reliably
+      const siRes = await fetch(`/api/stripe/setup-intent/${setupIntentId}`, {
+        credentials: 'include',
+      });
       
-      if (linkedAccounts) {
-        // Save the bank account to our database
-        completeBankLinkMutation.mutate({ accountId: linkedAccounts, setupIntentId });
+      if (siRes.ok) {
+        const siData = await siRes.json();
+        if (siData.financialConnectionsAccountId) {
+          completeBankLinkMutation.mutate({ 
+            accountId: siData.financialConnectionsAccountId, 
+            setupIntentId 
+          });
+        } else {
+          // No FC account - might be a different payment method type
+          toast({ description: 'Bank account linked but verification pending. Please try again.', variant: 'destructive' });
+        }
       } else {
-        // Try alternative method - refresh accounts via webhook or direct fetch
-        toast({ description: 'Bank account linked successfully!' });
-        refetchBankAccounts();
+        toast({ description: 'Bank linked but could not save details. Please try again.', variant: 'destructive' });
       }
     } catch (err: any) {
       toast({ description: err.message || 'Failed to link bank account', variant: 'destructive' });

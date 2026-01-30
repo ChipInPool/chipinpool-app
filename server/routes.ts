@@ -2729,6 +2729,40 @@ export async function registerRoutes(
     }
   });
 
+  // Retrieve SetupIntent details to get Financial Connections account ID
+  app.get("/api/stripe/setup-intent/:setupIntentId", requireAuth, async (req, res, next) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const { setupIntentId } = req.params;
+      
+      const setupIntent = await stripe.setupIntents.retrieve(setupIntentId, {
+        expand: ['payment_method'],
+      });
+      
+      // Verify this belongs to the current user
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user?.stripeCustomerId || setupIntent.customer !== user.stripeCustomerId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      
+      const paymentMethod = setupIntent.payment_method as any;
+      const fcAccountId = paymentMethod?.us_bank_account?.financial_connections_account;
+      
+      res.json({
+        id: setupIntent.id,
+        status: setupIntent.status,
+        financialConnectionsAccountId: fcAccountId,
+        routingNumber: paymentMethod?.us_bank_account?.routing_number,
+        last4: paymentMethod?.us_bank_account?.last4,
+        bankName: paymentMethod?.us_bank_account?.bank_name,
+      });
+    } catch (error: any) {
+      console.error('[Stripe] Setup intent retrieval error:', error.message);
+      next(error);
+    }
+  });
+
   // Create Stripe Connect Express account for payouts (if needed)
   app.post("/api/stripe/connect/create-account", requireAuth, async (req, res, next) => {
     try {
