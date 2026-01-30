@@ -2195,13 +2195,9 @@ export async function registerRoutes(
   // Wallet withdrawal endpoint - creates pending request for manual admin processing
   app.post("/api/wallet/withdraw", requireAuth, async (req, res, next) => {
     try {
-      const { amount, routingNumber, accountNumber, accountHolderName, accountType, savedMethodId } = z.object({
+      const { amount, savedMethodId } = z.object({
         amount: z.string(),
-        routingNumber: z.string().length(9, "Routing number must be 9 digits").optional(),
-        accountNumber: z.string().min(4, "Account number must be at least 4 digits").max(17).optional(),
-        accountHolderName: z.string().min(1, "Account holder name is required").optional(),
-        accountType: z.enum(['checking', 'savings']).optional().default('checking'),
-        savedMethodId: z.string().optional(),
+        savedMethodId: z.string({ required_error: "Please select a verified bank account" }),
       }).parse(req.body);
 
       const userId = req.session.userId!;
@@ -2228,43 +2224,30 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Insufficient balance" });
       }
 
-      // Get bank details from saved method or from input
-      let finalRoutingNumber: string;
-      let finalAccountNumber: string;
-      let finalAccountHolderName: string;
-      let finalAccountType: string;
-      let bankAccountIdRef: string | undefined;
-
-      if (savedMethodId) {
-        // Use saved payout method
-        const savedMethod = await db.select()
-          .from(bankAccounts)
-          .where(eq(bankAccounts.id, savedMethodId))
-          .then(rows => rows[0]);
-        
-        if (!savedMethod || savedMethod.userId !== userId) {
-          return res.status(404).json({ error: "Saved payout method not found" });
-        }
-        
-        if (!savedMethod.routingNumber || !savedMethod.accountNumber) {
-          return res.status(400).json({ error: "Saved method is missing bank details" });
-        }
-
-        finalRoutingNumber = savedMethod.routingNumber;
-        finalAccountNumber = savedMethod.accountNumber;
-        finalAccountHolderName = savedMethod.accountName;
-        finalAccountType = savedMethod.accountType;
-        bankAccountIdRef = savedMethod.id;
-      } else {
-        // Use provided bank details
-        if (!routingNumber || !accountNumber || !accountHolderName) {
-          return res.status(400).json({ error: "Please provide bank account details or select a saved method" });
-        }
-        finalRoutingNumber = routingNumber;
-        finalAccountNumber = accountNumber;
-        finalAccountHolderName = accountHolderName;
-        finalAccountType = accountType || 'checking';
+      // Get verified bank account
+      const savedMethod = await db.select()
+        .from(bankAccounts)
+        .where(eq(bankAccounts.id, savedMethodId))
+        .then(rows => rows[0]);
+      
+      if (!savedMethod || savedMethod.userId !== userId) {
+        return res.status(404).json({ error: "Bank account not found" });
       }
+      
+      // Require Stripe Financial Connections verified account
+      if (!savedMethod.stripeFinancialConnectionsAccountId) {
+        return res.status(400).json({ error: "Please link a verified bank account via Stripe" });
+      }
+      
+      if (!savedMethod.routingNumber || !savedMethod.accountNumber) {
+        return res.status(400).json({ error: "Bank account is missing routing/account details" });
+      }
+
+      const finalRoutingNumber = savedMethod.routingNumber;
+      const finalAccountNumber = savedMethod.accountNumber;
+      const finalAccountHolderName = savedMethod.accountName;
+      const finalAccountType = savedMethod.accountType;
+      const bankAccountIdRef = savedMethod.id;
 
       // Deduct from user balance immediately
       const newBalance = (currentBalance - withdrawAmount).toFixed(2);
@@ -2362,19 +2345,20 @@ export async function registerRoutes(
         .where(eq(bankAccounts.userId, userId))
         .orderBy(desc(bankAccounts.createdAt));
 
-      // Only include methods that have routing numbers (required for manual withdrawals)
-      // Filter out Stripe-linked accounts that don't have bank details
-      const withdrawableMethods = methods.filter(m => m.routingNumber && m.accountNumber);
+      // Only include Stripe Financial Connections verified accounts
+      // These have stripeFinancialConnectionsAccountId set
+      const verifiedMethods = methods.filter(m => m.stripeFinancialConnectionsAccountId);
 
       // Mask sensitive data for client
-      const maskedMethods = withdrawableMethods.map(m => ({
+      const maskedMethods = verifiedMethods.map(m => ({
         id: m.id,
         institutionName: m.institutionName,
         accountName: m.accountName,
         accountMask: m.accountMask,
         accountType: m.accountType,
         isDefault: m.isDefault,
-        hasRoutingNumber: true,
+        isVerified: true,
+        stripeAccountId: m.stripeFinancialConnectionsAccountId,
         createdAt: m.createdAt,
       }));
 
