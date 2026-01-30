@@ -111,16 +111,16 @@ Preferred communication style: Simple, everyday language.
     - Channels: Email and SMS with independent per-category toggles
     - Automatic notifications for: 2FA enable/disable, password reset, KYC verification, wallet withdrawals
     - Global channel opt-out respected (notifyEmail/notifySMS gates all category notifications)
-17. **Pool Withdrawals** - Simplified bank withdrawal system:
-    - Users link bank accounts via Stripe Financial Connections (secure OAuth bank login)
-    - Pool creators can withdraw funds to their own linked bank account
-    - Pool creators can send transfer requests to any contributor
-    - Contributors receive notifications and can accept/decline transfer requests
-    - Accept flow includes bank account selection
-    - Transfer tracking with status: pending → accepted → completed/cancelled/failed
-    - **Regular Users**: Link bank via Financial Connections, receive ACH payouts (1-3 days, free) or instant payouts via debit card (1.5% fee)
-    - **Merchants**: Use Stripe Connect for ACH payouts (automated daily payouts from ChipInPay revenue)
-    - Legacy Plaid-linked accounts still supported for existing users
+17. **Wallet Withdrawals** - Manual admin-processed withdrawal system:
+    - Users save bank accounts as payout methods (routing number, account number, holder name)
+    - Withdrawal requests require KYC verification (Stripe Identity)
+    - Users can select from saved payout methods or enter new bank details
+    - Withdrawals go to `pending_review` status for admin processing
+    - Admins review requests in `/admin/withdrawals` with full user identity and bank details
+    - Admin manually processes via Mercury banking and marks complete/rejected
+    - Rejected withdrawals return funds to user's wallet
+    - Minimum withdrawal: $10
+    - Processing time: 1-2 business days
 
 ### ChipInPay Merchant API:
 - `POST /api/v1/merchant/checkout` - Create checkout session

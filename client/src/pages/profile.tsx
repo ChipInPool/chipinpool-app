@@ -126,9 +126,11 @@ export default function Profile() {
     }
     
     // Validation depends on whether using saved method or new bank details
+    const isUsingNewBankForm = showNewBankForm || payoutMethods.length === 0;
+    
     if (selectedMethodId) {
       // Using saved method - no additional validation needed
-    } else if (showNewBankForm) {
+    } else if (isUsingNewBankForm) {
       if (!routingNumber || routingNumber.length !== 9) {
         toast({ description: "Please enter a valid 9-digit routing number", variant: "destructive" });
         return;
@@ -990,8 +992,8 @@ export default function Profile() {
                 parseFloat(amount) < 10 || 
                 parseFloat(amount) > parseFloat(user?.balance || '0') ||
                 user?.kycStatus !== 'verified' ||
-                (!selectedMethodId && !showNewBankForm) ||
-                (showNewBankForm && (routingNumber.length !== 9 || accountNumber.length < 4 || !accountHolderName.trim() || !institutionName.trim()))
+                (!selectedMethodId && !showNewBankForm && payoutMethods.length > 0) ||
+                ((showNewBankForm || payoutMethods.length === 0) && !selectedMethodId && (routingNumber.length !== 9 || accountNumber.length < 4 || !accountHolderName.trim() || !institutionName.trim()))
               }
               className="bg-blue-600 hover:bg-blue-700"
               data-testid="button-confirm-withdraw"
