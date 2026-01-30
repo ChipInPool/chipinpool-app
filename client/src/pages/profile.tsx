@@ -28,6 +28,8 @@ export default function Profile() {
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+  const [payoutSpeed, setPayoutSpeed] = useState<'standard' | 'instant'>('standard');
   const [isSyncing, setIsSyncing] = useState(false);
   const [followersOpen, setFollowersOpen] = useState(false);
   const [followingOpen, setFollowingOpen] = useState(false);
@@ -111,23 +113,48 @@ export default function Profile() {
       toast({ description: "Please link a bank account first in Payment Methods", variant: "destructive" });
       return;
     }
+    if (!selectedAccountId) {
+      toast({ description: "Please select a payment method", variant: "destructive" });
+      return;
+    }
     if (!amount || parseFloat(amount) <= 0) {
       toast({ description: "Please enter a valid amount", variant: "destructive" });
       return;
     }
     setIsProcessing(true);
     try {
-      const response = await api.plaid.withdraw(amount);
-      toast({ description: response.message || `Withdrawal of $${amount} initiated` });
+      const res = await fetch('/api/wallet/withdraw', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount,
+          bankAccountId: selectedAccountId,
+          payoutSpeed,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Withdrawal failed');
+      }
+      toast({ description: data.message || `Withdrawal initiated` });
       queryClient.invalidateQueries({ queryKey: queryKeys.user });
       setWithdrawDialogOpen(false);
       setAmount("");
+      setSelectedAccountId("");
+      setPayoutSpeed('standard');
     } catch (error: any) {
       toast({ description: error.message || "Withdrawal failed", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
   };
+
+  // Calculate withdrawal fee
+  const withdrawAmount = parseFloat(amount || '0');
+  const INSTANT_FEE_RATE = 0.015;
+  const withdrawalFee = payoutSpeed === 'instant' ? withdrawAmount * INSTANT_FEE_RATE : 0;
+  const netWithdrawal = withdrawAmount - withdrawalFee;
 
   const { data: poolsData, isLoading: poolsLoading } = useQuery({
     queryKey: queryKeys.pools,
@@ -664,15 +691,63 @@ export default function Profile() {
               </div>
             ) : (
               <>
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                  <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
-                    <Building className="w-4 h-4 text-green-400" />
-                  </div>
-                  <div className="text-sm">
-                    <p className="font-medium text-green-300">Bank Account Connected</p>
-                    <p className="text-muted-foreground text-xs">Ready for withdrawals</p>
-                  </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Withdraw to</label>
+                  <select
+                    value={selectedAccountId}
+                    onChange={(e) => {
+                      setSelectedAccountId(e.target.value);
+                      const acct = bankAccountsData?.accounts?.find((a: any) => a.id === e.target.value);
+                      if (acct?.payoutMethod === 'debit_card') {
+                        setPayoutSpeed('instant');
+                      } else {
+                        setPayoutSpeed('standard');
+                      }
+                    }}
+                    className="w-full h-12 px-3 rounded-lg border border-white/10 bg-background text-foreground"
+                    data-testid="select-withdraw-account"
+                  >
+                    <option value="">Select account...</option>
+                    {bankAccountsData?.accounts?.map((account: any) => (
+                      <option key={account.id} value={account.id}>
+                        {account.institutionName} ****{account.accountMask}
+                        {account.payoutMethod === 'debit_card' ? ' (Instant)' : ' (ACH)'}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+
+                {selectedAccountId && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Payout Speed</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPayoutSpeed('standard')}
+                        className={`p-3 rounded-lg border text-left ${payoutSpeed === 'standard' ? 'border-green-500 bg-green-500/10' : 'border-white/10'}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4" />
+                          <span className="font-medium text-sm">Standard</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">1-3 business days</p>
+                        <p className="text-xs text-green-400 mt-1">Free</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPayoutSpeed('instant')}
+                        className={`p-3 rounded-lg border text-left ${payoutSpeed === 'instant' ? 'border-yellow-500 bg-yellow-500/10' : 'border-white/10'}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <RefreshCw className="w-4 h-4" />
+                          <span className="font-medium text-sm">Instant</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">~30 minutes</p>
+                        <p className="text-xs text-yellow-400 mt-1">1.5% fee</p>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Amount to withdraw</label>
@@ -733,9 +808,32 @@ export default function Profile() {
                   </Button>
                 </div>
 
+                {withdrawAmount > 0 && (
+                  <div className="p-3 rounded-lg bg-muted/50 space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Withdraw amount</span>
+                      <span>${withdrawAmount.toFixed(2)}</span>
+                    </div>
+                    {withdrawalFee > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Instant fee (1.5%)</span>
+                        <span className="text-yellow-400">-${withdrawalFee.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm font-medium pt-1 border-t border-white/10">
+                      <span>You'll receive</span>
+                      <span className="text-green-400">${netWithdrawal.toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
                   <Clock className="w-4 h-4 mt-0.5 shrink-0" />
-                  <span>Funds typically arrive within 1-3 business days.</span>
+                  <span>
+                    {payoutSpeed === 'instant' 
+                      ? 'Funds typically arrive within 30 minutes.'
+                      : 'Funds typically arrive within 1-3 business days.'}
+                  </span>
                 </div>
               </>
             )}
