@@ -28,6 +28,11 @@ jobs:
       - name: Build application
         run: npm run build
 
+      - name: Run database migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run db:push
+
       - name: Prepare deployment package
         run: |
           mkdir -p deploy
