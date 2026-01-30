@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PoolCard } from "@/components/pool-card";
-import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus, Clock, Users, UserPlus, ChevronDown, ChevronUp, Building, AlertCircle, Receipt, RefreshCw, Loader2 } from "lucide-react";
+import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus, Clock, Users, UserPlus, ChevronDown, ChevronUp, Building, AlertCircle, Receipt, RefreshCw, Loader2, CreditCard, Trash2, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -36,6 +36,12 @@ export default function Profile() {
   const [followingOpen, setFollowingOpen] = useState(false);
   const [followersDialogOpen, setFollowersDialogOpen] = useState(false);
   const [followingDialogOpen, setFollowingDialogOpen] = useState(false);
+  const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
+  const [showNewBankForm, setShowNewBankForm] = useState(false);
+  const [accountType, setAccountType] = useState<'checking' | 'savings'>('checking');
+  const [institutionName, setInstitutionName] = useState("");
+  const [saveAsPayoutMethod, setSaveAsPayoutMethod] = useState(true);
+  const [payoutMethodsDialogOpen, setPayoutMethodsDialogOpen] = useState(false);
 
   const handleSyncWallet = async () => {
     setIsSyncing(true);
@@ -118,30 +124,69 @@ export default function Profile() {
       toast({ description: "Minimum withdrawal is $10", variant: "destructive" });
       return;
     }
-    if (!routingNumber || routingNumber.length !== 9) {
-      toast({ description: "Please enter a valid 9-digit routing number", variant: "destructive" });
+    
+    // Validation depends on whether using saved method or new bank details
+    if (selectedMethodId) {
+      // Using saved method - no additional validation needed
+    } else if (showNewBankForm) {
+      if (!routingNumber || routingNumber.length !== 9) {
+        toast({ description: "Please enter a valid 9-digit routing number", variant: "destructive" });
+        return;
+      }
+      if (!accountNumber || accountNumber.length < 4) {
+        toast({ description: "Please enter a valid account number", variant: "destructive" });
+        return;
+      }
+      if (!accountHolderName.trim()) {
+        toast({ description: "Please enter the account holder name", variant: "destructive" });
+        return;
+      }
+      if (!institutionName.trim()) {
+        toast({ description: "Please enter the bank name", variant: "destructive" });
+        return;
+      }
+    } else {
+      toast({ description: "Please select a payout method or add a new bank account", variant: "destructive" });
       return;
     }
-    if (!accountNumber || accountNumber.length < 4) {
-      toast({ description: "Please enter a valid account number", variant: "destructive" });
-      return;
-    }
-    if (!accountHolderName.trim()) {
-      toast({ description: "Please enter the account holder name", variant: "destructive" });
-      return;
-    }
+
     setIsProcessing(true);
     try {
+      // Build request body based on selected method
+      const body: any = { amount };
+      
+      if (selectedMethodId) {
+        body.savedMethodId = selectedMethodId;
+      } else {
+        body.routingNumber = routingNumber;
+        body.accountNumber = accountNumber;
+        body.accountHolderName = accountHolderName.trim();
+        body.accountType = accountType;
+        
+        // Optionally save as payout method
+        if (saveAsPayoutMethod) {
+          await fetch('/api/payout-methods', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              accountHolderName: accountHolderName.trim(),
+              routingNumber,
+              accountNumber,
+              accountType,
+              institutionName: institutionName.trim(),
+              setAsDefault: payoutMethods.length === 0,
+            }),
+          });
+          refetchPayoutMethods();
+        }
+      }
+
       const res = await fetch('/api/wallet/withdraw', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount,
-          routingNumber,
-          accountNumber,
-          accountHolderName: accountHolderName.trim(),
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -154,6 +199,9 @@ export default function Profile() {
       setRoutingNumber("");
       setAccountNumber("");
       setAccountHolderName("");
+      setInstitutionName("");
+      setSelectedMethodId(null);
+      setShowNewBankForm(false);
     } catch (error: any) {
       toast({ description: error.message || "Withdrawal failed", variant: "destructive" });
     } finally {
@@ -163,6 +211,37 @@ export default function Profile() {
 
   // Calculate withdrawal amount
   const withdrawAmount = parseFloat(amount || '0');
+
+  const handleDeletePayoutMethod = async (methodId: string) => {
+    try {
+      const res = await fetch(`/api/payout-methods/${methodId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to delete');
+      toast({ description: "Payout method removed" });
+      refetchPayoutMethods();
+      if (selectedMethodId === methodId) {
+        setSelectedMethodId(null);
+      }
+    } catch (error) {
+      toast({ description: "Failed to remove payout method", variant: "destructive" });
+    }
+  };
+
+  const handleSetDefaultPayoutMethod = async (methodId: string) => {
+    try {
+      const res = await fetch(`/api/payout-methods/${methodId}/set-default`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to set default');
+      toast({ description: "Default payout method updated" });
+      refetchPayoutMethods();
+    } catch (error) {
+      toast({ description: "Failed to update default", variant: "destructive" });
+    }
+  };
 
   const { data: poolsData, isLoading: poolsLoading } = useQuery({
     queryKey: queryKeys.pools,
@@ -197,6 +276,18 @@ export default function Profile() {
     },
     enabled: isAuthenticated,
   });
+
+  const { data: payoutMethodsData, refetch: refetchPayoutMethods } = useQuery({
+    queryKey: ["payoutMethods"],
+    queryFn: async () => {
+      const res = await fetch("/api/payout-methods", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch payout methods");
+      return res.json();
+    },
+    enabled: isAuthenticated,
+  });
+
+  const payoutMethods = payoutMethodsData?.methods || [];
 
   const hasBankLinked = plaidStatus?.hasBankLinked || 
     (bankAccountsData?.accounts?.some((a: any) => a.stripeFinancialConnectionsAccountId || a.canReceivePayouts));
@@ -712,49 +803,154 @@ export default function Profile() {
               <div className="pt-2 border-t border-white/10">
                 <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
                   <Building className="w-4 h-4" />
-                  Bank Account Details
+                  Payout Method
                 </h4>
                 
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Account Holder Name</label>
-                    <Input
-                      type="text"
-                      placeholder="John Doe"
-                      value={accountHolderName}
-                      onChange={(e) => setAccountHolderName(e.target.value)}
-                      className="h-10"
-                      data-testid="input-account-holder"
-                    />
+                {user?.kycStatus !== 'verified' && (
+                  <Alert className="mb-3 border-yellow-500/30 bg-yellow-500/10">
+                    <AlertCircle className="h-4 w-4 text-yellow-500" />
+                    <AlertDescription className="text-sm">
+                      Please complete identity verification before withdrawing. <a href="/kyc" className="underline text-yellow-400">Verify now</a>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {payoutMethods.length > 0 && !showNewBankForm && (
+                  <div className="space-y-2 mb-3">
+                    {payoutMethods.map((method: any) => (
+                      <div 
+                        key={method.id}
+                        onClick={() => setSelectedMethodId(method.id)}
+                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                          selectedMethodId === method.id 
+                            ? 'border-blue-500 bg-blue-500/10' 
+                            : 'border-white/10 hover:border-white/20'
+                        }`}
+                        data-testid={`payout-method-${method.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                            <Building className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{method.institutionName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {method.accountType} ••••{method.accountMask}
+                            </p>
+                          </div>
+                          {method.isDefault && (
+                            <Badge variant="secondary" className="text-xs">Default</Badge>
+                          )}
+                        </div>
+                        {selectedMethodId === method.id && (
+                          <Check className="w-5 h-5 text-blue-500" />
+                        )}
+                      </div>
+                    ))}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-full mt-2"
+                      onClick={() => { setShowNewBankForm(true); setSelectedMethodId(null); }}
+                    >
+                      <Plus className="w-4 h-4 mr-2" /> Use a different bank account
+                    </Button>
                   </div>
-                  
-                  <div className="grid grid-cols-2 gap-3">
+                )}
+
+                {(payoutMethods.length === 0 || showNewBankForm) && (
+                  <div className="space-y-3">
+                    {showNewBankForm && payoutMethods.length > 0 && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => { setShowNewBankForm(false); setSelectedMethodId(payoutMethods[0]?.id); }}
+                      >
+                        ← Back to saved methods
+                      </Button>
+                    )}
+                    
                     <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">Routing Number</label>
+                      <label className="text-xs text-muted-foreground">Bank Name</label>
                       <Input
                         type="text"
-                        placeholder="9 digits"
-                        value={routingNumber}
-                        onChange={(e) => setRoutingNumber(e.target.value.replace(/\D/g, '').slice(0, 9))}
-                        maxLength={9}
+                        placeholder="e.g., Chase, Bank of America"
+                        value={institutionName}
+                        onChange={(e) => setInstitutionName(e.target.value)}
                         className="h-10"
-                        data-testid="input-routing-number"
+                        data-testid="input-bank-name"
                       />
                     </div>
+
                     <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">Account Number</label>
+                      <label className="text-xs text-muted-foreground">Account Holder Name</label>
                       <Input
                         type="text"
-                        placeholder="Account number"
-                        value={accountNumber}
-                        onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 17))}
-                        maxLength={17}
+                        placeholder="John Doe"
+                        value={accountHolderName}
+                        onChange={(e) => setAccountHolderName(e.target.value)}
                         className="h-10"
-                        data-testid="input-account-number"
+                        data-testid="input-account-holder"
                       />
                     </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Routing Number</label>
+                        <Input
+                          type="text"
+                          placeholder="9 digits"
+                          value={routingNumber}
+                          onChange={(e) => setRoutingNumber(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                          maxLength={9}
+                          className="h-10"
+                          data-testid="input-routing-number"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Account Number</label>
+                        <Input
+                          type="text"
+                          placeholder="Account number"
+                          value={accountNumber}
+                          onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 17))}
+                          maxLength={17}
+                          className="h-10"
+                          data-testid="input-account-number"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        variant={accountType === 'checking' ? 'default' : 'outline'}
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setAccountType('checking')}
+                      >
+                        Checking
+                      </Button>
+                      <Button
+                        variant={accountType === 'savings' ? 'default' : 'outline'}
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setAccountType('savings')}
+                      >
+                        Savings
+                      </Button>
+                    </div>
+
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={saveAsPayoutMethod}
+                        onChange={(e) => setSaveAsPayoutMethod(e.target.checked)}
+                        className="rounded"
+                      />
+                      Save this bank for future withdrawals
+                    </label>
                   </div>
-                </div>
+                )}
               </div>
 
               {withdrawAmount >= 10 && (
@@ -774,12 +970,29 @@ export default function Profile() {
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="ghost" onClick={() => { setWithdrawDialogOpen(false); setAmount(""); setRoutingNumber(""); setAccountNumber(""); setAccountHolderName(""); }}>
+            <Button variant="ghost" onClick={() => { 
+              setWithdrawDialogOpen(false); 
+              setAmount(""); 
+              setRoutingNumber(""); 
+              setAccountNumber(""); 
+              setAccountHolderName(""); 
+              setInstitutionName("");
+              setSelectedMethodId(null);
+              setShowNewBankForm(false);
+            }}>
               Cancel
             </Button>
             <Button 
               onClick={handleWithdraw} 
-              disabled={isProcessing || !amount || parseFloat(amount) < 10 || parseFloat(amount) > parseFloat(user?.balance || '0') || routingNumber.length !== 9 || accountNumber.length < 4 || !accountHolderName.trim()}
+              disabled={
+                isProcessing || 
+                !amount || 
+                parseFloat(amount) < 10 || 
+                parseFloat(amount) > parseFloat(user?.balance || '0') ||
+                user?.kycStatus !== 'verified' ||
+                (!selectedMethodId && !showNewBankForm) ||
+                (showNewBankForm && (routingNumber.length !== 9 || accountNumber.length < 4 || !accountHolderName.trim() || !institutionName.trim()))
+              }
               className="bg-blue-600 hover:bg-blue-700"
               data-testid="button-confirm-withdraw"
             >
