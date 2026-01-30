@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
-import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals } from "@shared/schema";
+import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, bankAccounts } from "@shared/schema";
 import express from "express";
 import { db } from "./db";
 import { eq, desc, sql, inArray } from "drizzle-orm";
@@ -2195,16 +2195,23 @@ export async function registerRoutes(
   // Wallet withdrawal endpoint - creates pending request for manual admin processing
   app.post("/api/wallet/withdraw", requireAuth, async (req, res, next) => {
     try {
-      const { amount, routingNumber, accountNumber, accountHolderName } = z.object({
+      const { amount, routingNumber, accountNumber, accountHolderName, accountType, savedMethodId } = z.object({
         amount: z.string(),
-        routingNumber: z.string().length(9, "Routing number must be 9 digits"),
-        accountNumber: z.string().min(4, "Account number must be at least 4 digits").max(17),
-        accountHolderName: z.string().min(1, "Account holder name is required"),
+        routingNumber: z.string().length(9, "Routing number must be 9 digits").optional(),
+        accountNumber: z.string().min(4, "Account number must be at least 4 digits").max(17).optional(),
+        accountHolderName: z.string().min(1, "Account holder name is required").optional(),
+        accountType: z.enum(['checking', 'savings']).optional().default('checking'),
+        savedMethodId: z.string().optional(),
       }).parse(req.body);
 
       const userId = req.session.userId!;
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Require KYC verification for withdrawals
+      if (user.kycStatus !== 'verified') {
+        return res.status(400).json({ error: "Please complete identity verification before withdrawing" });
+      }
 
       const withdrawAmount = parseFloat(amount);
       const currentBalance = parseFloat(user.balance);
@@ -2221,25 +2228,65 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Insufficient balance" });
       }
 
+      // Get bank details from saved method or from input
+      let finalRoutingNumber: string;
+      let finalAccountNumber: string;
+      let finalAccountHolderName: string;
+      let finalAccountType: string;
+      let bankAccountIdRef: string | undefined;
+
+      if (savedMethodId) {
+        // Use saved payout method
+        const savedMethod = await db.select()
+          .from(bankAccounts)
+          .where(eq(bankAccounts.id, savedMethodId))
+          .then(rows => rows[0]);
+        
+        if (!savedMethod || savedMethod.userId !== userId) {
+          return res.status(404).json({ error: "Saved payout method not found" });
+        }
+        
+        if (!savedMethod.routingNumber || !savedMethod.accountNumber) {
+          return res.status(400).json({ error: "Saved method is missing bank details" });
+        }
+
+        finalRoutingNumber = savedMethod.routingNumber;
+        finalAccountNumber = savedMethod.accountNumber;
+        finalAccountHolderName = savedMethod.accountName;
+        finalAccountType = savedMethod.accountType;
+        bankAccountIdRef = savedMethod.id;
+      } else {
+        // Use provided bank details
+        if (!routingNumber || !accountNumber || !accountHolderName) {
+          return res.status(400).json({ error: "Please provide bank account details or select a saved method" });
+        }
+        finalRoutingNumber = routingNumber;
+        finalAccountNumber = accountNumber;
+        finalAccountHolderName = accountHolderName;
+        finalAccountType = accountType || 'checking';
+      }
+
       // Deduct from user balance immediately
       const newBalance = (currentBalance - withdrawAmount).toFixed(2);
       await storage.updateUser(userId, { balance: newBalance });
 
-      // Create withdrawal request with bank details (stored for manual processing)
-      // Store last 4 of account for display, full details in notes for admin
-      const accountLast4 = accountNumber.slice(-4);
-      const withdrawal = await storage.createWalletWithdrawal(userId, amount, undefined);
+      // Create withdrawal request with full bank details
+      const accountLast4 = finalAccountNumber.slice(-4);
+      const withdrawal = await storage.createWalletWithdrawal(userId, amount, bankAccountIdRef);
       
-      // Update withdrawal with bank details (we'll add these fields)
+      // Update withdrawal with complete bank details for admin processing
       await db.update(walletWithdrawals)
         .set({
           status: 'pending_review',
-          bankAccountId: `manual:${routingNumber}:****${accountLast4}:${accountHolderName}`,
+          accountHolderName: finalAccountHolderName,
+          routingNumber: finalRoutingNumber,
+          accountNumberLast4: accountLast4,
+          accountType: finalAccountType,
         })
         .where(eq(walletWithdrawals.id, withdrawal.id));
 
       console.log(`[Wallet Withdraw] Manual payout request created: ${withdrawal.id} for $${amount}`);
-      console.log(`[Wallet Withdraw] Bank: ${accountHolderName}, Routing: ${routingNumber}, Account: ****${accountLast4}`);
+      console.log(`[Wallet Withdraw] Bank: ${finalAccountHolderName}, Routing: ${finalRoutingNumber}, Account: ****${accountLast4}`);
 
       // Send notification
       sendWalletActivityNotification(
@@ -2264,7 +2311,7 @@ export async function registerRoutes(
     }
   });
 
-  // Get pending withdrawal requests (admin only)
+  // Get pending withdrawal requests (admin only) - includes full user identity data
   app.get("/api/admin/withdrawals/pending", requireAuth, async (req, res, next) => {
     try {
       const userId = req.session.userId!;
@@ -2278,7 +2325,7 @@ export async function registerRoutes(
         .where(eq(walletWithdrawals.status, 'pending_review'))
         .orderBy(desc(walletWithdrawals.createdAt));
 
-      // Enrich with user info
+      // Enrich with full user identity info from KYC verification
       const enrichedWithdrawals = await Promise.all(pendingWithdrawals.map(async (w) => {
         const wUser = await storage.getUser(w.userId);
         return {
@@ -2288,11 +2335,151 @@ export async function registerRoutes(
             firstName: wUser.firstName,
             lastName: wUser.lastName,
             email: wUser.email,
+            phone: wUser.phone,
+            kycStatus: wUser.kycStatus,
+            verifiedLegalName: wUser.verifiedLegalName,
+            verifiedAddress: wUser.verifiedAddress,
+            verifiedCity: wUser.verifiedCity,
+            verifiedState: wUser.verifiedState,
+            verifiedPostalCode: wUser.verifiedPostalCode,
+            verifiedCountry: wUser.verifiedCountry,
           } : null,
         };
       }));
 
       res.json({ withdrawals: enrichedWithdrawals });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // User payout methods - list saved methods
+  app.get("/api/payout-methods", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const methods = await db.select()
+        .from(bankAccounts)
+        .where(eq(bankAccounts.userId, userId))
+        .orderBy(desc(bankAccounts.createdAt));
+
+      // Mask sensitive data for client
+      const maskedMethods = methods.map(m => ({
+        id: m.id,
+        institutionName: m.institutionName,
+        accountName: m.accountName,
+        accountMask: m.accountMask,
+        accountType: m.accountType,
+        isDefault: m.isDefault,
+        hasRoutingNumber: !!m.routingNumber,
+        createdAt: m.createdAt,
+      }));
+
+      res.json({ methods: maskedMethods });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Add a new payout method (manual bank account entry)
+  app.post("/api/payout-methods", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const { accountHolderName, routingNumber, accountNumber, accountType, institutionName, setAsDefault } = z.object({
+        accountHolderName: z.string().min(1),
+        routingNumber: z.string().length(9),
+        accountNumber: z.string().min(4).max(17),
+        accountType: z.enum(['checking', 'savings']),
+        institutionName: z.string().min(1),
+        setAsDefault: z.boolean().optional().default(false),
+      }).parse(req.body);
+
+      // If setting as default, unset other defaults
+      if (setAsDefault) {
+        await db.update(bankAccounts)
+          .set({ isDefault: false })
+          .where(eq(bankAccounts.userId, userId));
+      }
+
+      const accountLast4 = accountNumber.slice(-4);
+      
+      const [newMethod] = await db.insert(bankAccounts)
+        .values({
+          userId,
+          institutionName,
+          accountName: accountHolderName,
+          accountMask: accountLast4,
+          accountType,
+          routingNumber,
+          accountNumber,
+          isDefault: setAsDefault,
+        })
+        .returning();
+
+      res.json({
+        success: true,
+        method: {
+          id: newMethod.id,
+          institutionName: newMethod.institutionName,
+          accountName: newMethod.accountName,
+          accountMask: newMethod.accountMask,
+          accountType: newMethod.accountType,
+          isDefault: newMethod.isDefault,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Delete a payout method
+  app.delete("/api/payout-methods/:id", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const { id } = req.params;
+
+      const method = await db.select()
+        .from(bankAccounts)
+        .where(eq(bankAccounts.id, id))
+        .then(rows => rows[0]);
+
+      if (!method || method.userId !== userId) {
+        return res.status(404).json({ error: "Payout method not found" });
+      }
+
+      await db.delete(bankAccounts).where(eq(bankAccounts.id, id));
+
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Set a payout method as default
+  app.post("/api/payout-methods/:id/set-default", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const { id } = req.params;
+
+      const method = await db.select()
+        .from(bankAccounts)
+        .where(eq(bankAccounts.id, id))
+        .then(rows => rows[0]);
+
+      if (!method || method.userId !== userId) {
+        return res.status(404).json({ error: "Payout method not found" });
+      }
+
+      // Unset other defaults
+      await db.update(bankAccounts)
+        .set({ isDefault: false })
+        .where(eq(bankAccounts.userId, userId));
+
+      // Set this one as default
+      await db.update(bankAccounts)
+        .set({ isDefault: true })
+        .where(eq(bankAccounts.id, id));
+
+      res.json({ success: true });
     } catch (error) {
       next(error);
     }
