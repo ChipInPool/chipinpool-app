@@ -2567,8 +2567,14 @@ export async function registerRoutes(
 
       res.json({ account, message: "Debit card linked successfully!" });
     } catch (error: any) {
-      console.error('[Debit Card Link] Error:', error.message);
-      next(error);
+      console.error('[Debit Card Link] Error:', error.message, error);
+      if (error.type === 'StripeInvalidRequestError') {
+        return res.status(400).json({ error: error.message || "Invalid card details" });
+      }
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid request data" });
+      }
+      return res.status(500).json({ error: error.message || "Failed to link debit card" });
     }
   });
 
