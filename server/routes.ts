@@ -2600,11 +2600,13 @@ export async function registerRoutes(
       }
 
       // Create SetupIntent with Financial Connections for bank account linking
+      // Force instant verification to ensure Financial Connections is used (no micro-deposits fallback)
       const setupIntent = await stripe.setupIntents.create({
         customer: stripeCustomerId,
         payment_method_types: ['us_bank_account'],
         payment_method_options: {
           us_bank_account: {
+            verification_method: 'instant', // Force instant verification via Financial Connections
             financial_connections: {
               permissions: ['payment_method', 'balances', 'ownership'],
             },
@@ -2612,6 +2614,8 @@ export async function registerRoutes(
         },
         metadata: { userId: user.id.toString() },
       });
+      
+      console.log('[Stripe FC] Created SetupIntent:', setupIntent.id);
 
       res.json({ 
         clientSecret: setupIntent.client_secret,
