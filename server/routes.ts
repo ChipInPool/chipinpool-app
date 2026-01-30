@@ -2626,11 +2626,15 @@ export async function registerRoutes(
   // Complete bank linking after user authorizes in Financial Connections
   app.post("/api/stripe/financial-connections/complete", requireAuth, async (req, res, next) => {
     try {
+      console.log('[Stripe FC Complete] Request body:', req.body);
+      
       const stripe = await getUncachableStripeClient();
       const { accountId, setupIntentId } = z.object({
         accountId: z.string(), // Financial Connections account ID (fca_...)
         setupIntentId: z.string().optional(), // SetupIntent ID to get payment method details
       }).parse(req.body);
+      
+      console.log('[Stripe FC Complete] Parsed:', { accountId, setupIntentId });
 
       const userId = req.session.userId!;
       const user = await storage.getUser(userId);
@@ -2735,30 +2739,46 @@ export async function registerRoutes(
       const stripe = await getUncachableStripeClient();
       const { setupIntentId } = req.params;
       
+      console.log('[Stripe SI] Retrieving SetupIntent:', setupIntentId);
+      
       const setupIntent = await stripe.setupIntents.retrieve(setupIntentId, {
         expand: ['payment_method'],
       });
+      
+      console.log('[Stripe SI] SetupIntent status:', setupIntent.status, 'payment_method:', typeof setupIntent.payment_method);
       
       // Verify this belongs to the current user
       const userId = req.session.userId!;
       const user = await storage.getUser(userId);
       if (!user?.stripeCustomerId || setupIntent.customer !== user.stripeCustomerId) {
+        console.log('[Stripe SI] Unauthorized - user customer:', user?.stripeCustomerId, 'si customer:', setupIntent.customer);
         return res.status(403).json({ error: "Unauthorized" });
       }
       
       const paymentMethod = setupIntent.payment_method as any;
       const fcAccountId = paymentMethod?.us_bank_account?.financial_connections_account;
+      const routingNumber = paymentMethod?.us_bank_account?.routing_number;
+      const last4 = paymentMethod?.us_bank_account?.last4;
+      const bankName = paymentMethod?.us_bank_account?.bank_name;
+      
+      console.log('[Stripe SI] Payment method data:', { 
+        hasPaymentMethod: !!paymentMethod, 
+        fcAccountId, 
+        routingNumber: routingNumber ? '***' : null,
+        last4, 
+        bankName 
+      });
       
       res.json({
         id: setupIntent.id,
         status: setupIntent.status,
         financialConnectionsAccountId: fcAccountId,
-        routingNumber: paymentMethod?.us_bank_account?.routing_number,
-        last4: paymentMethod?.us_bank_account?.last4,
-        bankName: paymentMethod?.us_bank_account?.bank_name,
+        routingNumber,
+        last4,
+        bankName,
       });
     } catch (error: any) {
-      console.error('[Stripe] Setup intent retrieval error:', error.message);
+      console.error('[Stripe SI] Error:', error.message);
       next(error);
     }
   });

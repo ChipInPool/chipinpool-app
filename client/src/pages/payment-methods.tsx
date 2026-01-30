@@ -285,22 +285,34 @@ export default function PaymentMethods() {
       }
       
       // Always retrieve from server to get the Financial Connections account ID reliably
+      console.log('[Bank Link] Fetching SetupIntent details for:', setupIntentId);
       const siRes = await fetch(`/api/stripe/setup-intent/${setupIntentId}`, {
         credentials: 'include',
       });
       
+      console.log('[Bank Link] SetupIntent response status:', siRes.status);
+      
       if (siRes.ok) {
         const siData = await siRes.json();
+        console.log('[Bank Link] SetupIntent data:', siData);
+        
         if (siData.financialConnectionsAccountId) {
+          console.log('[Bank Link] Calling complete mutation with:', { 
+            accountId: siData.financialConnectionsAccountId, 
+            setupIntentId 
+          });
           completeBankLinkMutation.mutate({ 
             accountId: siData.financialConnectionsAccountId, 
             setupIntentId 
           });
         } else {
           // No FC account - might be a different payment method type
+          console.log('[Bank Link] No FC account ID in response');
           toast({ description: 'Bank account linked but verification pending. Please try again.', variant: 'destructive' });
         }
       } else {
+        const errorText = await siRes.text();
+        console.log('[Bank Link] Error response:', errorText);
         toast({ description: 'Bank linked but could not save details. Please try again.', variant: 'destructive' });
       }
     } catch (err: any) {
