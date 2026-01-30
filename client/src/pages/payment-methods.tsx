@@ -185,12 +185,12 @@ export default function PaymentMethods() {
   const canReceivePayouts = bankAccountsList.length > 0 || debitCardsList.length > 0;
 
   const completeBankLinkMutation = useMutation({
-    mutationFn: async (accountId: string) => {
-      const res = await fetch('/api/bank-accounts/complete-link', {
+    mutationFn: async ({ accountId, setupIntentId }: { accountId: string; setupIntentId?: string }) => {
+      const res = await fetch('/api/stripe/financial-connections/complete', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId }),
+        body: JSON.stringify({ accountId, setupIntentId }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -249,7 +249,7 @@ export default function PaymentMethods() {
         const err = await res.json();
         throw new Error(err.error || err.message || 'Failed to initiate bank linking');
       }
-      const { clientSecret } = await res.json();
+      const { clientSecret, setupIntentId } = await res.json();
       
       const stripe = await getStripeInstance();
       if (!stripe) {
@@ -284,9 +284,18 @@ export default function PaymentMethods() {
         }
       }
       
-      // Refresh bank accounts list
-      toast({ description: 'Bank account linked successfully!' });
-      refetchBankAccounts();
+      // Get the Financial Connections account ID from the setup intent
+      const setupIntent = result.setupIntent;
+      const linkedAccounts = (setupIntent as any)?.payment_method?.us_bank_account?.financial_connections_account;
+      
+      if (linkedAccounts) {
+        // Save the bank account to our database
+        completeBankLinkMutation.mutate({ accountId: linkedAccounts, setupIntentId });
+      } else {
+        // Try alternative method - refresh accounts via webhook or direct fetch
+        toast({ description: 'Bank account linked successfully!' });
+        refetchBankAccounts();
+      }
     } catch (err: any) {
       toast({ description: err.message || 'Failed to link bank account', variant: 'destructive' });
     } finally {

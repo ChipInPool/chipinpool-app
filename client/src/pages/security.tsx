@@ -233,12 +233,12 @@ export default function Security() {
   const [bankLinkLoading, setBankLinkLoading] = useState(false);
 
   const completeBankLinkMutation = useMutation({
-    mutationFn: async (accountId: string) => {
+    mutationFn: async ({ accountId, setupIntentId }: { accountId: string; setupIntentId?: string }) => {
       const res = await fetch('/api/stripe/financial-connections/complete', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId }),
+        body: JSON.stringify({ accountId, setupIntentId }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -267,7 +267,7 @@ export default function Security() {
         const err = await res.json();
         throw new Error(err.error || err.message || 'Failed to initiate bank linking');
       }
-      const { clientSecret } = await res.json();
+      const { clientSecret, setupIntentId } = await res.json();
       
       const stripe = await getStripeInstance();
       if (!stripe) {
@@ -284,7 +284,7 @@ export default function Security() {
       
       if (result.financialConnectionsSession?.accounts && result.financialConnectionsSession.accounts.length > 0) {
         const account = result.financialConnectionsSession.accounts[0];
-        completeBankLinkMutation.mutate(account.id);
+        completeBankLinkMutation.mutate({ accountId: account.id, setupIntentId });
       } else {
         toast({ description: "No accounts were selected", variant: "destructive" });
       }

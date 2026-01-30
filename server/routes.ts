@@ -2606,7 +2606,7 @@ export async function registerRoutes(
         payment_method_options: {
           us_bank_account: {
             financial_connections: {
-              permissions: ['payment_method', 'balances'],
+              permissions: ['payment_method', 'balances', 'ownership'],
             },
           },
         },
@@ -2615,6 +2615,7 @@ export async function registerRoutes(
 
       res.json({ 
         clientSecret: setupIntent.client_secret,
+        setupIntentId: setupIntent.id,
       });
     } catch (error: any) {
       console.error('[Stripe FC] Session creation error:', error.message);
@@ -2626,8 +2627,9 @@ export async function registerRoutes(
   app.post("/api/stripe/financial-connections/complete", requireAuth, async (req, res, next) => {
     try {
       const stripe = await getUncachableStripeClient();
-      const { accountId } = z.object({
+      const { accountId, setupIntentId } = z.object({
         accountId: z.string(), // Financial Connections account ID (fca_...)
+        setupIntentId: z.string().optional(), // SetupIntent ID to get payment method details
       }).parse(req.body);
 
       const userId = req.session.userId!;
@@ -2658,7 +2660,26 @@ export async function registerRoutes(
       const accountSubtype = (fcAccount.subcategory as string) || 'checking';
       const isDebitCard = accountSubtype === 'debit' || accountSubtype === 'prepaid';
 
-      // Create bank account record
+      // Try to get routing number from the payment method attached to SetupIntent
+      let routingNumber: string | undefined;
+      
+      if (setupIntentId) {
+        try {
+          const setupIntent = await stripe.setupIntents.retrieve(setupIntentId, {
+            expand: ['payment_method'],
+          });
+          
+          const paymentMethod = setupIntent.payment_method as any;
+          if (paymentMethod?.us_bank_account) {
+            routingNumber = paymentMethod.us_bank_account.routing_number;
+            console.log('[Stripe FC] Got routing number from payment method:', routingNumber);
+          }
+        } catch (e: any) {
+          console.log('[Stripe FC] Could not retrieve payment method:', e.message);
+        }
+      }
+
+      // Create bank account record with routing number if available
       const bankAccount = await storage.createBankAccount({
         userId,
         stripeFinancialConnectionsAccountId: accountId,
@@ -2667,7 +2688,14 @@ export async function registerRoutes(
         accountMask: fcAccount.last4 || '****',
         accountType: accountSubtype,
         payoutMethod: isDebitCard ? 'debit_card' : 'bank_account',
+        routingNumber: routingNumber,
         isDefault: isFirst,
+      });
+
+      console.log('[Stripe FC] Bank account saved:', { 
+        id: bankAccount.id, 
+        hasRouting: !!routingNumber,
+        fcAccountId: accountId 
       });
 
       res.json({ 
