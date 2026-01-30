@@ -2541,6 +2541,7 @@ export async function registerRoutes(
       if (!user) return res.status(404).json({ error: "User not found" });
 
       // Retrieve token details from Stripe to get card info
+      const stripe = await getUncachableStripeClient();
       const stripeToken = await stripe.tokens.retrieve(token);
       if (!stripeToken.card) {
         return res.status(400).json({ error: "Invalid card token" });
