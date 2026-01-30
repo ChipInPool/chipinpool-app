@@ -2362,15 +2362,19 @@ export async function registerRoutes(
         .where(eq(bankAccounts.userId, userId))
         .orderBy(desc(bankAccounts.createdAt));
 
+      // Only include methods that have routing numbers (required for manual withdrawals)
+      // Filter out Stripe-linked accounts that don't have bank details
+      const withdrawableMethods = methods.filter(m => m.routingNumber && m.accountNumber);
+
       // Mask sensitive data for client
-      const maskedMethods = methods.map(m => ({
+      const maskedMethods = withdrawableMethods.map(m => ({
         id: m.id,
         institutionName: m.institutionName,
         accountName: m.accountName,
         accountMask: m.accountMask,
         accountType: m.accountType,
         isDefault: m.isDefault,
-        hasRoutingNumber: !!m.routingNumber,
+        hasRoutingNumber: true,
         createdAt: m.createdAt,
       }));
 
