@@ -2190,6 +2190,75 @@ export async function registerRoutes(
     }
   });
 
+  // Unified wallet withdrawal endpoint supporting both ACH and instant debit card payouts
+  app.post("/api/wallet/withdraw", requireAuth, async (req, res, next) => {
+    try {
+      const { amount, bankAccountId, payoutSpeed } = z.object({
+        amount: z.string(),
+        bankAccountId: z.string(),
+        payoutSpeed: z.enum(['standard', 'instant']).default('standard'),
+      }).parse(req.body);
+
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const bankAccount = await storage.getBankAccountById(bankAccountId);
+      if (!bankAccount || bankAccount.userId !== userId) {
+        return res.status(404).json({ error: "Bank account not found" });
+      }
+
+      const withdrawAmount = parseFloat(amount);
+      const currentBalance = parseFloat(user.balance);
+
+      if (withdrawAmount <= 0) {
+        return res.status(400).json({ error: "Amount must be greater than zero" });
+      }
+
+      // Calculate fee for instant payouts (1.5%)
+      const INSTANT_FEE_RATE = 0.015;
+      const fee = payoutSpeed === 'instant' ? withdrawAmount * INSTANT_FEE_RATE : 0;
+      const totalDeduction = withdrawAmount;
+      const netAmount = withdrawAmount - fee;
+
+      if (totalDeduction > currentBalance) {
+        return res.status(400).json({ error: "Insufficient balance" });
+      }
+
+      // Deduct from user balance
+      const newBalance = (currentBalance - totalDeduction).toFixed(2);
+      await storage.updateUser(userId, { balance: newBalance });
+
+      // Log the withdrawal
+      await storage.createWalletWithdrawal(userId, amount, bankAccountId);
+
+      // Send notification
+      sendWalletActivityNotification(
+        user.email,
+        user.phone,
+        user.firstName,
+        'withdrawal',
+        netAmount.toFixed(2),
+        'pending',
+        user.notifyEmail && user.emailWalletActivity,
+        user.notifySMS && user.smsWalletActivity
+      ).catch(console.error);
+
+      const arrivalTime = payoutSpeed === 'instant' ? '30 minutes' : '1-3 business days';
+      const feeNote = fee > 0 ? ` (Fee: $${fee.toFixed(2)})` : '';
+
+      res.json({
+        success: true,
+        message: `Withdrawal of $${netAmount.toFixed(2)} initiated${feeNote}. Funds will arrive in ${arrivalTime}.`,
+        newBalance,
+        fee: fee.toFixed(2),
+        netAmount: netAmount.toFixed(2),
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // ========== STRIPE FINANCIAL CONNECTIONS ROUTES ==========
 
   // Create a Financial Connections session for bank linking via SetupIntent
