@@ -36,6 +36,7 @@ import {
   sendWalletActivityNotification,
   sendAccountChangeNotification
 } from "./notificationService";
+import { getMercuryClient, hasMercuryCredentials } from "./mercuryClient";
 
 declare module "express-session" {
   interface SessionData {
@@ -2190,7 +2191,7 @@ export async function registerRoutes(
     }
   });
 
-  // Unified wallet withdrawal endpoint supporting both ACH and instant debit card payouts
+  // Unified wallet withdrawal endpoint supporting ACH via Mercury
   app.post("/api/wallet/withdraw", requireAuth, async (req, res, next) => {
     try {
       const { amount, bankAccountId, payoutSpeed } = z.object({
@@ -2225,51 +2226,56 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Insufficient balance" });
       }
 
-      const stripe = await getUncachableStripeClient();
-      let payoutId: string | null = null;
       let payoutStatus = 'pending';
+      let mercuryRequestId: string | null = null;
+      let arrivalTime = '1-3 business days';
 
-      // Process payout via Stripe
-      try {
-        // Check if bank account has Financial Connections ID for ACH payout
-        if (bankAccount.stripeFinancialConnectionsAccountId) {
-          // For Financial Connections accounts, we need to use the payment method
-          // Create a PaymentIntent to send money to the bank account
-          const amountInCents = Math.round(netAmount * 100);
+      // Process payout via Mercury ACH
+      if (hasMercuryCredentials()) {
+        try {
+          const mercury = getMercuryClient();
           
-          // First ensure user has a Stripe customer
-          let customerId = user.stripeCustomerId;
-          if (!customerId) {
-            const customer = await stripe.customers.create({
-              email: user.email,
-              name: `${user.firstName} ${user.lastName}`,
-              metadata: { userId: user.id },
-            });
-            customerId = customer.id;
-            await storage.updateUser(userId, { stripeCustomerId: customerId });
+          // Check if we have bank routing/account info stored
+          if (bankAccount.routingNumber && bankAccount.accountNumber) {
+            // Try to find matching Mercury recipient
+            const recipient = await mercury.findRecipientByBankAccount(
+              bankAccount.routingNumber,
+              bankAccount.accountNumber
+            );
+
+            if (recipient) {
+              // Create payment request via Mercury (requires admin approval)
+              const idempotencyKey = `withdraw-${userId}-${Date.now()}`;
+              const paymentRequest = await mercury.requestSendMoney({
+                recipientId: recipient.id,
+                amount: netAmount,
+                paymentMethod: 'ach',
+                memo: `ChipIn Wallet Withdrawal - User ${user.username}`,
+                idempotencyKey,
+              });
+
+              mercuryRequestId = paymentRequest.requestId;
+              payoutStatus = 'pending_approval';
+              arrivalTime = '1-3 business days (after approval)';
+              console.log(`[Wallet Withdraw] Mercury payment request created: ${mercuryRequestId}`);
+            } else {
+              // Recipient not found in Mercury - needs to be added manually
+              payoutStatus = 'pending_recipient_setup';
+              console.log(`[Wallet Withdraw] No matching Mercury recipient found for bank account. Routing: ${bankAccount.routingNumber}, Last 4: ${bankAccount.accountNumber?.slice(-4)}`);
+            }
+          } else {
+            // No bank routing info stored
+            payoutStatus = 'pending_bank_info';
+            console.log(`[Wallet Withdraw] Bank account missing routing/account number`);
           }
-
-          // Create a transfer using the Financial Connections linked account
-          // Note: This requires the account to have been verified and have a payment method attached
-          console.log(`[Wallet Withdraw] Processing payout of $${netAmount} to FC account ${bankAccount.stripeFinancialConnectionsAccountId}`);
-          
-          // For now, we'll mark as pending since actual ACH payouts require additional setup
-          // In production, you would use Stripe Treasury or a banking partner
-          payoutStatus = 'processing';
-          console.log(`[Wallet Withdraw] Payout marked as processing - requires manual settlement or Treasury integration`);
-        } else if (bankAccount.payoutMethod === 'debit_card') {
-          // For debit cards with instant payouts - requires Connect account
-          console.log(`[Wallet Withdraw] Instant payout to debit card requested`);
-          payoutStatus = 'processing';
-        } else {
-          // Legacy Plaid or manual bank account
-          console.log(`[Wallet Withdraw] Standard ACH payout requested`);
-          payoutStatus = 'processing';
+        } catch (mercuryError: any) {
+          console.error('[Wallet Withdraw] Mercury error:', mercuryError.message);
+          payoutStatus = 'pending_review';
         }
-      } catch (stripeError: any) {
-        console.error('[Wallet Withdraw] Stripe error:', stripeError.message);
-        // Don't fail the withdrawal - just mark for manual processing
-        payoutStatus = 'pending_review';
+      } else {
+        // Mercury not configured - mark for manual processing
+        payoutStatus = 'pending_manual';
+        console.log(`[Wallet Withdraw] Mercury not configured, marking for manual processing`);
       }
 
       // Deduct from user balance
@@ -2277,30 +2283,42 @@ export async function registerRoutes(
       await storage.updateUser(userId, { balance: newBalance });
 
       // Log the withdrawal with payout status
-      await storage.createWalletWithdrawal(userId, amount, bankAccountId);
+      const withdrawal = await storage.createWalletWithdrawal(userId, amount, bankAccountId);
 
-      // Send notification
+      // Send notification (map custom status to valid notification status)
+      const notificationStatus = payoutStatus === 'pending_approval' || payoutStatus === 'pending_recipient_setup' 
+        ? 'pending' as const 
+        : 'pending' as const;
       sendWalletActivityNotification(
         user.email,
         user.phone,
         user.firstName,
         'withdrawal',
         netAmount.toFixed(2),
-        'pending',
+        notificationStatus,
         user.notifyEmail && user.emailWalletActivity,
         user.notifySMS && user.smsWalletActivity
       ).catch(console.error);
 
-      const arrivalTime = payoutSpeed === 'instant' ? '30 minutes' : '1-3 business days';
       const feeNote = fee > 0 ? ` (Fee: $${fee.toFixed(2)})` : '';
+      
+      let message: string;
+      if (payoutStatus === 'pending_approval') {
+        message = `Withdrawal of $${netAmount.toFixed(2)} submitted${feeNote}. Awaiting approval - funds will arrive in ${arrivalTime}.`;
+      } else if (payoutStatus === 'pending_recipient_setup') {
+        message = `Withdrawal of $${netAmount.toFixed(2)} queued${feeNote}. Your bank account needs to be verified before processing.`;
+      } else {
+        message = `Withdrawal of $${netAmount.toFixed(2)} initiated${feeNote}. Processing will begin shortly.`;
+      }
 
       res.json({
         success: true,
-        message: `Withdrawal of $${netAmount.toFixed(2)} initiated${feeNote}. Funds will arrive in ${arrivalTime}.`,
+        message,
         newBalance,
         fee: fee.toFixed(2),
         netAmount: netAmount.toFixed(2),
         payoutStatus,
+        mercuryRequestId,
       });
     } catch (error) {
       next(error);
@@ -5216,6 +5234,63 @@ export async function registerRoutes(
         balance: user?.balance || "0",
         message: synced > 0 ? `Found and added ${synced} deposit(s) to your wallet` : "Wallet is up to date"
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ========== ADMIN MERCURY/PAYOUT MANAGEMENT ==========
+
+  // Get Mercury account info and balance (admin)
+  app.get("/api/admin/mercury/account", requireAdmin, async (req, res, next) => {
+    try {
+      if (!hasMercuryCredentials()) {
+        return res.status(400).json({ error: "Mercury not configured" });
+      }
+      
+      const mercury = getMercuryClient();
+      const account = await mercury.getAccount();
+      const balance = await mercury.getAccountBalance();
+      
+      res.json({
+        id: account.id,
+        name: account.name,
+        type: account.type,
+        status: account.status,
+        routingNumber: account.routingNumber,
+        accountNumberLast4: account.accountNumber?.slice(-4),
+        availableBalance: balance.available,
+        currentBalance: balance.current,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // List Mercury recipients (admin)
+  app.get("/api/admin/mercury/recipients", requireAdmin, async (req, res, next) => {
+    try {
+      if (!hasMercuryCredentials()) {
+        return res.status(400).json({ error: "Mercury not configured" });
+      }
+      
+      const mercury = getMercuryClient();
+      const { recipients } = await mercury.getRecipients();
+      
+      res.json(recipients.map(r => ({
+        id: r.id,
+        name: r.name,
+        emails: r.emails,
+        status: r.status,
+        paymentMethod: r.paymentMethod,
+        bankInfo: r.electronicRoutingInfo ? {
+          routingNumber: r.electronicRoutingInfo.routingNumber,
+          accountNumberLast4: r.electronicRoutingInfo.accountNumber?.slice(-4),
+          bankName: r.electronicRoutingInfo.bankName,
+          type: r.electronicRoutingInfo.electronicAccountType,
+        } : null,
+        dateLastPaid: r.dateLastPaid,
+      })));
     } catch (error) {
       next(error);
     }

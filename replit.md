@@ -166,9 +166,15 @@ Preferred communication style: Simple, everyday language.
 
 ### Third-Party Services (Production APIs)
 - **Stripe Financial Connections**: Bank account linking and verification for regular users (OAuth-based secure bank login)
-- **Stripe Connect**: Payouts to users and merchants (Express accounts for users, Standard for merchants)
-- **Plaid** (legacy): Older bank account links still supported via Plaid Transfer API for payouts
-- **Stripe**: Payments, Stripe Identity (KYC), Stripe Issuing (virtual cards), Stripe Connect (ChipInPay merchants only)
+- **Stripe Connect**: Payouts to merchants (Standard accounts for ChipInPay merchants)
+- **Mercury Banking API**: ACH payouts to user bank accounts from ChipIn business account
+  - Uses `request-send-money` endpoint (requires admin approval in Mercury dashboard)
+  - Recipients must be pre-created in Mercury dashboard, then matched by routing/account number
+  - Custom API token with `RequestSendMoney` scope (no IP whitelist required)
+  - 100 free ACH payments/month
+  - Admin endpoints: `/api/admin/mercury/account`, `/api/admin/mercury/recipients`
+- **Plaid** (legacy): Older bank account links still supported
+- **Stripe**: Payments, Stripe Identity (KYC), Stripe Issuing (virtual cards)
 - **Resend**: Email invitations
 - **ClickSend**: SMS invitations
 - **Fonts**: Google Fonts (Inter, Plus Jakarta Sans)
