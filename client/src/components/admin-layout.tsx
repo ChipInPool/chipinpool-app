@@ -11,7 +11,8 @@ import {
   Shield,
   Store,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Banknote
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -24,6 +25,7 @@ const navItems = [
   { href: "/admin/users", icon: Users, label: "Users" },
   { href: "/admin/pools", icon: Layers, label: "Pools" },
   { href: "/admin/transactions", icon: CreditCard, label: "Transactions" },
+  { href: "/admin/withdrawals", icon: Banknote, label: "Withdrawals" },
   { href: "/admin/merchants", icon: Store, label: "Merchants" },
   { href: "/admin/fraud", icon: AlertTriangle, label: "Fraud Detection" },
 ];

@@ -40,6 +40,7 @@ import ResetPassword from "@/pages/reset-password";
 import MerchantDashboard from "@/pages/merchant-dashboard";
 import ChipInPayCheckout from "@/pages/chipinpay-checkout";
 import AdminFraud from "@/pages/admin/fraud";
+import AdminWithdrawals from "@/pages/admin/withdrawals";
 import CardAnalyticsPage from "@/pages/card-analytics";
 import AcceptTransfer from "@/pages/accept-transfer";
 import Rewards from "@/pages/rewards";
@@ -81,6 +82,7 @@ function Router() {
       <Route path="/admin/transactions" component={AdminTransactions} />
       <Route path="/admin/merchants" component={AdminMerchants} />
       <Route path="/admin/fraud" component={AdminFraud} />
+      <Route path="/admin/withdrawals" component={AdminWithdrawals} />
       <Route path="/card-analytics" component={CardAnalyticsPage} />
       <Route path="/merchant" component={MerchantDashboard} />
       <Route path="/chipinpay/checkout/:sessionId" component={ChipInPayCheckout} />
