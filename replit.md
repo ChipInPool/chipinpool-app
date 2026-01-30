@@ -112,9 +112,10 @@ Preferred communication style: Simple, everyday language.
     - Automatic notifications for: 2FA enable/disable, password reset, KYC verification, wallet withdrawals
     - Global channel opt-out respected (notifyEmail/notifySMS gates all category notifications)
 17. **Wallet Withdrawals** - Manual admin-processed withdrawal system:
-    - Users save bank accounts as payout methods (routing number, account number, holder name)
+    - Bank accounts must be linked via Stripe Financial Connections (verified accounts only)
+    - No manual bank entry allowed - all accounts are verified through secure OAuth flow
     - Withdrawal requests require KYC verification (Stripe Identity)
-    - Users can select from saved payout methods or enter new bank details
+    - Users select from verified payout methods only
     - Withdrawals go to `pending_review` status for admin processing
     - Admins review requests in `/admin/withdrawals` with full user identity and bank details
     - Admin manually processes via Mercury banking and marks complete/rejected
