@@ -37,6 +37,7 @@ import {
   sendAccountChangeNotification
 } from "./notificationService";
 import { getMercuryClient, hasMercuryCredentials } from "./mercuryClient";
+import { createPlaidPayout, hasPlaidCredentials, TransferSpeed } from "./plaidTransferClient";
 
 declare module "express-session" {
   interface SessionData {
@@ -2227,55 +2228,112 @@ export async function registerRoutes(
       }
 
       let payoutStatus = 'pending';
-      let mercuryRequestId: string | null = null;
+      let transferId: string | null = null;
       let arrivalTime = '1-3 business days';
 
-      // Process payout via Mercury ACH
-      if (hasMercuryCredentials()) {
+      // Determine transfer speed based on payout speed preference
+      const transferSpeed: TransferSpeed = payoutSpeed === 'instant' ? 'instant' : 'standard';
+
+      // Process payout via Plaid Transfer (preferred) or Mercury (fallback)
+      if (bankAccount.plaidAccessToken && bankAccount.plaidAccountId && hasPlaidCredentials()) {
+        // Use Plaid Transfer for Plaid-linked accounts
         try {
-          const mercury = getMercuryClient();
+          const idempotencyKey = `withdraw-${userId}-${Date.now()}`;
+          const userName = `${user.firstName} ${user.lastName}`;
           
-          // Check if we have bank routing/account info stored
-          if (bankAccount.routingNumber && bankAccount.accountNumber) {
-            // Try to find matching Mercury recipient
-            const recipient = await mercury.findRecipientByBankAccount(
-              bankAccount.routingNumber,
-              bankAccount.accountNumber
-            );
+          const result = await createPlaidPayout({
+            accessToken: bankAccount.plaidAccessToken,
+            accountId: bankAccount.plaidAccountId,
+            amount: netAmount,
+            userName,
+            description: 'ChipIn Wallet Withdrawal',
+            speed: transferSpeed,
+            idempotencyKey,
+          });
 
-            if (recipient) {
-              // Create payment request via Mercury (requires admin approval)
-              const idempotencyKey = `withdraw-${userId}-${Date.now()}`;
-              const paymentRequest = await mercury.requestSendMoney({
-                recipientId: recipient.id,
-                amount: netAmount,
-                paymentMethod: 'ach',
-                memo: `ChipIn Wallet Withdrawal - User ${user.username}`,
-                idempotencyKey,
-              });
+          transferId = result.transferId;
+          payoutStatus = result.status;
+          arrivalTime = result.arrivalTime;
+          console.log(`[Wallet Withdraw] Plaid Transfer created: ${transferId}, status: ${payoutStatus}`);
+        } catch (plaidError: any) {
+          console.error('[Wallet Withdraw] Plaid Transfer error:', plaidError.message);
+          
+          // Check if it's a user action required error (bank reconnection needed)
+          if (plaidError.message.includes('Bank account connection needs to be refreshed')) {
+            return res.status(400).json({ 
+              error: 'Your bank connection has expired. Please re-link your bank account in Settings.',
+              code: 'BANK_RECONNECTION_REQUIRED'
+            });
+          }
+          
+          // For other errors, try Mercury fallback
+          if (hasMercuryCredentials() && bankAccount.routingNumber && bankAccount.accountNumber) {
+            try {
+              const mercury = getMercuryClient();
+              const recipient = await mercury.findRecipientByBankAccount(
+                bankAccount.routingNumber,
+                bankAccount.accountNumber
+              );
 
-              mercuryRequestId = paymentRequest.requestId;
-              payoutStatus = 'pending_approval';
-              arrivalTime = '1-3 business days (after approval)';
-              console.log(`[Wallet Withdraw] Mercury payment request created: ${mercuryRequestId}`);
-            } else {
-              // Recipient not found in Mercury - needs to be added manually
-              payoutStatus = 'pending_recipient_setup';
-              console.log(`[Wallet Withdraw] No matching Mercury recipient found for bank account. Routing: ${bankAccount.routingNumber}, Last 4: ${bankAccount.accountNumber?.slice(-4)}`);
+              if (recipient) {
+                const mercuryIdempotencyKey = `withdraw-${userId}-${Date.now()}`;
+                const paymentRequest = await mercury.requestSendMoney({
+                  recipientId: recipient.id,
+                  amount: netAmount,
+                  paymentMethod: 'ach',
+                  memo: `ChipIn Wallet Withdrawal - User ${user.username}`,
+                  idempotencyKey: mercuryIdempotencyKey,
+                });
+                transferId = paymentRequest.requestId;
+                payoutStatus = 'pending_approval';
+                arrivalTime = '1-3 business days (after approval)';
+                console.log(`[Wallet Withdraw] Fallback to Mercury: ${transferId}`);
+              } else {
+                payoutStatus = 'pending_review';
+              }
+            } catch (mercuryErr: any) {
+              console.error('[Wallet Withdraw] Mercury fallback error:', mercuryErr.message);
+              payoutStatus = 'pending_review';
             }
           } else {
-            // No bank routing info stored
-            payoutStatus = 'pending_bank_info';
-            console.log(`[Wallet Withdraw] Bank account missing routing/account number`);
+            payoutStatus = 'pending_review';
+          }
+        }
+      } else if (hasMercuryCredentials() && bankAccount.routingNumber && bankAccount.accountNumber) {
+        // Use Mercury for non-Plaid accounts (Stripe Financial Connections, manual entry)
+        try {
+          const mercury = getMercuryClient();
+          const recipient = await mercury.findRecipientByBankAccount(
+            bankAccount.routingNumber,
+            bankAccount.accountNumber
+          );
+
+          if (recipient) {
+            const idempotencyKey = `withdraw-${userId}-${Date.now()}`;
+            const paymentRequest = await mercury.requestSendMoney({
+              recipientId: recipient.id,
+              amount: netAmount,
+              paymentMethod: 'ach',
+              memo: `ChipIn Wallet Withdrawal - User ${user.username}`,
+              idempotencyKey,
+            });
+
+            transferId = paymentRequest.requestId;
+            payoutStatus = 'pending_approval';
+            arrivalTime = '1-3 business days (after approval)';
+            console.log(`[Wallet Withdraw] Mercury payment request created: ${transferId}`);
+          } else {
+            payoutStatus = 'pending_recipient_setup';
+            console.log(`[Wallet Withdraw] No matching Mercury recipient found`);
           }
         } catch (mercuryError: any) {
           console.error('[Wallet Withdraw] Mercury error:', mercuryError.message);
           payoutStatus = 'pending_review';
         }
       } else {
-        // Mercury not configured - mark for manual processing
+        // No payout method available
         payoutStatus = 'pending_manual';
-        console.log(`[Wallet Withdraw] Mercury not configured, marking for manual processing`);
+        console.log(`[Wallet Withdraw] No automated payout method available, marking for manual processing`);
       }
 
       // Deduct from user balance
@@ -2318,7 +2376,8 @@ export async function registerRoutes(
         fee: fee.toFixed(2),
         netAmount: netAmount.toFixed(2),
         payoutStatus,
-        mercuryRequestId,
+        transferId,
+        arrivalTime,
       });
     } catch (error) {
       next(error);

@@ -165,15 +165,18 @@ Preferred communication style: Simple, everyday language.
 ## External Dependencies
 
 ### Third-Party Services (Production APIs)
+- **Plaid Transfer**: Primary payout method for ACH withdrawals to user bank accounts
+  - Uses `/transfer/authorization/create` + `/transfer/create` endpoints
+  - Supports: Standard ACH (1-3 days), Same-Day ACH, RTP/FedNow (instant)
+  - Works with existing Plaid-linked bank accounts (uses stored `plaidAccessToken`)
+  - Automatic risk assessment and fraud prevention
+- **Mercury Banking API**: Fallback payout method for non-Plaid accounts
+  - Uses `request-send-money` endpoint (requires admin approval in Mercury dashboard)
+  - Recipients must be pre-created in Mercury dashboard
+  - Admin endpoints: `/api/admin/mercury/account`, `/api/admin/mercury/recipients`
 - **Stripe Financial Connections**: Bank account linking and verification for regular users (OAuth-based secure bank login)
 - **Stripe Connect**: Payouts to merchants (Standard accounts for ChipInPay merchants)
-- **Mercury Banking API**: ACH payouts to user bank accounts from ChipIn business account
-  - Uses `request-send-money` endpoint (requires admin approval in Mercury dashboard)
-  - Recipients must be pre-created in Mercury dashboard, then matched by routing/account number
-  - Custom API token with `RequestSendMoney` scope (no IP whitelist required)
-  - 100 free ACH payments/month
-  - Admin endpoints: `/api/admin/mercury/account`, `/api/admin/mercury/recipients`
-- **Plaid** (legacy): Older bank account links still supported
+- **Plaid**: Bank account linking via Plaid Link (stores access token for Transfer API)
 - **Stripe**: Payments, Stripe Identity (KYC), Stripe Issuing (virtual cards)
 - **Resend**: Email invitations
 - **ClickSend**: SMS invitations
