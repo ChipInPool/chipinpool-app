@@ -28,8 +28,9 @@ export default function Profile() {
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
-  const [payoutSpeed, setPayoutSpeed] = useState<'standard' | 'instant'>('standard');
+  const [routingNumber, setRoutingNumber] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountHolderName, setAccountHolderName] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
   const [followersOpen, setFollowersOpen] = useState(false);
   const [followingOpen, setFollowingOpen] = useState(false);
@@ -109,12 +110,24 @@ export default function Profile() {
   };
 
   const handleWithdraw = async () => {
-    if (!canWithdraw) {
-      toast({ description: "Please set up payouts first in Settings", variant: "destructive" });
-      return;
-    }
     if (!amount || parseFloat(amount) <= 0) {
       toast({ description: "Please enter a valid amount", variant: "destructive" });
+      return;
+    }
+    if (parseFloat(amount) < 10) {
+      toast({ description: "Minimum withdrawal is $10", variant: "destructive" });
+      return;
+    }
+    if (!routingNumber || routingNumber.length !== 9) {
+      toast({ description: "Please enter a valid 9-digit routing number", variant: "destructive" });
+      return;
+    }
+    if (!accountNumber || accountNumber.length < 4) {
+      toast({ description: "Please enter a valid account number", variant: "destructive" });
+      return;
+    }
+    if (!accountHolderName.trim()) {
+      toast({ description: "Please enter the account holder name", variant: "destructive" });
       return;
     }
     setIsProcessing(true);
@@ -125,69 +138,31 @@ export default function Profile() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount,
-          payoutSpeed,
+          routingNumber,
+          accountNumber,
+          accountHolderName: accountHolderName.trim(),
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        if (data.code === 'CONNECT_NOT_SETUP' || data.code === 'CONNECT_SETUP_INCOMPLETE') {
-          toast({ description: "Please complete payout setup in Settings first", variant: "destructive" });
-          setWithdrawDialogOpen(false);
-          setLocation("/settings");
-          return;
-        }
         throw new Error(data.error || 'Withdrawal failed');
       }
-      toast({ description: data.message || `Withdrawal initiated` });
+      toast({ description: data.message || `Withdrawal request submitted` });
       queryClient.invalidateQueries({ queryKey: queryKeys.user });
       setWithdrawDialogOpen(false);
       setAmount("");
-      setPayoutSpeed('standard');
+      setRoutingNumber("");
+      setAccountNumber("");
+      setAccountHolderName("");
     } catch (error: any) {
       toast({ description: error.message || "Withdrawal failed", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
   };
-  
-  const handleSetupPayouts = async () => {
-    setIsProcessing(true);
-    try {
-      // Create Connect account if needed
-      const createRes = await fetch('/api/stripe/connect/create-account', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!createRes.ok) {
-        throw new Error('Failed to create payout account');
-      }
-      
-      // Get onboarding link
-      const linkRes = await fetch('/api/stripe/connect/onboarding-link', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      const linkData = await linkRes.json();
-      if (!linkRes.ok || !linkData.url) {
-        throw new Error('Failed to get onboarding link');
-      }
-      
-      // Open onboarding in new tab
-      window.open(linkData.url, '_blank');
-      toast({ description: "Complete the payout setup in the new tab" });
-      setWithdrawDialogOpen(false);
-    } catch (error: any) {
-      toast({ description: error.message || "Failed to start payout setup", variant: "destructive" });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
-  // Calculate withdrawal fee
+  // Calculate withdrawal amount
   const withdrawAmount = parseFloat(amount || '0');
-  const INSTANT_FEE_RATE = 0.015;
-  const withdrawalFee = payoutSpeed === 'instant' ? withdrawAmount * INSTANT_FEE_RATE : 0;
-  const netWithdrawal = withdrawAmount - withdrawalFee;
 
   const { data: poolsData, isLoading: poolsLoading } = useQuery({
     queryKey: queryKeys.pools,
@@ -223,20 +198,8 @@ export default function Profile() {
     enabled: isAuthenticated,
   });
 
-  const { data: connectStatus, refetch: refetchConnectStatus } = useQuery({
-    queryKey: ["connectStatus"],
-    queryFn: async () => {
-      const res = await fetch("/api/stripe/connect/status", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch connect status");
-      return res.json();
-    },
-    enabled: isAuthenticated,
-  });
-
   const hasBankLinked = plaidStatus?.hasBankLinked || 
     (bankAccountsData?.accounts?.some((a: any) => a.stripeFinancialConnectionsAccountId || a.canReceivePayouts));
-  
-  const canWithdraw = connectStatus?.payoutsEnabled === true;
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -714,177 +677,114 @@ export default function Profile() {
               </p>
             </div>
 
-            {!canWithdraw ? (
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 text-center">
-                  <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-3">
-                    <Building className="w-6 h-6 text-orange-400" />
-                  </div>
-                  <h4 className="font-medium text-orange-300 mb-1">Set Up Payouts</h4>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Complete a quick 2-minute verification to receive withdrawals directly to your bank.
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Amount to withdraw (min $10)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">$</span>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    min="10"
+                    max={parseFloat(user?.balance || '0')}
+                    step="0.01"
+                    className="pl-8 text-lg h-12"
+                    data-testid="input-withdraw-amount"
+                  />
+                </div>
+                {parseFloat(amount || '0') > parseFloat(user?.balance || '0') && (
+                  <p className="text-xs text-red-400 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    Amount exceeds available balance
                   </p>
-                  <Button 
-                    onClick={handleSetupPayouts}
-                    disabled={isProcessing}
-                    className="bg-orange-600 hover:bg-orange-700"
-                    data-testid="button-setup-payouts"
-                  >
-                    {isProcessing ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Building className="w-4 h-4 mr-2" />
-                    )}
-                    Set Up Payouts
-                  </Button>
-                </div>
+                )}
               </div>
-            ) : (
-              <>
-                <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
-                    <Building className="w-4 h-4 text-green-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-green-300">Payouts Enabled</p>
-                    <p className="text-xs text-muted-foreground">Funds will go to your linked bank account</p>
-                  </div>
-                </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Payout Speed</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPayoutSpeed('standard')}
-                      className={`p-3 rounded-lg border text-left ${payoutSpeed === 'standard' ? 'border-green-500 bg-green-500/10' : 'border-white/10'}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        <span className="font-medium text-sm">Standard</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">1-2 business days</p>
-                      <p className="text-xs text-green-400 mt-1">Free</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPayoutSpeed('instant')}
-                      className={`p-3 rounded-lg border text-left ${payoutSpeed === 'instant' ? 'border-yellow-500 bg-yellow-500/10' : 'border-white/10'}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <RefreshCw className="w-4 h-4" />
-                        <span className="font-medium text-sm">Instant</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">~30 minutes</p>
-                      <p className="text-xs text-yellow-400 mt-1">1.5% fee</p>
-                    </button>
-                  </div>
-                </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setAmount((parseFloat(user?.balance || '0') * 0.25).toFixed(2))}>25%</Button>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setAmount((parseFloat(user?.balance || '0') * 0.5).toFixed(2))}>50%</Button>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setAmount((parseFloat(user?.balance || '0') * 0.75).toFixed(2))}>75%</Button>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setAmount(user?.balance || '0')}>Max</Button>
+              </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Amount to withdraw</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">$</span>
+              <div className="pt-2 border-t border-white/10">
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <Building className="w-4 h-4" />
+                  Bank Account Details
+                </h4>
+                
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Account Holder Name</label>
                     <Input
-                      type="number"
-                      placeholder="0.00"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      min="0"
-                      max={parseFloat(user?.balance || '0')}
-                      step="0.01"
-                      className="pl-8 text-lg h-12"
-                      data-testid="input-withdraw-amount"
+                      type="text"
+                      placeholder="John Doe"
+                      value={accountHolderName}
+                      onChange={(e) => setAccountHolderName(e.target.value)}
+                      className="h-10"
+                      data-testid="input-account-holder"
                     />
                   </div>
-                  {parseFloat(amount || '0') > parseFloat(user?.balance || '0') && (
-                    <p className="text-xs text-red-400 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      Amount exceeds available balance
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => setAmount((parseFloat(user?.balance || '0') * 0.25).toFixed(2))}
-                  >
-                    25%
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => setAmount((parseFloat(user?.balance || '0') * 0.5).toFixed(2))}
-                  >
-                    50%
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => setAmount((parseFloat(user?.balance || '0') * 0.75).toFixed(2))}
-                  >
-                    75%
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => setAmount(user?.balance || '0')}
-                  >
-                    Max
-                  </Button>
-                </div>
-
-                {withdrawAmount > 0 && (
-                  <div className="p-3 rounded-lg bg-muted/50 space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Withdraw amount</span>
-                      <span>${withdrawAmount.toFixed(2)}</span>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Routing Number</label>
+                      <Input
+                        type="text"
+                        placeholder="9 digits"
+                        value={routingNumber}
+                        onChange={(e) => setRoutingNumber(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                        maxLength={9}
+                        className="h-10"
+                        data-testid="input-routing-number"
+                      />
                     </div>
-                    {withdrawalFee > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Instant fee (1.5%)</span>
-                        <span className="text-yellow-400">-${withdrawalFee.toFixed(2)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-sm font-medium pt-1 border-t border-white/10">
-                      <span>You'll receive</span>
-                      <span className="text-green-400">${netWithdrawal.toFixed(2)}</span>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Account Number</label>
+                      <Input
+                        type="text"
+                        placeholder="Account number"
+                        value={accountNumber}
+                        onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 17))}
+                        maxLength={17}
+                        className="h-10"
+                        data-testid="input-account-number"
+                      />
                     </div>
                   </div>
-                )}
-
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
-                  <Clock className="w-4 h-4 mt-0.5 shrink-0" />
-                  <span>
-                    {payoutSpeed === 'instant' 
-                      ? 'Funds typically arrive within 30 minutes.'
-                      : 'Funds typically arrive within 1-3 business days.'}
-                  </span>
                 </div>
-              </>
-            )}
+              </div>
+
+              {withdrawAmount >= 10 && (
+                <div className="p-3 rounded-lg bg-muted/50 space-y-1">
+                  <div className="flex justify-between text-sm font-medium">
+                    <span>You'll receive</span>
+                    <span className="text-green-400">${withdrawAmount.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm text-muted-foreground">
+                <Clock className="w-4 h-4 mt-0.5 shrink-0 text-blue-400" />
+                <span>Withdrawals are processed within 1-2 business days.</span>
+              </div>
+            </div>
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="ghost" onClick={() => { setWithdrawDialogOpen(false); setAmount(""); }}>
+            <Button variant="ghost" onClick={() => { setWithdrawDialogOpen(false); setAmount(""); setRoutingNumber(""); setAccountNumber(""); setAccountHolderName(""); }}>
               Cancel
             </Button>
-            {canWithdraw && (
-              <Button 
-                onClick={handleWithdraw} 
-                disabled={isProcessing || !amount || parseFloat(amount) <= 0 || parseFloat(amount) > parseFloat(user?.balance || '0')}
-                className="bg-blue-600 hover:bg-blue-700"
-                data-testid="button-confirm-withdraw"
-              >
-                {isProcessing ? "Processing..." : `Withdraw $${amount || '0'}`}
-              </Button>
-            )}
+            <Button 
+              onClick={handleWithdraw} 
+              disabled={isProcessing || !amount || parseFloat(amount) < 10 || parseFloat(amount) > parseFloat(user?.balance || '0') || routingNumber.length !== 9 || accountNumber.length < 4 || !accountHolderName.trim()}
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="button-confirm-withdraw"
+            >
+              {isProcessing ? "Processing..." : `Request Withdrawal`}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

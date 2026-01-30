@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
-import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts } from "@shared/schema";
+import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals } from "@shared/schema";
 import express from "express";
 import { db } from "./db";
 import { eq, desc, sql, inArray } from "drizzle-orm";
@@ -2192,12 +2192,14 @@ export async function registerRoutes(
     }
   });
 
-  // Unified wallet withdrawal endpoint - uses Stripe Connect for payouts
+  // Wallet withdrawal endpoint - creates pending request for manual admin processing
   app.post("/api/wallet/withdraw", requireAuth, async (req, res, next) => {
     try {
-      const { amount, payoutSpeed } = z.object({
+      const { amount, routingNumber, accountNumber, accountHolderName } = z.object({
         amount: z.string(),
-        payoutSpeed: z.enum(['standard', 'instant']).default('standard'),
+        routingNumber: z.string().length(9, "Routing number must be 9 digits"),
+        accountNumber: z.string().min(4, "Account number must be at least 4 digits").max(17),
+        accountHolderName: z.string().min(1, "Account holder name is required"),
       }).parse(req.body);
 
       const userId = req.session.userId!;
@@ -2211,141 +2213,190 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Amount must be greater than zero" });
       }
 
-      // Calculate fee for instant payouts (1.5%)
-      const INSTANT_FEE_RATE = 0.015;
-      const fee = payoutSpeed === 'instant' ? withdrawAmount * INSTANT_FEE_RATE : 0;
-      const totalDeduction = withdrawAmount;
-      const netAmount = withdrawAmount - fee;
+      if (withdrawAmount < 10) {
+        return res.status(400).json({ error: "Minimum withdrawal is $10" });
+      }
 
-      if (totalDeduction > currentBalance) {
+      if (withdrawAmount > currentBalance) {
         return res.status(400).json({ error: "Insufficient balance" });
       }
 
-      let payoutStatus = 'pending';
-      let transferId: string | null = null;
-      let arrivalTime = '1-3 business days';
-
-      const stripe = await getUncachableStripeClient();
-
-      // PRIMARY METHOD: Stripe Connect Express (fully automated payouts)
-      if (user.stripeConnectId && user.stripeConnectId.startsWith('acct_')) {
-        try {
-          // Check if Connect account is ready for payouts
-          const connectAccount = await stripe.accounts.retrieve(user.stripeConnectId);
-          
-          if (connectAccount.payouts_enabled) {
-            // Transfer funds to the connected account first
-            const amountInCents = Math.round(netAmount * 100);
-            
-            const transfer = await stripe.transfers.create({
-              amount: amountInCents,
-              currency: 'usd',
-              destination: user.stripeConnectId,
-              metadata: {
-                userId: user.id,
-                type: 'wallet_withdrawal',
-                payoutSpeed,
-              },
-            });
-
-            transferId = transfer.id;
-            
-            // Now trigger the payout from the connected account
-            if (payoutSpeed === 'instant') {
-              // For instant payouts, we need to create a payout on the connected account
-              try {
-                const payout = await stripe.payouts.create(
-                  {
-                    amount: amountInCents,
-                    currency: 'usd',
-                    method: 'instant',
-                  },
-                  { stripeAccount: user.stripeConnectId }
-                );
-                payoutStatus = payout.status;
-                arrivalTime = 'Within 30 minutes';
-                console.log(`[Wallet Withdraw] Stripe instant payout created: ${payout.id}`);
-              } catch (instantErr: any) {
-                // Instant payout failed, fall back to standard
-                console.warn(`[Wallet Withdraw] Instant payout failed, using standard: ${instantErr.message}`);
-                payoutStatus = 'pending';
-                arrivalTime = '1-2 business days';
-              }
-            } else {
-              // Standard payouts happen automatically on Stripe's schedule
-              payoutStatus = 'pending';
-              arrivalTime = '1-2 business days';
-            }
-            
-            console.log(`[Wallet Withdraw] Stripe Connect transfer created: ${transferId}`);
-          } else {
-            // Connect account exists but payouts not enabled yet
-            return res.status(400).json({ 
-              error: 'Please complete your payout setup first. Go to Settings to finish verification.',
-              code: 'CONNECT_SETUP_INCOMPLETE'
-            });
-          }
-        } catch (connectError: any) {
-          console.error('[Wallet Withdraw] Stripe Connect error:', connectError.message);
-          
-          if (connectError.code === 'resource_missing') {
-            // Connect account was deleted, clear it
-            await storage.updateUser(userId, { stripeConnectId: null });
-            return res.status(400).json({ 
-              error: 'Your payout account was not found. Please set up payouts again in Settings.',
-              code: 'CONNECT_ACCOUNT_MISSING'
-            });
-          }
-          
-          return res.status(400).json({ 
-            error: 'Payout failed. Please try again or contact support.',
-            code: 'PAYOUT_FAILED'
-          });
-        }
-      } else {
-        // No Connect account - prompt user to set up payouts
-        return res.status(400).json({ 
-          error: 'Please set up payouts first. Go to Settings and complete the quick 2-minute verification.',
-          code: 'CONNECT_NOT_SETUP',
-          setupRequired: true
-        });
-      }
-
-      // Deduct from user balance
-      const newBalance = (currentBalance - totalDeduction).toFixed(2);
+      // Deduct from user balance immediately
+      const newBalance = (currentBalance - withdrawAmount).toFixed(2);
       await storage.updateUser(userId, { balance: newBalance });
 
-      // Log the withdrawal with payout status (null bankAccountId since using Connect)
+      // Create withdrawal request with bank details (stored for manual processing)
+      // Store last 4 of account for display, full details in notes for admin
+      const accountLast4 = accountNumber.slice(-4);
       const withdrawal = await storage.createWalletWithdrawal(userId, amount, undefined);
+      
+      // Update withdrawal with bank details (we'll add these fields)
+      await db.update(walletWithdrawals)
+        .set({
+          status: 'pending_review',
+          bankAccountId: `manual:${routingNumber}:****${accountLast4}:${accountHolderName}`,
+        })
+        .where(eq(walletWithdrawals.id, withdrawal.id));
 
-      // Send notification (map custom status to valid notification status)
-      const notificationStatus = payoutStatus === 'pending_approval' || payoutStatus === 'pending_recipient_setup' 
-        ? 'pending' as const 
-        : 'pending' as const;
+      console.log(`[Wallet Withdraw] Manual payout request created: ${withdrawal.id} for $${amount}`);
+      console.log(`[Wallet Withdraw] Bank: ${accountHolderName}, Routing: ${routingNumber}, Account: ****${accountLast4}`);
+
+      // Send notification
       sendWalletActivityNotification(
         user.email,
         user.phone,
         user.firstName,
         'withdrawal',
-        netAmount.toFixed(2),
-        notificationStatus,
+        amount,
+        'pending',
         user.notifyEmail && user.emailWalletActivity,
         user.notifySMS && user.smsWalletActivity
       ).catch(console.error);
 
-      const feeNote = fee > 0 ? ` (Fee: $${fee.toFixed(2)})` : '';
-      const message = `Withdrawal of $${netAmount.toFixed(2)} initiated${feeNote}. Funds will arrive in ${arrivalTime}.`;
-
       res.json({
         success: true,
-        message,
+        message: `Withdrawal request for $${withdrawAmount.toFixed(2)} submitted. Our team will process it within 1-2 business days.`,
         newBalance,
-        fee: fee.toFixed(2),
-        netAmount: netAmount.toFixed(2),
-        payoutStatus,
-        transferId,
-        arrivalTime,
+        withdrawalId: withdrawal.id,
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get pending withdrawal requests (admin only)
+  app.get("/api/admin/withdrawals/pending", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const pendingWithdrawals = await db.select()
+        .from(walletWithdrawals)
+        .where(eq(walletWithdrawals.status, 'pending_review'))
+        .orderBy(desc(walletWithdrawals.createdAt));
+
+      // Enrich with user info
+      const enrichedWithdrawals = await Promise.all(pendingWithdrawals.map(async (w) => {
+        const wUser = await storage.getUser(w.userId);
+        return {
+          ...w,
+          user: wUser ? {
+            id: wUser.id,
+            firstName: wUser.firstName,
+            lastName: wUser.lastName,
+            email: wUser.email,
+          } : null,
+        };
+      }));
+
+      res.json({ withdrawals: enrichedWithdrawals });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Process withdrawal (admin marks as completed after manual Mercury transfer)
+  app.post("/api/admin/withdrawals/:id/complete", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { id } = req.params;
+      const { mercuryTransferId, notes } = req.body;
+
+      const withdrawal = await db.select()
+        .from(walletWithdrawals)
+        .where(eq(walletWithdrawals.id, id))
+        .then(rows => rows[0]);
+
+      if (!withdrawal) {
+        return res.status(404).json({ error: "Withdrawal not found" });
+      }
+
+      if (withdrawal.status !== 'pending_review') {
+        return res.status(400).json({ error: "Withdrawal already processed" });
+      }
+
+      await db.update(walletWithdrawals)
+        .set({
+          status: 'completed',
+          plaidTransferId: mercuryTransferId || `manual_${Date.now()}`,
+        })
+        .where(eq(walletWithdrawals.id, id));
+
+      // Log admin action
+      await db.insert(adminAuditLogs).values({
+        adminId: userId,
+        action: 'process_withdrawal',
+        targetType: 'wallet_withdrawal',
+        targetId: id,
+        details: JSON.stringify({ mercuryTransferId, notes, amount: withdrawal.amount }),
+      });
+
+      console.log(`[Admin] Withdrawal ${id} marked as completed by admin ${userId}`);
+
+      res.json({ success: true, message: "Withdrawal marked as completed" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Reject withdrawal and refund balance (admin)
+  app.post("/api/admin/withdrawals/:id/reject", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { id } = req.params;
+      const { reason } = req.body;
+
+      const withdrawal = await db.select()
+        .from(walletWithdrawals)
+        .where(eq(walletWithdrawals.id, id))
+        .then(rows => rows[0]);
+
+      if (!withdrawal) {
+        return res.status(404).json({ error: "Withdrawal not found" });
+      }
+
+      if (withdrawal.status !== 'pending_review') {
+        return res.status(400).json({ error: "Withdrawal already processed" });
+      }
+
+      // Refund the user's balance
+      const withdrawalUser = await storage.getUser(withdrawal.userId);
+      if (withdrawalUser) {
+        const currentBalance = parseFloat(withdrawalUser.balance);
+        const refundAmount = parseFloat(withdrawal.amount);
+        const newBalance = (currentBalance + refundAmount).toFixed(2);
+        await storage.updateUser(withdrawal.userId, { balance: newBalance });
+      }
+
+      await db.update(walletWithdrawals)
+        .set({ status: 'rejected' })
+        .where(eq(walletWithdrawals.id, id));
+
+      // Log admin action
+      await db.insert(adminAuditLogs).values({
+        adminId: userId,
+        action: 'reject_withdrawal',
+        targetType: 'wallet_withdrawal',
+        targetId: id,
+        details: JSON.stringify({ reason, amount: withdrawal.amount, refunded: true }),
+      });
+
+      console.log(`[Admin] Withdrawal ${id} rejected and refunded by admin ${userId}`);
+
+      res.json({ success: true, message: "Withdrawal rejected and balance refunded" });
     } catch (error) {
       next(error);
     }
