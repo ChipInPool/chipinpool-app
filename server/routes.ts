@@ -2336,10 +2336,15 @@ export async function registerRoutes(
   app.get("/api/payout-methods", requireAuth, async (req, res, next) => {
     try {
       const userId = req.session.userId!;
+      console.log('[Payout Methods] Fetching for user:', userId);
+      
       const methods = await db.select()
         .from(bankAccounts)
         .where(eq(bankAccounts.userId, userId))
         .orderBy(desc(bankAccounts.createdAt));
+
+      console.log('[Payout Methods] Total bank accounts:', methods.length);
+      console.log('[Payout Methods] Accounts with FC ID:', methods.filter(m => m.stripeFinancialConnectionsAccountId).length);
 
       // Only include Stripe Financial Connections verified accounts
       // These have stripeFinancialConnectionsAccountId set
@@ -2358,6 +2363,7 @@ export async function registerRoutes(
         createdAt: m.createdAt,
       }));
 
+      console.log('[Payout Methods] Returning:', maskedMethods.length, 'methods');
       res.json({ methods: maskedMethods });
     } catch (error) {
       next(error);

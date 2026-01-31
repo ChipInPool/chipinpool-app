@@ -221,9 +221,17 @@ export default function Profile() {
   const { data: payoutMethodsData, refetch: refetchPayoutMethods } = useQuery({
     queryKey: ["payoutMethods"],
     queryFn: async () => {
-      const res = await fetch("/api/payout-methods", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch payout methods");
-      return res.json();
+      // Use the same endpoint as payment methods for consistency
+      const res = await fetch("/api/bank-accounts", { credentials: "include" });
+      if (!res.ok) {
+        throw new Error("Failed to fetch payout methods");
+      }
+      const data = await res.json();
+      // Filter to only show FC-verified accounts that can receive payouts
+      const verifiedAccounts = (data.accounts || []).filter((a: any) => 
+        a.stripeFinancialConnectionsAccountId || a.canReceivePayouts
+      );
+      return { methods: verifiedAccounts };
     },
     enabled: isAuthenticated,
   });
@@ -476,7 +484,10 @@ export default function Profile() {
                 <Button 
                   variant="outline" 
                   className="flex-1" 
-                  onClick={() => setWithdrawDialogOpen(true)}
+                  onClick={() => {
+                    refetchPayoutMethods();
+                    setWithdrawDialogOpen(true);
+                  }}
                   data-testid="button-withdraw"
                 >
                   <Minus className="w-4 h-4 mr-2" /> Withdraw
