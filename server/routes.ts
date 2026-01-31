@@ -2703,20 +2703,28 @@ export async function registerRoutes(
       }
       
       // Try to get full account numbers if we have the account_numbers permission
-      // This requires refetching the account with the account_numbers expansion
+      // First subscribe to the account_numbers feature, then retrieve
       try {
-        const fcAccountWithNumbers = await stripe.financialConnections.accounts.retrieve(accountId, {
-          expand: ['account_holder'],
-        }) as any;
+        // Subscribe to account_numbers feature to activate it
+        await (stripe.financialConnections.accounts as any).subscribe(accountId, {
+          features: ['account_numbers'],
+        });
+        console.log('[Stripe FC] Subscribed to account_numbers feature');
+        
+        // Now retrieve the account - account_numbers should be available
+        const fcAccountWithNumbers = await stripe.financialConnections.accounts.retrieve(accountId) as any;
         
         // Check if account_numbers are available (only if user granted permission)
         if (fcAccountWithNumbers.account_numbers) {
-          routingNumber = fcAccountWithNumbers.account_numbers.routing;
+          routingNumber = fcAccountWithNumbers.account_numbers.routing || routingNumber;
           accountNumber = fcAccountWithNumbers.account_numbers.account;
           console.log('[Stripe FC] Got account numbers from FC:', { 
             hasRouting: !!routingNumber, 
-            hasAccount: !!accountNumber 
+            hasAccount: !!accountNumber,
+            accountNumberLength: accountNumber?.length 
           });
+        } else {
+          console.log('[Stripe FC] account_numbers not available on FC account');
         }
       } catch (e: any) {
         console.log('[Stripe FC] Could not get account numbers:', e.message);
