@@ -9,8 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building, CreditCard, Plus, Trash2, Star, Loader2, CheckCircle, XCircle, Zap, Shield, ArrowRight, Clock, DollarSign } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Building, CreditCard, Plus, Trash2, Star, Loader2, CheckCircle, XCircle, Zap, Shield, ArrowRight, Clock, DollarSign, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Stripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { getStripePromise, getStripeInstance } from "@/lib/stripe";
@@ -151,6 +151,10 @@ export default function PaymentMethods() {
   const [bankLinkLoading, setBankLinkLoading] = useState(false);
   const [showDebitCardDialog, setShowDebitCardDialog] = useState(false);
   const [debitCardholderName, setDebitCardholderName] = useState('');
+  const [showAccountNumberDialog, setShowAccountNumberDialog] = useState(false);
+  const [pendingAccountId, setPendingAccountId] = useState<string | null>(null);
+  const [accountNumber, setAccountNumber] = useState('');
+  const [confirmAccountNumber, setConfirmAccountNumber] = useState('');
 
   useEffect(() => {
     const promise = getStripePromise();
@@ -198,9 +202,14 @@ export default function PaymentMethods() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({ description: "Bank account linked successfully!" });
       refetchBankAccounts();
+      // Show dialog to collect account number for withdrawals
+      if (data.account?.id) {
+        setPendingAccountId(data.account.id);
+        setShowAccountNumberDialog(true);
+      }
     },
     onError: (err: Error) => {
       toast({ description: err.message, variant: "destructive" });
@@ -234,6 +243,33 @@ export default function PaymentMethods() {
     onSuccess: () => {
       toast({ description: "Payment method removed" });
       refetchBankAccounts();
+    },
+  });
+
+  const updateAccountNumberMutation = useMutation({
+    mutationFn: async ({ accountId, accountNumber }: { accountId: string; accountNumber: string }) => {
+      const res = await fetch(`/api/bank-accounts/${accountId}/account-number`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountNumber }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to update account number');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ description: "Account details saved successfully" });
+      setShowAccountNumberDialog(false);
+      setPendingAccountId(null);
+      setAccountNumber('');
+      setConfirmAccountNumber('');
+      refetchBankAccounts();
+    },
+    onError: (error: any) => {
+      toast({ description: error.message, variant: 'destructive' });
     },
   });
 
@@ -436,40 +472,64 @@ export default function PaymentMethods() {
                 {bankAccountsList.length > 0 && (
                   <div className="space-y-2">
                     {bankAccountsList.map((account: any) => (
-                      <div key={account.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <Building className="w-4 h-4 text-muted-foreground" />
-                          <div>
-                            <p className="text-sm font-medium">{account.institutionName}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {account.accountType} ••••{account.accountMask}
-                              {account.isDefault && <span className="ml-2 text-cyan-400">(Default)</span>}
-                            </p>
+                      <div key={account.id} className="p-3 bg-white/5 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Building className="w-4 h-4 text-muted-foreground" />
+                            <div>
+                              <p className="text-sm font-medium">{account.institutionName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {account.accountType} ••••{account.accountMask}
+                                {account.isDefault && <span className="ml-2 text-cyan-400">(Default)</span>}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {!account.isDefault && (
+                          <div className="flex items-center gap-2">
+                            {!account.isDefault && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDefaultMutation.mutate(account.id)}
+                                disabled={setDefaultMutation.isPending}
+                                data-testid={`button-set-default-bank-${account.id}`}
+                              >
+                                <Star className="w-4 h-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => setDefaultMutation.mutate(account.id)}
-                              disabled={setDefaultMutation.isPending}
-                              data-testid={`button-set-default-bank-${account.id}`}
+                              onClick={() => deleteBankAccountMutation.mutate(account.id)}
+                              disabled={deleteBankAccountMutation.isPending}
+                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                              data-testid={`button-delete-bank-${account.id}`}
                             >
-                              <Star className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4" />
                             </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteBankAccountMutation.mutate(account.id)}
-                            disabled={deleteBankAccountMutation.isPending}
-                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                            data-testid={`button-delete-bank-${account.id}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          </div>
                         </div>
+                        {!account.accountNumber && (
+                          <div className="mt-2 pt-2 border-t border-white/5">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs text-amber-400 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                Account number needed for withdrawals
+                              </p>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-cyan-400 hover:text-cyan-300 text-xs h-7 px-2"
+                                onClick={() => {
+                                  setPendingAccountId(account.id);
+                                  setShowAccountNumberDialog(true);
+                                }}
+                                data-testid={`button-add-account-number-${account.id}`}
+                              >
+                                Add Number
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -627,6 +687,91 @@ export default function PaymentMethods() {
               />
             </Elements>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAccountNumberDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowAccountNumberDialog(false);
+          setPendingAccountId(null);
+          setAccountNumber('');
+          setConfirmAccountNumber('');
+        }
+      }}>
+        <DialogContent className="bg-card border-white/10">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-cyan-400" />
+              Complete Bank Account Setup
+            </DialogTitle>
+            <DialogDescription>
+              To enable withdrawals, please enter your full account number. This is required for secure ACH transfers.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="accountNumber">Account Number</Label>
+              <Input
+                id="accountNumber"
+                type="password"
+                placeholder="Enter your account number"
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))}
+                maxLength={17}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmAccountNumber">Confirm Account Number</Label>
+              <Input
+                id="confirmAccountNumber"
+                type="text"
+                placeholder="Re-enter your account number"
+                value={confirmAccountNumber}
+                onChange={(e) => setConfirmAccountNumber(e.target.value.replace(/\D/g, ''))}
+                maxLength={17}
+              />
+              {confirmAccountNumber && accountNumber !== confirmAccountNumber && (
+                <p className="text-xs text-red-400">Account numbers don't match</p>
+              )}
+            </div>
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm text-muted-foreground">
+              <p className="flex items-start gap-2">
+                <Shield className="w-4 h-4 mt-0.5 shrink-0 text-blue-400" />
+                Your account number is encrypted and securely stored. It will only be used to process your withdrawals.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowAccountNumberDialog(false);
+                setPendingAccountId(null);
+                setAccountNumber('');
+                setConfirmAccountNumber('');
+              }}
+            >
+              Skip for now
+            </Button>
+            <Button
+              onClick={() => {
+                if (pendingAccountId && accountNumber && accountNumber === confirmAccountNumber) {
+                  updateAccountNumberMutation.mutate({ accountId: pendingAccountId, accountNumber });
+                }
+              }}
+              disabled={!accountNumber || accountNumber !== confirmAccountNumber || updateAccountNumberMutation.isPending}
+              className="bg-gradient-to-r from-cyan-500 to-blue-500"
+            >
+              {updateAccountNumberMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Account Number'
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </Layout>

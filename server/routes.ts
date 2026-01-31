@@ -3095,6 +3095,36 @@ export async function registerRoutes(
     }
   });
 
+  // Update bank account with full account number for withdrawals
+  app.post("/api/bank-accounts/:id/account-number", requireAuth, async (req, res, next) => {
+    try {
+      const accountId = req.params.id;
+      const userId = req.session.userId!;
+      
+      const { accountNumber } = z.object({
+        accountNumber: z.string().min(4).max(17).regex(/^\d+$/, "Account number must be numeric"),
+      }).parse(req.body);
+      
+      const account = await storage.getBankAccountById(accountId);
+      if (!account || account.userId !== userId) {
+        return res.status(404).json({ error: "Bank account not found" });
+      }
+
+      // Update the account with the full account number
+      // Also update accountMask to reflect the new last4
+      await db.update(bankAccounts)
+        .set({ 
+          accountNumber,
+          accountMask: accountNumber.slice(-4),
+        })
+        .where(eq(bankAccounts.id, accountId));
+      
+      res.json({ success: true, message: "Account number saved" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Get pool contributors for transfer selection
   app.get("/api/pools/:id/contributors", requireAuth, async (req, res, next) => {
     try {
