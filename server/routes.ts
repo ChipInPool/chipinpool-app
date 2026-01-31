@@ -2603,6 +2603,7 @@ export async function registerRoutes(
 
       // Create SetupIntent with Financial Connections for bank account linking
       // Force instant verification to ensure Financial Connections is used (no micro-deposits fallback)
+      // Request account_numbers permission to get full account/routing numbers for payouts
       const setupIntent = await stripe.setupIntents.create({
         customer: stripeCustomerId,
         payment_method_types: ['us_bank_account'],
@@ -2610,7 +2611,7 @@ export async function registerRoutes(
           us_bank_account: {
             verification_method: 'instant', // Force instant verification via Financial Connections
             financial_connections: {
-              permissions: ['payment_method', 'balances', 'ownership'],
+              permissions: ['payment_method', 'balances', 'ownership', 'account_numbers'] as any,
             },
           },
         },
@@ -2690,10 +2691,27 @@ export async function registerRoutes(
         }
       }
       
-      // Note: Full account numbers require a webhook listener for financial_connections.account.refreshed_account_numbers
-      // For now, we save without full account number - admin will process via manual verification
+      // Try to get full account numbers if we have the account_numbers permission
+      // This requires refetching the account with the account_numbers expansion
+      try {
+        const fcAccountWithNumbers = await stripe.financialConnections.accounts.retrieve(accountId, {
+          expand: ['account_holder'],
+        }) as any;
+        
+        // Check if account_numbers are available (only if user granted permission)
+        if (fcAccountWithNumbers.account_numbers) {
+          routingNumber = fcAccountWithNumbers.account_numbers.routing;
+          accountNumber = fcAccountWithNumbers.account_numbers.account;
+          console.log('[Stripe FC] Got account numbers from FC:', { 
+            hasRouting: !!routingNumber, 
+            hasAccount: !!accountNumber 
+          });
+        }
+      } catch (e: any) {
+        console.log('[Stripe FC] Could not get account numbers:', e.message);
+      }
 
-      // Create bank account record with routing number if available
+      // Create bank account record with routing/account numbers if available
       const bankAccount = await storage.createBankAccount({
         userId,
         stripeFinancialConnectionsAccountId: accountId,
@@ -2720,6 +2738,7 @@ export async function registerRoutes(
           institutionName: bankAccount.institutionName,
           accountMask: bankAccount.accountMask,
           accountType: bankAccount.accountType,
+          hasAccountNumber: !!accountNumber,
         }
       });
     } catch (error: any) {

@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building, CreditCard, Plus, Trash2, Star, Loader2, CheckCircle, XCircle, Zap, Shield, ArrowRight, Clock, DollarSign, AlertTriangle } from "lucide-react";
+import { Building, CreditCard, Plus, Trash2, Star, Loader2, CheckCircle, XCircle, Zap, Shield, ArrowRight, Clock, DollarSign, AlertTriangle, AlertCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Stripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -205,8 +205,8 @@ export default function PaymentMethods() {
     onSuccess: (data) => {
       toast({ description: "Bank account linked successfully!" });
       refetchBankAccounts();
-      // Show dialog to collect account number for withdrawals
-      if (data.account?.id) {
+      // Only show dialog if Stripe didn't capture the account number
+      if (data.account?.id && !data.account?.hasAccountNumber) {
         setPendingAccountId(data.account.id);
         setShowAccountNumberDialog(true);
       }
