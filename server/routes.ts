@@ -4300,7 +4300,44 @@ export async function registerRoutes(
       console.log('[KYC Refresh] Session status:', userSession.status, 'for user:', userId);
       
       if (userSession.status === 'verified') {
-        await storage.updateUser(userId, { kycStatus: 'verified' });
+        // Retrieve full session with expanded verified_outputs to get address
+        const fullSession = await stripe.identity.verificationSessions.retrieve(userSession.id, {
+          expand: ['verified_outputs'],
+        }) as any;
+        
+        const verifiedOutputs = fullSession.verified_outputs;
+        console.log('[KYC Refresh] Verified outputs:', JSON.stringify(verifiedOutputs, null, 2));
+        
+        // Extract verified data from Stripe Identity
+        const updateData: any = { 
+          kycStatus: 'verified',
+          kycVerifiedAt: new Date(),
+          stripeIdentityVerificationId: userSession.id,
+        };
+        
+        // Capture legal name if available
+        if (verifiedOutputs?.first_name || verifiedOutputs?.last_name) {
+          updateData.verifiedLegalName = `${verifiedOutputs.first_name || ''} ${verifiedOutputs.last_name || ''}`.trim();
+        }
+        
+        // Capture address if available
+        if (verifiedOutputs?.address) {
+          const addr = verifiedOutputs.address;
+          updateData.verifiedAddress = addr.line1 || '';
+          updateData.verifiedCity = addr.city || '';
+          updateData.verifiedState = addr.state || '';
+          updateData.verifiedPostalCode = addr.postal_code || '';
+          updateData.verifiedCountry = addr.country || '';
+          console.log('[KYC Refresh] Captured address:', addr);
+        }
+        
+        // Capture DOB if available
+        if (verifiedOutputs?.dob) {
+          const dob = verifiedOutputs.dob;
+          updateData.verifiedDob = `${dob.year}-${String(dob.month).padStart(2, '0')}-${String(dob.day).padStart(2, '0')}`;
+        }
+        
+        await storage.updateUser(userId, updateData);
         
         // Send notification
         sendKycStatusNotification(
@@ -5529,25 +5566,64 @@ export async function registerRoutes(
         }
       }
 
-      // Auto-sync KYC status
+      // Auto-sync KYC status and verified data
       for (const vs of identityResult.data) {
         const userId = vs.metadata?.userId;
         if (!userId) continue;
         const user = await storage.getUser(userId);
         if (!user) continue;
-        if (vs.status === 'verified' && user.kycStatus !== 'verified') {
-          await storage.updateUser(userId, { kycStatus: 'verified' });
-          synced++;
+        
+        if (vs.status === 'verified') {
+          // Fetch full session to get verified_outputs
+          const fullSession = await stripe.identity.verificationSessions.retrieve(vs.id, {
+            expand: ['verified_outputs'],
+          }) as any;
           
-          // Send KYC status notification - gate with global channel preference AND per-category preference
-          sendKycStatusNotification(
-            user.email,
-            user.phone,
-            user.firstName,
-            'verified',
-            user.notifyEmail && user.emailKycUpdates,
-            user.notifySMS && user.smsKycUpdates
-          ).catch(console.error);
+          const verifiedOutputs = fullSession.verified_outputs;
+          const updateData: any = { 
+            kycStatus: 'verified',
+            stripeIdentityVerificationId: vs.id,
+          };
+          
+          // Only update if we don't already have the data or KYC wasn't verified
+          if (user.kycStatus !== 'verified' || !user.verifiedAddress) {
+            if (!user.kycVerifiedAt) {
+              updateData.kycVerifiedAt = new Date(vs.created * 1000);
+            }
+            
+            if (verifiedOutputs?.first_name || verifiedOutputs?.last_name) {
+              updateData.verifiedLegalName = `${verifiedOutputs.first_name || ''} ${verifiedOutputs.last_name || ''}`.trim();
+            }
+            
+            if (verifiedOutputs?.address) {
+              const addr = verifiedOutputs.address;
+              updateData.verifiedAddress = addr.line1 || '';
+              updateData.verifiedCity = addr.city || '';
+              updateData.verifiedState = addr.state || '';
+              updateData.verifiedPostalCode = addr.postal_code || '';
+              updateData.verifiedCountry = addr.country || '';
+            }
+            
+            if (verifiedOutputs?.dob) {
+              const dob = verifiedOutputs.dob;
+              updateData.verifiedDob = `${dob.year}-${String(dob.month).padStart(2, '0')}-${String(dob.day).padStart(2, '0')}`;
+            }
+            
+            await storage.updateUser(userId, updateData);
+            synced++;
+            
+            // Only send notification if just became verified
+            if (user.kycStatus !== 'verified') {
+              sendKycStatusNotification(
+                user.email,
+                user.phone,
+                user.firstName,
+                'verified',
+                user.notifyEmail && user.emailKycUpdates,
+                user.notifySMS && user.smsKycUpdates
+              ).catch(console.error);
+            }
+          }
         }
       }
 
