@@ -34,6 +34,7 @@ interface Withdrawal {
   accountHolderName: string | null;
   routingNumber: string | null;
   accountNumberLast4: string | null;
+  fullAccountNumber: string | null;
   accountType: string | null;
   adminNotes: string | null;
   processedAt: string | null;
@@ -271,7 +272,16 @@ export default function AdminWithdrawals() {
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-muted-foreground">Account Number:</span>
-                            <span className="font-mono">••••{withdrawal.accountNumberLast4 || 'N/A'}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-medium">
+                                {withdrawal.fullAccountNumber || `••••${withdrawal.accountNumberLast4 || 'N/A'}`}
+                              </span>
+                              {withdrawal.fullAccountNumber && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(withdrawal.fullAccountNumber!, "Account number")}>
+                                  <Copy className="w-3 h-3" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Account Type:</span>

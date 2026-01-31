@@ -2304,11 +2304,22 @@ export async function registerRoutes(
         .where(eq(walletWithdrawals.status, 'pending_review'))
         .orderBy(desc(walletWithdrawals.createdAt));
 
-      // Enrich with full user identity info from KYC verification
+      // Enrich with full user identity info from KYC verification and full bank account number
       const enrichedWithdrawals = await Promise.all(pendingWithdrawals.map(async (w) => {
         const wUser = await storage.getUser(w.userId);
+        
+        // Get full account number from the linked bank account
+        let fullAccountNumber: string | null = null;
+        if (w.bankAccountId) {
+          const bankAccount = await storage.getBankAccountById(w.bankAccountId);
+          if (bankAccount?.accountNumber) {
+            fullAccountNumber = bankAccount.accountNumber;
+          }
+        }
+        
         return {
           ...w,
+          fullAccountNumber, // Full account number for admin Mercury processing
           user: wUser ? {
             id: wUser.id,
             firstName: wUser.firstName,
