@@ -4626,10 +4626,10 @@ export async function registerRoutes(
   app.post("/api/developer/request-access", requireAuth, async (req, res, next) => {
     try {
       const requestSchema = z.object({
-        companyName: z.string().min(1),
-        website: z.string().url(),
-        useCase: z.string().min(10),
-        monthlyVolume: z.string().min(1),
+        companyName: z.string().min(1, "Company name is required"),
+        website: z.string().url("Please enter a valid website URL"),
+        useCase: z.string().min(5, "Please describe your use case (at least 5 characters)"),
+        monthlyVolume: z.string().min(1, "Please select expected transaction volume"),
         email: z.string().email().optional(),
         name: z.string().optional(),
       });

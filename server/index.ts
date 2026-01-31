@@ -130,14 +130,23 @@ app.use((req, res, next) => {
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) {
+      return next(err);
+    }
+
+    // Handle Zod validation errors
+    if (err.name === 'ZodError' && err.issues) {
+      const firstIssue = err.issues[0];
+      const field = firstIssue.path.join('.');
+      const message = firstIssue.message || `Invalid value for ${field}`;
+      console.error("Validation Error:", { field, message, issues: err.issues });
+      return res.status(400).json({ error: message, field });
+    }
+
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
     console.error("Internal Server Error:", err);
-
-    if (res.headersSent) {
-      return next(err);
-    }
 
     return res.status(status).json({ message });
   });
