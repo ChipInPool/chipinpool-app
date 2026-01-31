@@ -100,6 +100,8 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
   try {
     const { client, fromEmail } = await getResendClient();
     
+    console.log('[Email] Sending email:', { to, subject, from: fromEmail });
+    
     const result = await client.emails.send({
       from: fromEmail,
       to: [to],
@@ -107,10 +109,29 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
       html,
     });
 
-    console.log('[Email] Sent to', to, result);
+    // Check if Resend returned an error in the response
+    if (result.error) {
+      console.error('[Email] Resend API error:', {
+        to,
+        subject,
+        from: fromEmail,
+        error: result.error.message,
+        statusCode: (result.error as any).statusCode,
+        name: result.error.name
+      });
+      return false;
+    }
+
+    console.log('[Email] Sent successfully:', { to, subject, from: fromEmail, id: result.data?.id });
     return true;
   } catch (error: any) {
-    console.error('[Email] Failed to send:', error.message);
+    console.error('[Email] Failed to send:', {
+      to,
+      subject,
+      error: error.message,
+      name: error.name,
+      statusCode: error.statusCode,
+    });
     return false;
   }
 }

@@ -73,7 +73,7 @@ export async function sendPoolInviteEmail(
   try {
     const { client, fromEmail } = await getUncachableResendClient();
     
-    await client.emails.send({
+    const result = await client.emails.send({
       from: fromEmail,
       to: [to],
       subject: `${inviterName} invited you to chip in for "${poolTitle}"`,
@@ -96,7 +96,18 @@ export async function sendPoolInviteEmail(
       `,
     });
     
-    console.log(`Email invite sent to ${to} for pool "${poolTitle}"`);
+    // Check if Resend returned an error
+    if (result.error) {
+      console.error('Email invite failed:', {
+        to,
+        poolTitle,
+        error: result.error.message,
+        statusCode: (result.error as any).statusCode
+      });
+      return false;
+    }
+    
+    console.log(`Email invite sent to ${to} for pool "${poolTitle}", id: ${result.data?.id}`);
     return true;
   } catch (error: any) {
     console.error('Failed to send email invite:', {

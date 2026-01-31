@@ -81,6 +81,33 @@ export async function registerRoutes(
     next();
   };
 
+  // Debug email test endpoint (admin only in production)
+  app.post("/api/debug/test-email", async (req, res) => {
+    try {
+      const { to } = req.body;
+      if (!to) {
+        return res.status(400).json({ error: "Missing 'to' email address" });
+      }
+      
+      console.log('[Debug] Testing email to:', to);
+      const { sendEmail } = await import('./notificationService');
+      
+      const result = await sendEmail(
+        to,
+        'ChipIn Email Test',
+        '<h1>Email Test</h1><p>This is a test email from ChipIn to verify email delivery is working.</p>'
+      );
+      
+      res.json({ 
+        success: result,
+        message: result ? 'Email sent successfully - check your inbox and spam folder' : 'Email send failed - check server logs'
+      });
+    } catch (error: any) {
+      console.error('[Debug] Email test error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Phone verification routes
   app.post("/api/auth/send-phone-code", async (req, res, next) => {
     try {
