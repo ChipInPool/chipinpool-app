@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
-import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, bankAccounts } from "@shared/schema";
+import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, bankAccounts, merchantPayouts } from "@shared/schema";
 import express from "express";
 import { db } from "./db";
 import { eq, desc, sql, inArray } from "drizzle-orm";
@@ -900,6 +900,40 @@ export async function registerRoutes(
       // Check if pool goal is reached
       if (parseFloat(newPoolAmount) >= parseFloat(pool.targetAmount)) {
         await storage.updatePoolStatus(pool.id, 'completed');
+        
+        // Check if this pool is linked to a merchant checkout session
+        const merchantSession = await storage.getMerchantCheckoutSessionByPoolId(pool.id);
+        if (merchantSession && merchantSession.status === 'collecting') {
+          // Complete the checkout session
+          await storage.updateCheckoutSessionStatus(
+            merchantSession.id, 
+            'completed', 
+            newPoolAmount
+          );
+          
+          // Update merchant stats - add net amount to pending balance
+          const netAmount = parseFloat(merchantSession.netAmount);
+          const feeAmount = parseFloat(merchantSession.feeAmount);
+          const totalAmount = parseFloat(merchantSession.amount);
+          await storage.updateMerchantStats(merchantSession.merchantId, netAmount, feeAmount, totalAmount);
+          
+          // Send webhook to merchant
+          const merchant = await storage.getMerchant(merchantSession.merchantId);
+          if (merchant?.webhookUrl) {
+            sendMerchantWebhook(merchant, merchantSession.id, 'session.completed', {
+              sessionId: merchantSession.id,
+              orderId: merchantSession.externalOrderId,
+              status: 'completed',
+              poolId: pool.id,
+              amount: totalAmount,
+              netAmount: netAmount,
+              feeAmount: feeAmount,
+              completedAt: new Date().toISOString(),
+            });
+          }
+          
+          console.log(`[ChipInPay] Session ${merchantSession.id} completed. Merchant ${merchantSession.merchantId} earned $${netAmount.toFixed(2)}`);
+        }
         
         // Create notification for pool creator
         await storage.createNotification({
@@ -4844,6 +4878,101 @@ export async function registerRoutes(
 
       const payouts = await storage.getMerchantPayouts(merchant.id);
       res.json(payouts);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Request merchant payout
+  app.post("/api/merchant/payouts/request", requireAuth, async (req, res, next) => {
+    try {
+      const merchant = await storage.getMerchantByUserId(req.session.userId!);
+      if (!merchant) {
+        return res.status(404).json({ error: "No merchant account found" });
+      }
+
+      if (merchant.status !== 'approved') {
+        return res.status(403).json({ error: "Merchant account must be approved to request payouts" });
+      }
+
+      const pendingBalance = parseFloat(merchant.pendingBalance);
+      if (pendingBalance < 10) {
+        return res.status(400).json({ error: "Minimum payout is $10. Your current balance is $" + pendingBalance.toFixed(2) });
+      }
+
+      // Check for existing pending payout
+      const existingPayouts = await storage.getMerchantPayouts(merchant.id);
+      const pendingPayout = existingPayouts.find(p => p.status === 'pending' || p.status === 'processing');
+      if (pendingPayout) {
+        return res.status(400).json({ error: "You already have a pending payout request" });
+      }
+
+      // If merchant has Stripe Connect, process immediately with transactional safety
+      if (merchant.stripeConnectId) {
+        // Create payout in processing state
+        const [payout] = await db.insert(merchantPayouts).values({
+          merchantId: merchant.id,
+          amount: pendingBalance.toFixed(2),
+          status: 'processing',
+        }).returning();
+
+        // Immediately reserve the balance to prevent race conditions
+        const [updatedMerchant] = await db.update(merchants).set({
+          pendingBalance: '0.00',
+        }).where(eq(merchants.id, merchant.id)).returning();
+
+        try {
+          const stripe = await getUncachableStripeClient();
+          const transfer = await stripe.transfers.create({
+            amount: Math.round(pendingBalance * 100),
+            currency: 'usd',
+            destination: merchant.stripeConnectId,
+            description: `ChipInPay payout for ${merchant.companyName}`,
+            metadata: { payoutId: payout.id, merchantId: merchant.id },
+          });
+
+          // Update payout with Stripe transfer ID and mark as completed
+          await db.update(merchantPayouts).set({
+            stripeTransferId: transfer.id,
+            status: 'completed',
+          }).where(eq(merchantPayouts.id, payout.id));
+
+          // Update total payouts
+          await db.update(merchants).set({
+            totalPayouts: sql`${merchants.totalPayouts}::decimal + ${pendingBalance}::decimal`,
+          }).where(eq(merchants.id, merchant.id));
+
+          console.log(`[ChipInPay] Processed payout ${payout.id} for merchant ${merchant.id}: $${pendingBalance.toFixed(2)} via Stripe Transfer ${transfer.id}`);
+
+          res.json({
+            payout: { ...payout, status: 'completed', stripeTransferId: transfer.id },
+            message: "Payout processed successfully! Funds will arrive in your connected account within 2 business days.",
+          });
+        } catch (stripeError: any) {
+          console.error('[ChipInPay] Stripe transfer failed:', stripeError);
+          
+          // Rollback: restore the balance and mark payout as failed
+          await db.update(merchants).set({
+            pendingBalance: pendingBalance.toFixed(2),
+          }).where(eq(merchants.id, merchant.id));
+          
+          await db.update(merchantPayouts).set({ status: 'failed' }).where(eq(merchantPayouts.id, payout.id));
+          
+          return res.status(500).json({ error: "Payment processing failed. Please try again or contact support." });
+        }
+      } else {
+        // No Stripe Connect - queue for manual processing
+        const payout = await storage.createMerchantPayout({
+          merchantId: merchant.id,
+          amount: pendingBalance.toFixed(2),
+        });
+        
+        console.log(`[ChipInPay] Merchant ${merchant.id} requested payout but has no Stripe Connect. Queued for manual review.`);
+        res.json({
+          payout,
+          message: "Payout request submitted. Please connect your Stripe account to receive automatic payouts, or wait for manual processing (3-5 business days).",
+        });
+      }
     } catch (error) {
       next(error);
     }

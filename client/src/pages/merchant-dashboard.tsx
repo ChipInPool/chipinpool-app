@@ -90,6 +90,29 @@ export default function MerchantDashboard() {
     enabled: isAuthenticated && !!merchant,
   });
 
+  const requestPayoutMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/merchant/payouts/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to request payout");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["merchant"] });
+      queryClient.invalidateQueries({ queryKey: ["merchantPayouts"] });
+      toast({ description: data.message });
+    },
+    onError: (err: any) => {
+      toast({ description: err.message, variant: "destructive" });
+    },
+  });
+
   const createKeyMutation = useMutation({
     mutationFn: async (name: string) => {
       const res = await fetch("/api/merchant/api-keys", {
@@ -277,14 +300,26 @@ export default function MerchantDashboard() {
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-green-500/10 rounded-lg">
-                  <CreditCard className="w-5 h-5 text-green-600" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-green-500/10 rounded-lg">
+                    <CreditCard className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Pending Balance</p>
+                    <p className="text-xl font-bold">${parseFloat(merchant.pendingBalance).toLocaleString()}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Pending Balance</p>
-                  <p className="text-xl font-bold">${parseFloat(merchant.pendingBalance).toLocaleString()}</p>
-                </div>
+                {parseFloat(merchant.pendingBalance) >= 10 && merchant.status === 'approved' && (
+                  <Button 
+                    size="sm"
+                    onClick={() => requestPayoutMutation.mutate()}
+                    disabled={requestPayoutMutation.isPending}
+                    data-testid="button-request-payout"
+                  >
+                    {requestPayoutMutation.isPending ? "Processing..." : "Request Payout"}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

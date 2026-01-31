@@ -113,7 +113,6 @@ export interface IStorage {
   getMerchantByUserId(userId: string): Promise<Merchant | undefined>;
   getMerchantByApiKey(keyHash: string): Promise<Merchant | undefined>;
   updateMerchant(id: string, data: Partial<Merchant>): Promise<Merchant | undefined>;
-  updateMerchantStats(id: string, volume: string, fees: string): Promise<void>;
   
   // Merchant API key operations
   createMerchantApiKey(apiKey: InsertMerchantApiKey): Promise<MerchantApiKey>;
@@ -126,10 +125,12 @@ export interface IStorage {
   createMerchantCheckoutSession(session: InsertMerchantCheckoutSession): Promise<MerchantCheckoutSession>;
   getMerchantCheckoutSession(id: string): Promise<MerchantCheckoutSession | undefined>;
   getMerchantCheckoutSessionByOrderId(merchantId: string, orderId: string): Promise<MerchantCheckoutSession | undefined>;
+  getMerchantCheckoutSessionByPoolId(poolId: string): Promise<MerchantCheckoutSession | undefined>;
   getMerchantCheckoutSessions(merchantId: string): Promise<MerchantCheckoutSession[]>;
   updateCheckoutSessionStatus(id: string, status: string, collectedAmount?: string): Promise<void>;
   updateCheckoutSessionPool(id: string, poolId: string): Promise<void>;
   getExpiredCheckoutSessions(): Promise<MerchantCheckoutSession[]>;
+  updateMerchantStats(merchantId: string, netAmount: number, feeAmount: number, totalAmount: number): Promise<void>;
   
   // Merchant webhook operations
   createWebhookDelivery(delivery: InsertMerchantWebhookDelivery): Promise<MerchantWebhookDelivery>;
@@ -580,14 +581,6 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async updateMerchantStats(id: string, volume: string, fees: string): Promise<void> {
-    await db.update(merchants).set({
-      totalVolume: sql`${merchants.totalVolume} + ${volume}`,
-      totalFees: sql`${merchants.totalFees} + ${fees}`,
-      pendingBalance: sql`${merchants.pendingBalance} + ${sql`${volume}::decimal - ${fees}::decimal`}`,
-    }).where(eq(merchants.id, id));
-  }
-
   // Merchant API key operations
   async createMerchantApiKey(apiKey: InsertMerchantApiKey): Promise<MerchantApiKey> {
     const [result] = await db.insert(merchantApiKeys).values(apiKey).returning();
@@ -652,6 +645,20 @@ export class DatabaseStorage implements IStorage {
         eq(merchantCheckoutSessions.status, 'collecting'),
         sql`${merchantCheckoutSessions.collectionDeadline} < NOW()`
       ));
+  }
+
+  async getMerchantCheckoutSessionByPoolId(poolId: string): Promise<MerchantCheckoutSession | undefined> {
+    const [session] = await db.select().from(merchantCheckoutSessions)
+      .where(eq(merchantCheckoutSessions.poolId, poolId));
+    return session;
+  }
+
+  async updateMerchantStats(merchantId: string, netAmount: number, feeAmount: number, totalAmount: number): Promise<void> {
+    await db.update(merchants).set({
+      pendingBalance: sql`${merchants.pendingBalance}::decimal + ${netAmount}::decimal`,
+      totalVolume: sql`${merchants.totalVolume}::decimal + ${totalAmount}::decimal`,
+      totalFees: sql`${merchants.totalFees}::decimal + ${feeAmount}::decimal`,
+    }).where(eq(merchants.id, merchantId));
   }
 
   // Merchant webhook operations
