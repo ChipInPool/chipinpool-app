@@ -70,9 +70,42 @@ Preferred communication style: Simple, everyday language.
 - `bankAccounts`: Linked bank accounts for payouts (stores routing/account numbers locally)
 - `poolTransferRequests`: Pool fund transfer requests with status tracking
 
+## Recent Changes (February 2026)
+
+### New Features Added (February 2026):
+18. **Pay Me Back Links** (`/@username` and `/@username/amount`) - Viral payment links:
+    - Public payment pages requiring no login for senders
+    - Shareable links like `chipinpool.com/@sarah` or `chipinpool.com/@sarah/50`
+    - Guest payments via Stripe with optional message
+    - Funds added directly to recipient's wallet
+    - Input validation: $1-$10,000, sanitized messages, email validation
+    - Full idempotency and security checks on payment confirmation
+
+19. **Push Notifications** - Real-time browser notifications:
+    - Web push using VAPID keys and service worker
+    - Notifications for: contributions to your pools, 90% milestones, pool completion
+    - Merchant notifications for new orders
+    - Enable/disable toggle in Settings page
+    - Respects user's notifyPush preference
+    - VAPID keys required in production (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL)
+
+20. **Auto-Contributions** - Scheduled recurring pool payments:
+    - Set up recurring contributions (weekly/monthly/quarterly) to any active pool
+    - Automatic processing via hourly cron job
+    - Deducts from wallet balance automatically
+    - Pause/resume/edit/cancel functionality in `/recurring` dashboard
+    - Insufficient balance notifications
+    - Cascade delete when user or pool is removed
+
+### Production Fixes (February 2026):
+- Virtual card billing address now uses KYC-verified user data
+- Stripe webhook handler now triggers ChipInPay session completion
+- Admin withdrawal processing tracks processedAt/processedBy/adminNotes
+- User notifications sent for withdrawal completion/rejection
+
 ## Recent Changes (January 2026)
 
-### New Features Added:
+### Previous Features:
 1. **Recurring Contributions Dashboard** (`/recurring`) - Manage all recurring payments in one place
 2. **Pool Analytics** (`/pool/:id/analytics`) - Detailed insights on contribution trends and patterns
 3. **Activity Feed** (`/activity`) - See what people you follow are doing
