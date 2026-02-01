@@ -81,32 +81,18 @@ export async function registerRoutes(
     next();
   };
 
-  // Debug email test endpoint (admin only in production)
-  app.post("/api/debug/test-email", async (req, res) => {
-    try {
-      const { to } = req.body;
-      if (!to) {
-        return res.status(400).json({ error: "Missing 'to' email address" });
-      }
-      
-      console.log('[Debug] Testing email to:', to);
-      const { sendEmail } = await import('./notificationService');
-      
-      const result = await sendEmail(
-        to,
-        'ChipIn Email Test',
-        '<h1>Email Test</h1><p>This is a test email from ChipIn to verify email delivery is working.</p>'
-      );
-      
-      res.json({ 
-        success: result,
-        message: result ? 'Email sent successfully - check your inbox and spam folder' : 'Email send failed - check server logs'
-      });
-    } catch (error: any) {
-      console.error('[Debug] Email test error:', error);
-      res.status(500).json({ error: error.message });
+  // Admin middleware
+  const requireAdmin = async (req: any, res: any, next: any) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
-  });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    req.adminUser = user;
+    next();
+  };
 
   // Phone verification routes
   app.post("/api/auth/send-phone-code", async (req, res, next) => {
@@ -1263,17 +1249,17 @@ export async function registerRoutes(
         let cardholderId = user.stripeCardholderId;
         if (!cardholderId) {
           const cardholder = await stripe.issuing.cardholders.create({
-            name: `${user.firstName} ${user.lastName}`,
+            name: user.verifiedLegalName || `${user.firstName} ${user.lastName}`,
             email: user.email,
             phone_number: user.phone || undefined,
             type: 'individual',
             billing: {
               address: {
-                line1: '123 Main Street',
-                city: 'San Francisco',
-                state: 'CA',
-                postal_code: '94111',
-                country: 'US',
+                line1: user.verifiedAddress || '123 Main Street',
+                city: user.verifiedCity || 'San Francisco',
+                state: user.verifiedState || 'CA',
+                postal_code: user.verifiedPostalCode || '94111',
+                country: user.verifiedCountry || 'US',
               },
             },
           });
@@ -2352,14 +2338,8 @@ export async function registerRoutes(
   });
 
   // Get pending withdrawal requests (admin only) - includes full user identity data
-  app.get("/api/admin/withdrawals/pending", requireAuth, async (req, res, next) => {
+  app.get("/api/admin/withdrawals/pending", requireAdmin, async (req: any, res, next) => {
     try {
-      const userId = req.session.userId!;
-      const user = await storage.getUser(userId);
-      if (!user || user.role !== 'admin') {
-        return res.status(403).json({ error: "Admin access required" });
-      }
-
       const pendingWithdrawals = await db.select()
         .from(walletWithdrawals)
         .where(eq(walletWithdrawals.status, 'pending_review'))
@@ -2548,14 +2528,8 @@ export async function registerRoutes(
   });
 
   // Process withdrawal (admin marks as completed after manual Mercury transfer)
-  app.post("/api/admin/withdrawals/:id/complete", requireAuth, async (req, res, next) => {
+  app.post("/api/admin/withdrawals/:id/complete", requireAdmin, async (req: any, res, next) => {
     try {
-      const userId = req.session.userId!;
-      const user = await storage.getUser(userId);
-      if (!user || user.role !== 'admin') {
-        return res.status(403).json({ error: "Admin access required" });
-      }
-
       const { id } = req.params;
       const { mercuryTransferId, notes } = req.body;
 
@@ -2576,19 +2550,37 @@ export async function registerRoutes(
         .set({
           status: 'completed',
           plaidTransferId: mercuryTransferId || `manual_${Date.now()}`,
+          processedAt: new Date(),
+          processedBy: req.adminUser.id,
+          adminNotes: notes || null,
         })
         .where(eq(walletWithdrawals.id, id));
 
       // Log admin action
       await db.insert(adminAuditLogs).values({
-        adminId: userId,
+        adminId: req.adminUser.id,
         action: 'process_withdrawal',
         targetType: 'wallet_withdrawal',
         targetId: id,
         details: JSON.stringify({ mercuryTransferId, notes, amount: withdrawal.amount }),
       });
 
-      console.log(`[Admin] Withdrawal ${id} marked as completed by admin ${userId}`);
+      // Send notification to user
+      const withdrawalUser = await storage.getUser(withdrawal.userId);
+      if (withdrawalUser) {
+        sendWalletActivityNotification(
+          withdrawalUser.email,
+          withdrawalUser.phone,
+          withdrawalUser.firstName || 'User',
+          'withdrawal',
+          withdrawal.amount,
+          'completed',
+          withdrawalUser.notifyEmail,
+          withdrawalUser.notifySMS
+        );
+      }
+
+      console.log(`[Admin] Withdrawal ${id} marked as completed by admin ${req.adminUser.id}`);
 
       res.json({ success: true, message: "Withdrawal marked as completed" });
     } catch (error) {
@@ -2597,14 +2589,8 @@ export async function registerRoutes(
   });
 
   // Reject withdrawal and refund balance (admin)
-  app.post("/api/admin/withdrawals/:id/reject", requireAuth, async (req, res, next) => {
+  app.post("/api/admin/withdrawals/:id/reject", requireAdmin, async (req: any, res, next) => {
     try {
-      const userId = req.session.userId!;
-      const user = await storage.getUser(userId);
-      if (!user || user.role !== 'admin') {
-        return res.status(403).json({ error: "Admin access required" });
-      }
-
       const { id } = req.params;
       const { reason } = req.body;
 
@@ -2631,19 +2617,38 @@ export async function registerRoutes(
       }
 
       await db.update(walletWithdrawals)
-        .set({ status: 'rejected' })
+        .set({ 
+          status: 'rejected',
+          processedAt: new Date(),
+          processedBy: req.adminUser.id,
+          adminNotes: reason || null,
+        })
         .where(eq(walletWithdrawals.id, id));
 
       // Log admin action
       await db.insert(adminAuditLogs).values({
-        adminId: userId,
+        adminId: req.adminUser.id,
         action: 'reject_withdrawal',
         targetType: 'wallet_withdrawal',
         targetId: id,
         details: JSON.stringify({ reason, amount: withdrawal.amount, refunded: true }),
       });
 
-      console.log(`[Admin] Withdrawal ${id} rejected and refunded by admin ${userId}`);
+      // Send notification to user about rejection and refund
+      if (withdrawalUser) {
+        sendWalletActivityNotification(
+          withdrawalUser.email,
+          withdrawalUser.phone,
+          withdrawalUser.firstName || 'User',
+          'withdrawal',
+          withdrawal.amount,
+          'failed',
+          withdrawalUser.notifyEmail,
+          withdrawalUser.notifySMS
+        );
+      }
+
+      console.log(`[Admin] Withdrawal ${id} rejected and refunded by admin ${req.adminUser.id}`);
 
       res.json({ success: true, message: "Withdrawal rejected and balance refunded" });
     } catch (error) {
@@ -5316,19 +5321,6 @@ export async function registerRoutes(
   }
 
   // ========== ADMIN ROUTES ==========
-  
-  // Admin middleware - requires admin role
-  const requireAdmin = async (req: any, res: any, next: any) => {
-    if (!req.session.userId) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-    const user = await storage.getUser(req.session.userId);
-    if (!user || user.role !== 'admin') {
-      return res.status(403).json({ message: "Admin access required" });
-    }
-    req.adminUser = user;
-    next();
-  };
 
   // Log admin action helper
   const logAdminAction = async (adminId: string, action: string, targetType: string, targetId?: string, details?: string, ipAddress?: string) => {

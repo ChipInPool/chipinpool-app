@@ -86,11 +86,82 @@ export class WebhookHandlers {
 
       if (contribution) {
         console.log(`Stripe payment processed: $${amount} to pool ${poolId} (session: ${sessionId})`);
+        
+        // Check if pool reached target and handle merchant checkout session completion
+        const pool = await storage.getPool(poolId);
+        if (pool && parseFloat(pool.currentAmount) >= parseFloat(pool.targetAmount)) {
+          // Mark pool as completed if not already
+          if (pool.status !== 'completed') {
+            await storage.updatePoolStatus(pool.id, 'completed');
+          }
+          
+          // Check if this pool is linked to a merchant checkout session
+          const merchantSession = await storage.getMerchantCheckoutSessionByPoolId(pool.id);
+          if (merchantSession && merchantSession.status === 'collecting') {
+            // Complete the checkout session
+            await storage.updateCheckoutSessionStatus(
+              merchantSession.id, 
+              'completed', 
+              pool.currentAmount
+            );
+            
+            // Update merchant stats - add net amount to pending balance
+            const netAmount = parseFloat(merchantSession.netAmount);
+            const feeAmount = parseFloat(merchantSession.feeAmount);
+            const totalAmount = parseFloat(merchantSession.amount);
+            await storage.updateMerchantStats(merchantSession.merchantId, netAmount, feeAmount, totalAmount);
+            
+            // Send webhook to merchant
+            const merchant = await storage.getMerchant(merchantSession.merchantId);
+            if (merchant?.webhookUrl) {
+              await WebhookHandlers.sendMerchantWebhook(merchant, merchantSession.id, 'session.completed', {
+                sessionId: merchantSession.id,
+                orderId: merchantSession.externalOrderId,
+                status: 'completed',
+                poolId: pool.id,
+                amount: totalAmount,
+                netAmount: netAmount,
+                feeAmount: feeAmount,
+                completedAt: new Date().toISOString(),
+              });
+            }
+            
+            console.log(`[ChipInPay] Session ${merchantSession.id} completed via Stripe payment. Merchant ${merchantSession.merchantId} earned $${netAmount.toFixed(2)}`);
+          }
+        }
       } else {
         console.log(`Payment already processed for session ${sessionId}`);
       }
     } catch (err: any) {
       console.error('Error processing checkout completion:', err.message);
+    }
+  }
+  
+  // Helper method to send merchant webhooks
+  static async sendMerchantWebhook(merchant: any, sessionId: string, eventType: string, payload: any): Promise<void> {
+    if (!merchant.webhookUrl) return;
+    
+    const crypto = await import('crypto');
+    const timestamp = Math.floor(Date.now() / 1000);
+    const payloadString = JSON.stringify(payload);
+    const signatureData = `${timestamp}.${payloadString}`;
+    const signature = crypto.createHmac('sha256', merchant.webhookSecret)
+      .update(signatureData)
+      .digest('hex');
+    
+    try {
+      const response = await fetch(merchant.webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-ChipInPay-Signature': `t=${timestamp},v1=${signature}`,
+          'X-ChipInPay-Event': eventType,
+        },
+        body: payloadString,
+      });
+      console.log(`[Webhook] Delivered ${eventType} to ${merchant.webhookUrl}: ${response.status}`);
+    } catch (err: any) {
+      console.error(`[Webhook] Failed to deliver ${eventType}:`, err.message);
     }
   }
 
