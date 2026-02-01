@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
+import rateLimit from "express-rate-limit";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, bankAccounts, merchantPayouts, payMeTransactions } from "@shared/schema";
 import express from "express";
@@ -51,17 +52,48 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Security: Validate SESSION_SECRET is set in production
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SESSION_SECRET environment variable is required in production');
+    }
+    console.warn('[Security Warning] SESSION_SECRET not set - using insecure default for development only');
+  }
+  
+  // Rate limiting for authentication endpoints (prevent brute force attacks)
+  const authRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // 10 attempts per window
+    message: { message: 'Too many attempts. Please try again in 15 minutes.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: false,
+  });
+
+  // More permissive rate limiter for less sensitive operations
+  const generalRateLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 100, // 100 requests per minute
+    message: { message: 'Too many requests. Please slow down.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // Apply general rate limiting to all API routes
+  app.use('/api/', generalRateLimiter);
+
   // Session middleware
   app.use(
     session({
-      secret: process.env.SESSION_SECRET || "chipin-secret-key-change-in-production",
+      secret: sessionSecret || 'dev-only-insecure-secret-do-not-use-in-production',
       resave: false,
       saveUninitialized: false,
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
       },
       proxy: true, // Trust the reverse proxy
     })
@@ -95,8 +127,8 @@ export async function registerRoutes(
     next();
   };
 
-  // Phone verification routes
-  app.post("/api/auth/send-phone-code", async (req, res, next) => {
+  // Phone verification routes - rate limited to prevent abuse
+  app.post("/api/auth/send-phone-code", authRateLimiter, async (req, res, next) => {
     try {
       const { phone } = sendPhoneCodeSchema.parse(req.body);
       
@@ -128,7 +160,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/auth/verify-phone-code", async (req, res, next) => {
+  app.post("/api/auth/verify-phone-code", authRateLimiter, async (req, res, next) => {
     try {
       const { phone, code } = verifyPhoneCodeSchema.parse(req.body);
       
@@ -216,8 +248,8 @@ export async function registerRoutes(
     }
   });
 
-  // Auth routes
-  app.post("/api/auth/register", async (req, res, next) => {
+  // Auth routes - rate limited to prevent brute force attacks
+  app.post("/api/auth/register", authRateLimiter, async (req, res, next) => {
     try {
       const data = registerSchema.parse(req.body);
       
@@ -286,7 +318,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/auth/login", async (req, res, next) => {
+  app.post("/api/auth/login", authRateLimiter, async (req, res, next) => {
     try {
       const data = loginSchema.parse(req.body);
       
@@ -321,7 +353,7 @@ export async function registerRoutes(
   });
 
   // Login with username and password
-  app.post("/api/auth/login-username", async (req, res, next) => {
+  app.post("/api/auth/login-username", authRateLimiter, async (req, res, next) => {
     try {
       const data = loginWithUsernameSchema.parse(req.body);
       const username = data.username.toLowerCase().replace(/^@/, '');
@@ -355,7 +387,7 @@ export async function registerRoutes(
   });
 
   // Verify MFA code during login
-  app.post("/api/auth/verify-mfa", async (req, res, next) => {
+  app.post("/api/auth/verify-mfa", authRateLimiter, async (req, res, next) => {
     try {
       const { userId, code, useRecoveryCode } = req.body;
       
@@ -399,7 +431,7 @@ export async function registerRoutes(
   });
 
   // Send OTP for phone login
-  app.post("/api/auth/phone-login/send", async (req, res, next) => {
+  app.post("/api/auth/phone-login/send", authRateLimiter, async (req, res, next) => {
     try {
       const data = phoneLoginSchema.parse(req.body);
       
@@ -427,7 +459,7 @@ export async function registerRoutes(
   });
 
   // Verify OTP and login
-  app.post("/api/auth/phone-login/verify", async (req, res, next) => {
+  app.post("/api/auth/phone-login/verify", authRateLimiter, async (req, res, next) => {
     try {
       const data = verifyPhoneLoginSchema.parse(req.body);
       
@@ -469,7 +501,7 @@ export async function registerRoutes(
   });
 
   // Forgot password - send reset link
-  app.post("/api/auth/forgot-password", async (req, res, next) => {
+  app.post("/api/auth/forgot-password", authRateLimiter, async (req, res, next) => {
     try {
       const data = forgotPasswordSchema.parse(req.body);
       
@@ -512,7 +544,7 @@ export async function registerRoutes(
   });
 
   // Reset password with token
-  app.post("/api/auth/reset-password", async (req, res, next) => {
+  app.post("/api/auth/reset-password", authRateLimiter, async (req, res, next) => {
     try {
       const data = resetPasswordSchema.parse(req.body);
       

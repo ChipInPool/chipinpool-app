@@ -356,15 +356,29 @@ export type InsertBankAccount = z.infer<typeof insertBankAccountSchema>;
 export const insertPhoneVerificationSchema = createInsertSchema(phoneVerificationCodes).omit({ id: true, createdAt: true, verified: true });
 export type PhoneVerificationCode = typeof phoneVerificationCodes.$inferSelect;
 
+// Password validation for fintech applications - requires:
+// - At least 8 characters
+// - At least one uppercase letter
+// - At least one lowercase letter  
+// - At least one number
+const passwordSchema = z.string()
+  .min(8, "Password must be at least 8 characters")
+  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+  .regex(/[0-9]/, "Password must contain at least one number");
+
+// Login allows legacy 6-char passwords for existing users, but registration requires stronger passwords
+const loginPasswordSchema = z.string().min(6, "Password is required");
+
 // Login/Register Schemas
 export const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: loginPasswordSchema,
 });
 
 export const loginWithUsernameSchema = z.object({
   username: z.string().min(3),
-  password: z.string().min(6),
+  password: loginPasswordSchema,
 });
 
 export const phoneLoginSchema = z.object({
@@ -384,7 +398,11 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   token: z.string(),
-  newPassword: z.string().min(6),
+  newPassword: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
 });
 
 export const registerSchema = z.object({
@@ -392,7 +410,11 @@ export const registerSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   username: z.string().min(3, "Username must be at least 3 characters").regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
   email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
   phone: z.string().min(10, "Valid phone number required"),
   dateOfBirth: z.string().refine((date) => {
     const birthDate = new Date(date);
