@@ -134,11 +134,13 @@ export const api = {
     getWalletHistory: () => fetchApi("/api/user/wallet-history"),
   },
   recurring: {
-    create: (poolId: string, amount: string, frequency: 'weekly' | 'monthly' | 'quarterly') =>
-      fetchApi(`/api/pools/${poolId}/recurring`, { method: "POST", body: JSON.stringify({ amount, frequency }) }),
+    create: (poolId: string, amount: string, frequency: 'weekly' | 'monthly' | 'quarterly', startImmediately: boolean = true) =>
+      fetchApi(`/api/pools/${poolId}/recurring`, { method: "POST", body: JSON.stringify({ amount, frequency, startImmediately }) }),
     getByPool: (poolId: string) => fetchApi(`/api/pools/${poolId}/recurring`),
     getUserRecurring: () => fetchApi("/api/user/recurring-contributions"),
-    cancel: (id: string) => fetchApi(`/api/recurring-contributions/${id}`, { method: "DELETE" }),
+    update: (id: string, data: { amount?: string; frequency?: 'weekly' | 'monthly' | 'quarterly'; status?: 'active' | 'paused' }) =>
+      fetchApi(`/api/recurring/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    cancel: (id: string) => fetchApi(`/api/recurring/${id}`, { method: "DELETE" }),
   },
   plaid: {
     getLinkToken: () => fetchApi("/api/plaid/link-token", { method: "POST" }),

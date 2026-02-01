@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
-import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, bankAccounts, merchantPayouts } from "@shared/schema";
+import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, bankAccounts, merchantPayouts, payMeTransactions } from "@shared/schema";
 import express from "express";
 import { db } from "./db";
 import { eq, desc, sql, inArray } from "drizzle-orm";
@@ -38,6 +38,7 @@ import {
 } from "./notificationService";
 import { getMercuryClient, hasMercuryCredentials } from "./mercuryClient";
 import { createPlaidPayout, hasPlaidCredentials, TransferSpeed } from "./plaidTransferClient";
+import { sendPushNotification, getVapidPublicKey, savePushSubscription, removePushSubscription } from "./pushService";
 
 declare module "express-session" {
   interface SessionData {
@@ -946,6 +947,19 @@ export async function registerRoutes(
           }
           
           console.log(`[ChipInPay] Session ${merchantSession.id} completed. Merchant ${merchantSession.merchantId} earned $${netAmount.toFixed(2)}`);
+          
+          // Send push notification to merchant owner
+          if (merchant) {
+            const merchantOwner = await storage.getUser(merchant.userId);
+            if (merchantOwner?.notifyPush) {
+              sendPushNotification(
+                merchant.userId,
+                '💳 Order Funded!',
+                `Order "${merchantSession.productTitle}" has been fully funded! You earned $${netAmount.toFixed(2)}`,
+                '/merchant-dashboard'
+              ).catch(err => console.error('[Push] Merchant order notification failed:', err));
+            }
+          }
         }
         
         // Create notification for pool creator
@@ -969,6 +983,30 @@ export async function registerRoutes(
             poolCreator.notifyEmail,
             poolCreator.notifySMS
           ).catch(err => console.error('[Notification] Pool completed notification failed:', err));
+          
+          // Send push notification for pool completion
+          if (poolCreator.notifyPush) {
+            sendPushNotification(
+              pool.creatorId,
+              '🎉 Pool Complete!',
+              `Your pool "${pool.title}" has reached its goal of $${pool.targetAmount}!`,
+              `/pool/${pool.id}`
+            ).catch(err => console.error('[Push] Pool completed notification failed:', err));
+          }
+        }
+      }
+      
+      // Check for 90% milestone (only if not already completed)
+      const currentPercentage = (parseFloat(newPoolAmount) / parseFloat(pool.targetAmount)) * 100;
+      const previousPercentage = (parseFloat(pool.currentAmount) / parseFloat(pool.targetAmount)) * 100;
+      if (previousPercentage < 90 && currentPercentage >= 90 && currentPercentage < 100) {
+        if (poolCreator?.notifyPush) {
+          sendPushNotification(
+            pool.creatorId,
+            '🔥 Almost There!',
+            `Your pool "${pool.title}" has reached 90% of its goal!`,
+            `/pool/${pool.id}`
+          ).catch(err => console.error('[Push] 90% milestone notification failed:', err));
         }
       }
 
@@ -994,6 +1032,16 @@ export async function registerRoutes(
           poolCreator.notifyEmail,
           poolCreator.notifySMS
         ).catch(err => console.error('[Notification] Contribution notification failed:', err));
+        
+        // Send push notification for contribution
+        if (poolCreator.notifyPush) {
+          sendPushNotification(
+            pool.creatorId,
+            '💰 New Contribution!',
+            `${user.firstName} ${user.lastName} contributed $${amount} to "${pool.title}"`,
+            `/pool/${pool.id}`
+          ).catch(err => console.error('[Push] Contribution notification failed:', err));
+        }
       }
 
       // Award gamification points for contribution
@@ -1868,12 +1916,13 @@ export async function registerRoutes(
   // Create a recurring contribution (subscription)
   app.post("/api/pools/:id/recurring", requireAuth, async (req, res, next) => {
     try {
-      const { amount, frequency } = z.object({
+      const { amount, frequency, startImmediately } = z.object({
         amount: z.string().refine((val) => {
           const num = parseFloat(val);
           return !isNaN(num) && num > 0;
         }, { message: "Amount must be a positive number" }),
         frequency: z.enum(['weekly', 'monthly', 'quarterly']),
+        startImmediately: z.boolean().optional().default(true),
       }).parse(req.body);
 
       const pool = await storage.getPool(req.params.id);
@@ -1881,19 +1930,19 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Pool not found" });
       }
 
-      if (!pool.isRecurring) {
-        return res.status(400).json({ message: "This pool does not accept recurring contributions" });
+      if (pool.status !== 'active') {
+        return res.status(400).json({ message: "This pool is not active" });
       }
 
       const userId = req.session.userId!;
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
 
-      // Validate sufficient balance for first contribution
       const contributionAmount = parseFloat(amount);
       const userBalance = parseFloat(user.balance);
 
-      if (userBalance < contributionAmount) {
+      // If starting immediately, validate sufficient balance
+      if (startImmediately && userBalance < contributionAmount) {
         return res.status(400).json({ 
           message: "Insufficient balance for the first contribution. Please add funds to your wallet." 
         });
@@ -1902,20 +1951,26 @@ export async function registerRoutes(
       // Calculate next payment date based on frequency
       const now = new Date();
       let nextPaymentDate = new Date(now);
-      if (frequency === 'weekly') {
-        nextPaymentDate.setDate(now.getDate() + 7);
-      } else if (frequency === 'monthly') {
-        nextPaymentDate.setMonth(now.getMonth() + 1);
-      } else if (frequency === 'quarterly') {
-        nextPaymentDate.setMonth(now.getMonth() + 3);
+      if (startImmediately) {
+        // If starting immediately, next payment is in the future
+        if (frequency === 'weekly') {
+          nextPaymentDate.setDate(now.getDate() + 7);
+        } else if (frequency === 'monthly') {
+          nextPaymentDate.setMonth(now.getMonth() + 1);
+        } else if (frequency === 'quarterly') {
+          nextPaymentDate.setMonth(now.getMonth() + 3);
+        }
+      }
+      // If not starting immediately, nextPaymentDate is now (will be processed by cron)
+
+      // Process first contribution immediately if requested
+      if (startImmediately) {
+        await storage.updateUserBalance(userId, (userBalance - contributionAmount).toFixed(2));
+        await storage.createContribution({ poolId: pool.id, userId, amount });
+        await storage.updatePoolAmount(pool.id, (parseFloat(pool.currentAmount) + contributionAmount).toFixed(2));
       }
 
-      // Process first contribution immediately
-      await storage.updateUserBalance(userId, (userBalance - contributionAmount).toFixed(2));
-      await storage.createContribution({ poolId: pool.id, userId, amount });
-      await storage.updatePoolAmount(pool.id, (parseFloat(pool.currentAmount) + contributionAmount).toFixed(2));
-
-      // Create recurring contribution record after successful first payment
+      // Create recurring contribution record
       const recurringContribution = await storage.createRecurringContribution({
         poolId: pool.id,
         userId,
@@ -1926,7 +1981,9 @@ export async function registerRoutes(
 
       res.json({ 
         recurringContribution,
-        message: `Recurring ${frequency} contribution of $${amount} set up successfully`,
+        message: startImmediately 
+          ? `Recurring ${frequency} contribution of $${amount} set up successfully. First payment processed.`
+          : `Recurring ${frequency} contribution of $${amount} scheduled. First payment will process within the hour.`,
       });
     } catch (error) {
       next(error);
@@ -1975,14 +2032,71 @@ export async function registerRoutes(
     }
   });
 
+  // Update a recurring contribution (pause/resume, change amount/frequency)
+  app.patch("/api/recurring/:id", requireAuth, async (req, res, next) => {
+    try {
+      const { amount, frequency, status } = z.object({
+        amount: z.string().refine((val) => {
+          const num = parseFloat(val);
+          return !isNaN(num) && num > 0;
+        }, { message: "Amount must be a positive number" }).optional(),
+        frequency: z.enum(['weekly', 'monthly', 'quarterly']).optional(),
+        status: z.enum(['active', 'paused']).optional(),
+      }).parse(req.body);
+
+      const userId = req.session.userId!;
+      const contribution = await storage.getRecurringContributionById(req.params.id);
+      
+      if (!contribution || contribution.userId !== userId) {
+        return res.status(404).json({ message: "Recurring contribution not found or you don't have permission to modify it" });
+      }
+
+      if (contribution.status === 'cancelled') {
+        return res.status(400).json({ message: "Cannot modify a cancelled recurring contribution" });
+      }
+
+      const updates: { amount?: string; frequency?: 'weekly' | 'monthly' | 'quarterly'; status?: string } = {};
+      if (amount !== undefined) updates.amount = amount;
+      if (frequency !== undefined) updates.frequency = frequency;
+      if (status !== undefined) updates.status = status;
+
+      const updated = await storage.updateRecurringContribution(req.params.id, updates);
+      
+      res.json({ 
+        recurringContribution: updated,
+        message: status === 'paused' ? 'Recurring contribution paused' : 
+                 status === 'active' ? 'Recurring contribution resumed' :
+                 'Recurring contribution updated successfully'
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Cancel a recurring contribution
+  app.delete("/api/recurring/:id", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const contribution = await storage.getRecurringContributionById(req.params.id);
+      
+      if (!contribution || contribution.userId !== userId) {
+        return res.status(404).json({ message: "Recurring contribution not found or you don't have permission to cancel it" });
+      }
+
+      await storage.cancelRecurringContribution(req.params.id);
+      res.json({ message: "Recurring contribution cancelled" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Keep backwards compatibility with old route
   app.delete("/api/recurring-contributions/:id", requireAuth, async (req, res, next) => {
     try {
-      // Get the recurring contribution to verify ownership
-      const userContributions = await storage.getRecurringContributionsByUser(req.session.userId!);
-      const contribution = userContributions.find(c => c.id === req.params.id);
+      const userId = req.session.userId!;
+      const contribution = await storage.getRecurringContributionById(req.params.id);
       
-      if (!contribution) {
+      if (!contribution || contribution.userId !== userId) {
         return res.status(404).json({ message: "Recurring contribution not found or you don't have permission to cancel it" });
       }
 
@@ -6670,6 +6784,252 @@ export async function registerRoutes(
       }
 
       res.json({ message: "Badges initialized", count: defaultBadges.length });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ============================================
+  // Pay Me Back Links Routes
+  // ============================================
+
+  // Public endpoint to get user profile by username
+  app.get("/api/users/username/:username", async (req, res, next) => {
+    try {
+      const username = req.params.username.toLowerCase().replace(/^@/, '');
+      
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Return only public, non-sensitive data
+      res.json({
+        id: user.id,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        avatar: user.avatar,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Public endpoint for guest payments to a user
+  app.post("/api/pay/:username", async (req, res, next) => {
+    try {
+      const username = req.params.username.toLowerCase().replace(/^@/, '');
+      
+      const sanitizeMessage = (msg: string): string => {
+        return msg
+          .replace(/<[^>]*>/g, '')
+          .replace(/javascript:/gi, '')
+          .replace(/on\w+=/gi, '')
+          .replace(/data:/gi, '')
+          .trim()
+          .substring(0, 500);
+      };
+
+      const paySchema = z.object({
+        amount: z.number().min(1, "Minimum amount is $1").max(10000, "Maximum amount is $10,000"),
+        message: z.string().max(500).optional().transform(val => val ? sanitizeMessage(val) : undefined),
+        guestEmail: z.string().email("Invalid email format").optional().or(z.literal('')).transform(val => val || undefined),
+        senderName: z.string().max(100).optional().transform(val => val ? val.replace(/<[^>]*>/g, '').trim().substring(0, 100) : undefined),
+      });
+      
+      const { amount, message, guestEmail, senderName } = paySchema.parse(req.body);
+      
+      const recipient = await storage.getUserByUsername(username);
+      if (!recipient) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      
+      // Create a PaymentIntent
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: 'usd',
+        metadata: {
+          type: 'pay_me_back',
+          recipientId: recipient.id,
+          recipientUsername: recipient.username,
+          message: message || '',
+          senderEmail: guestEmail || '',
+          senderName: senderName || '',
+        },
+        receipt_email: guestEmail || undefined,
+        description: `Payment to @${recipient.username}${message ? `: ${message.substring(0, 100)}` : ''}`,
+      });
+
+      // Create a pending transaction record
+      await db.insert(payMeTransactions).values({
+        recipientId: recipient.id,
+        amount: amount.toFixed(2),
+        message: message || null,
+        senderEmail: guestEmail || null,
+        senderName: senderName || null,
+        stripePaymentIntentId: paymentIntent.id,
+        status: 'pending',
+      });
+
+      res.json({ 
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Confirm payment and update wallet balance
+  app.post("/api/pay/:username/confirm", async (req, res, next) => {
+    try {
+      const username = req.params.username.toLowerCase().replace(/^@/, '');
+      const { paymentIntentId } = z.object({
+        paymentIntentId: z.string().min(1),
+      }).parse(req.body);
+
+      const recipient = await storage.getUserByUsername(username);
+      if (!recipient) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      
+      // Verify the payment intent status
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ message: "Payment not completed" });
+      }
+
+      // Verify PaymentIntent belongs to this recipient
+      if (paymentIntent.metadata?.recipientId !== recipient.id) {
+        return res.status(403).json({ message: "Payment does not belong to this user" });
+      }
+
+      // Verify this is a pay_me_back transaction type
+      if (paymentIntent.metadata?.type !== 'pay_me_back') {
+        return res.status(400).json({ message: "Invalid payment type" });
+      }
+
+      // Find the transaction record - required for idempotency
+      const [existingTransaction] = await db.select()
+        .from(payMeTransactions)
+        .where(eq(payMeTransactions.stripePaymentIntentId, paymentIntentId))
+        .limit(1);
+
+      if (!existingTransaction) {
+        return res.status(404).json({ message: "Transaction record not found" });
+      }
+
+      // Idempotency check - don't credit if already completed
+      if (existingTransaction.status === 'completed') {
+        return res.json({ 
+          message: "Payment already processed",
+          amount: existingTransaction.amount,
+        });
+      }
+
+      // Verify the transaction belongs to this recipient
+      if (existingTransaction.recipientId !== recipient.id) {
+        return res.status(403).json({ message: "Transaction does not belong to this user" });
+      }
+
+      const amount = paymentIntent.amount / 100; // Convert from cents
+
+      // Use transaction for atomicity
+      await db.transaction(async (tx) => {
+        // Double-check status inside transaction for race condition prevention
+        const [txRecord] = await tx.select()
+          .from(payMeTransactions)
+          .where(eq(payMeTransactions.id, existingTransaction.id))
+          .limit(1);
+
+        if (txRecord?.status === 'completed') {
+          return; // Already processed
+        }
+
+        // Update transaction status first (marks as processed)
+        await tx.update(payMeTransactions)
+          .set({ status: 'completed' })
+          .where(eq(payMeTransactions.id, existingTransaction.id));
+
+        // Update recipient's wallet balance
+        await tx.update(users)
+          .set({ balance: sql`${users.balance} + ${amount}` })
+          .where(eq(users.id, recipient.id));
+      });
+
+      // Send notification to recipient
+      sendWalletActivityNotification(
+        recipient.email,
+        recipient.phone,
+        recipient.firstName,
+        'deposit',
+        amount.toFixed(2),
+        'completed',
+        recipient.notifyEmail && recipient.emailWalletActivity,
+        recipient.notifySMS && recipient.smsWalletActivity
+      ).catch(console.error);
+
+      res.json({ 
+        message: "Payment successful",
+        amount: amount.toFixed(2),
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ============================================
+  // Push Notification Routes
+  // ============================================
+
+  // Get VAPID public key for client-side subscription
+  app.get("/api/push/vapid-public-key", (req, res) => {
+    try {
+      const publicKey = getVapidPublicKey();
+      res.json({ publicKey });
+    } catch (error) {
+      console.error('[Push] Failed to get VAPID key:', error);
+      res.status(500).json({ error: "Push notifications not configured" });
+    }
+  });
+
+  // Subscribe to push notifications
+  app.post("/api/push/subscribe", requireAuth, async (req, res, next) => {
+    try {
+      const { endpoint, p256dh, auth } = z.object({
+        endpoint: z.string().url(),
+        p256dh: z.string(),
+        auth: z.string(),
+      }).parse(req.body);
+
+      const userId = req.session.userId!;
+      await savePushSubscription(userId, endpoint, p256dh, auth);
+      
+      // Enable push notifications for this user
+      await storage.updateUser(userId, { notifyPush: true });
+
+      res.json({ message: "Push subscription saved successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Unsubscribe from push notifications
+  app.delete("/api/push/unsubscribe", requireAuth, async (req, res, next) => {
+    try {
+      const { endpoint } = z.object({
+        endpoint: z.string(),
+      }).parse(req.body);
+
+      await removePushSubscription(endpoint);
+
+      res.json({ message: "Push subscription removed" });
     } catch (error) {
       next(error);
     }

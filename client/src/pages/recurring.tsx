@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, RefreshCw, Calendar, DollarSign, Pause, Play, Trash2, Clock, TrendingUp, AlertCircle } from "lucide-react";
+import { ArrowLeft, RefreshCw, Calendar, DollarSign, Pause, Play, Trash2, Clock, TrendingUp, AlertCircle, Pencil, Wallet, Loader2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { format, formatDistanceToNow } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +10,9 @@ import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface RecurringContribution {
   id: string;
@@ -30,11 +33,14 @@ interface RecurringContribution {
 
 export default function Recurring() {
   const [, setLocation] = useLocation();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editFrequency, setEditFrequency] = useState<'weekly' | 'monthly' | 'quarterly'>('monthly');
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["userRecurring"],
@@ -52,6 +58,33 @@ export default function Recurring() {
     },
     onError: (err: any) => {
       toast({ description: err.message || "Failed to cancel", variant: "destructive" });
+    },
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'active' | 'paused' }) => 
+      api.recurring.update(id, { status }),
+    onSuccess: (data) => {
+      toast({ description: data.message });
+      queryClient.invalidateQueries({ queryKey: ["userRecurring"] });
+    },
+    onError: (err: any) => {
+      toast({ description: err.message || "Failed to update status", variant: "destructive" });
+    },
+  });
+
+  const editMutation = useMutation({
+    mutationFn: ({ id, amount, frequency }: { id: string; amount: string; frequency: 'weekly' | 'monthly' | 'quarterly' }) =>
+      api.recurring.update(id, { amount, frequency }),
+    onSuccess: () => {
+      toast({ description: "Recurring contribution updated" });
+      queryClient.invalidateQueries({ queryKey: ["userRecurring"] });
+      setEditDialogOpen(false);
+      setSelectedId(null);
+      setEditAmount("");
+    },
+    onError: (err: any) => {
+      toast({ description: err.message || "Failed to update", variant: "destructive" });
     },
   });
 
@@ -110,6 +143,18 @@ export default function Recurring() {
   const handleCancelClick = (id: string) => {
     setSelectedId(id);
     setCancelDialogOpen(true);
+  };
+
+  const handleEditClick = (contribution: RecurringContribution) => {
+    setSelectedId(contribution.id);
+    setEditAmount(contribution.amount);
+    setEditFrequency(contribution.frequency);
+    setEditDialogOpen(true);
+  };
+
+  const handleToggleStatus = (contribution: RecurringContribution) => {
+    const newStatus = contribution.status === 'active' ? 'paused' : 'active';
+    toggleStatusMutation.mutate({ id: contribution.id, status: newStatus });
   };
 
   if (isLoading || authLoading) {
@@ -172,7 +217,18 @@ export default function Recurring() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="p-5 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-lg bg-blue-500/20">
+                <Wallet className="w-5 h-5 text-blue-400" />
+              </div>
+              <span className="text-sm text-muted-foreground">Wallet Balance</span>
+            </div>
+            <div className="text-3xl font-display font-bold">
+              ${user ? parseFloat(user.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+            </div>
+          </div>
           <div className="p-5 rounded-xl bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 rounded-lg bg-green-500/20">
@@ -253,7 +309,7 @@ export default function Recurring() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                       <div className="text-right">
                         <div className="font-display font-bold text-lg">
                           ${parseFloat(contribution.amount).toFixed(2)}
@@ -264,17 +320,51 @@ export default function Recurring() {
                             Next: {format(new Date(contribution.nextPaymentDate), 'MMM d')}
                           </div>
                         )}
+                        {contribution.status === 'paused' && (
+                          <div className="text-xs text-yellow-400 flex items-center gap-1 justify-end">
+                            <Pause className="w-3 h-3" />
+                            Paused
+                          </div>
+                        )}
                       </div>
-                      {contribution.status === 'active' && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                          onClick={() => handleCancelClick(contribution.id)}
-                          data-testid={`button-cancel-${contribution.id}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                      {contribution.status !== 'cancelled' && (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-primary hover:bg-primary/10"
+                            onClick={() => handleToggleStatus(contribution)}
+                            disabled={toggleStatusMutation.isPending}
+                            data-testid={`button-toggle-${contribution.id}`}
+                            title={contribution.status === 'active' ? 'Pause' : 'Resume'}
+                          >
+                            {contribution.status === 'active' ? (
+                              <Pause className="w-4 h-4" />
+                            ) : (
+                              <Play className="w-4 h-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-blue-400 hover:bg-blue-500/10"
+                            onClick={() => handleEditClick(contribution)}
+                            data-testid={`button-edit-${contribution.id}`}
+                            title="Edit"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
+                            onClick={() => handleCancelClick(contribution.id)}
+                            data-testid={`button-cancel-${contribution.id}`}
+                            title="Cancel"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -302,6 +392,59 @@ export default function Recurring() {
                 disabled={cancelMutation.isPending}
               >
                 {cancelMutation.isPending ? "Cancelling..." : "Cancel Contribution"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Recurring Contribution</DialogTitle>
+              <DialogDescription>
+                Update the amount or frequency of this recurring contribution.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-amount">Amount ($)</Label>
+                <Input
+                  id="edit-amount"
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="bg-white/5 border-white/10"
+                  data-testid="input-edit-amount"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-frequency">Frequency</Label>
+                <Select value={editFrequency} onValueChange={(v) => setEditFrequency(v as 'weekly' | 'monthly' | 'quarterly')}>
+                  <SelectTrigger className="bg-white/5 border-white/10" data-testid="select-edit-frequency">
+                    <SelectValue placeholder="Select frequency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="quarterly">Quarterly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => selectedId && editMutation.mutate({ id: selectedId, amount: editAmount, frequency: editFrequency })}
+                disabled={editMutation.isPending || !editAmount || parseFloat(editAmount) <= 0}
+                data-testid="button-save-edit"
+              >
+                {editMutation.isPending ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
+                ) : (
+                  "Save Changes"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

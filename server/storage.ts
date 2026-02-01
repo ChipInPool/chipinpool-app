@@ -98,6 +98,9 @@ export interface IStorage {
   createRecurringContribution(data: InsertRecurringContribution): Promise<RecurringContribution>;
   getRecurringContributionsByPool(poolId: string): Promise<RecurringContribution[]>;
   getRecurringContributionsByUser(userId: string): Promise<RecurringContribution[]>;
+  getRecurringContributionById(id: string): Promise<RecurringContribution | undefined>;
+  getDueRecurringContributions(): Promise<RecurringContribution[]>;
+  updateRecurringContribution(id: string, data: { amount?: string; frequency?: 'weekly' | 'monthly' | 'quarterly'; status?: string; nextPaymentDate?: Date }): Promise<RecurringContribution | undefined>;
   updateRecurringContributionStatus(id: string, status: string): Promise<void>;
   cancelRecurringContribution(id: string): Promise<void>;
   
@@ -515,6 +518,34 @@ export class DatabaseStorage implements IStorage {
 
   async cancelRecurringContribution(id: string): Promise<void> {
     await db.update(recurringContributions).set({ status: 'cancelled' }).where(eq(recurringContributions.id, id));
+  }
+
+  async getRecurringContributionById(id: string): Promise<RecurringContribution | undefined> {
+    const [result] = await db.select().from(recurringContributions).where(eq(recurringContributions.id, id));
+    return result;
+  }
+
+  async getDueRecurringContributions(): Promise<RecurringContribution[]> {
+    const now = new Date();
+    return await db.select()
+      .from(recurringContributions)
+      .where(
+        and(
+          eq(recurringContributions.status, 'active'),
+          sql`${recurringContributions.nextPaymentDate} <= ${now}`
+        )
+      );
+  }
+
+  async updateRecurringContribution(id: string, data: { amount?: string; frequency?: 'weekly' | 'monthly' | 'quarterly'; status?: string; nextPaymentDate?: Date }): Promise<RecurringContribution | undefined> {
+    const updates: any = {};
+    if (data.amount !== undefined) updates.amount = data.amount;
+    if (data.frequency !== undefined) updates.frequency = data.frequency;
+    if (data.status !== undefined) updates.status = data.status;
+    if (data.nextPaymentDate !== undefined) updates.nextPaymentDate = data.nextPaymentDate;
+    
+    const [result] = await db.update(recurringContributions).set(updates).where(eq(recurringContributions.id, id)).returning();
+    return result;
   }
 
   async createApiAccessRequest(data: InsertApiAccessRequest): Promise<ApiAccessRequest> {

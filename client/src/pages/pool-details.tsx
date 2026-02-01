@@ -3,7 +3,8 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3 } from "lucide-react";
+import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3, RefreshCw } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useRoute, useLocation } from "wouter";
 import { formatDistanceToNow, format } from "date-fns";
 import { CircularProgressbarWithChildren, buildStyles } from 'react-circular-progressbar';
@@ -45,6 +46,10 @@ export default function PoolDetails() {
   const [inviteEmails, setInviteEmails] = useState("");
   const [invitePhones, setInvitePhones] = useState("");
   const [isSendingInvites, setIsSendingInvites] = useState(false);
+  const [autoContributeDialogOpen, setAutoContributeDialogOpen] = useState(false);
+  const [autoContributeAmount, setAutoContributeAmount] = useState("");
+  const [autoContributeFrequency, setAutoContributeFrequency] = useState<'weekly' | 'monthly' | 'quarterly'>('monthly');
+  const [startImmediately, setStartImmediately] = useState(true);
 
   const { data: poolData, isLoading: poolLoading } = useQuery({
     queryKey: queryKeys.pool(params?.id || ''),
@@ -122,6 +127,31 @@ export default function PoolDetails() {
       toast({
         title: "Failed to Send Invites",
         description: error.message || "Could not send invites",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const autoContributeMutation = useMutation({
+    mutationFn: () => api.recurring.create(params?.id || '', autoContributeAmount, autoContributeFrequency, startImmediately),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.pool(params?.id || '') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.pools });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user });
+      queryClient.invalidateQueries({ queryKey: ["userRecurring"] });
+      toast({
+        title: "Auto-Contribute Set Up!",
+        description: data.message,
+      });
+      setAutoContributeDialogOpen(false);
+      setAutoContributeAmount("");
+      setAutoContributeFrequency('monthly');
+      setStartImmediately(true);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to Set Up Auto-Contribute",
+        description: error.message || "Could not set up recurring contribution",
         variant: "destructive",
       });
     },
@@ -521,6 +551,88 @@ export default function PoolDetails() {
                           {(isChippingIn || contributeMutation.isPending) ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</> : "Confirm Payment"}
                         </Button>
                       )}
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={autoContributeDialogOpen} onOpenChange={setAutoContributeDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="lg" 
+                      className="w-full h-12 border-white/10 hover:bg-primary/5 hover:border-primary/30" 
+                      data-testid="button-auto-contribute"
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" /> Set Up Auto-Contribute
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md bg-card border-white/10">
+                    <DialogHeader>
+                      <DialogTitle>Set Up Auto-Contribute</DialogTitle>
+                      <DialogDescription>
+                        Automatically contribute to {pool.title} on a recurring schedule using your wallet balance.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-6 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="auto-amount">Amount per contribution ($)</Label>
+                        <Input
+                          id="auto-amount"
+                          value={autoContributeAmount}
+                          onChange={(e) => setAutoContributeAmount(e.target.value)}
+                          placeholder="0.00"
+                          className="text-xl h-12 bg-white/5 border-white/10 text-center font-bold"
+                          data-testid="input-auto-amount"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="frequency">Frequency</Label>
+                        <Select value={autoContributeFrequency} onValueChange={(v) => setAutoContributeFrequency(v as 'weekly' | 'monthly' | 'quarterly')}>
+                          <SelectTrigger className="bg-white/5 border-white/10" data-testid="select-frequency">
+                            <SelectValue placeholder="Select frequency" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="weekly">Weekly</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                            <SelectItem value="quarterly">Quarterly</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="start-immediately"
+                          checked={startImmediately}
+                          onCheckedChange={(checked) => setStartImmediately(checked as boolean)}
+                          data-testid="checkbox-start-immediately"
+                        />
+                        <Label htmlFor="start-immediately" className="text-sm text-muted-foreground cursor-pointer">
+                          Make first contribution immediately
+                        </Label>
+                      </div>
+                      <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground flex items-center gap-2">
+                            <Wallet className="w-4 h-4" /> Your Balance
+                          </span>
+                          <span className="font-semibold">${user ? parseFloat(user.balance).toLocaleString() : '0'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setAutoContributeDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button 
+                        onClick={() => autoContributeMutation.mutate()}
+                        disabled={!autoContributeAmount || parseFloat(autoContributeAmount) <= 0 || autoContributeMutation.isPending}
+                        data-testid="button-confirm-auto-contribute"
+                      >
+                        {autoContributeMutation.isPending ? (
+                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Setting Up...</>
+                        ) : (
+                          "Set Up Auto-Contribute"
+                        )}
+                      </Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>

@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Bell, Mail, Phone, Moon, Sun, Shield, Save, AlertCircle, User, MapPin, Loader2, Camera, Upload } from "lucide-react";
+import { ArrowLeft, Bell, Mail, Phone, Moon, Sun, Shield, Save, AlertCircle, User, MapPin, Loader2, Camera, Upload, Smartphone } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme } from "@/components/theme-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { isPushSupported, getNotificationPermission, subscribeToPush, unsubscribeFromPush, getPushSubscriptionStatus } from "@/lib/push-notifications";
 
 interface ProfileData {
   firstName: string;
@@ -43,6 +44,114 @@ interface NotificationPreferences {
   smsCardActivity: boolean;
   smsWalletActivity: boolean;
   smsAccountChanges: boolean;
+}
+
+function PushNotificationsSection() {
+  const { toast } = useToast();
+  const [pushSupported] = useState(() => isPushSupported());
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>('default');
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (pushSupported) {
+      setPermissionStatus(getNotificationPermission());
+      getPushSubscriptionStatus().then(setPushEnabled);
+    }
+  }, [pushSupported]);
+
+  const handleTogglePush = async () => {
+    if (isLoading) return;
+    setIsLoading(true);
+
+    try {
+      if (pushEnabled) {
+        const success = await unsubscribeFromPush();
+        if (success) {
+          setPushEnabled(false);
+          toast({ description: "Push notifications disabled" });
+        } else {
+          toast({ description: "Failed to disable push notifications", variant: "destructive" });
+        }
+      } else {
+        const success = await subscribeToPush();
+        if (success) {
+          setPushEnabled(true);
+          setPermissionStatus('granted');
+          toast({ description: "Push notifications enabled! You'll receive alerts for contributions and pool updates." });
+        } else {
+          const permission = getNotificationPermission();
+          setPermissionStatus(permission);
+          if (permission === 'denied') {
+            toast({ description: "Notifications blocked. Please enable them in your browser settings.", variant: "destructive" });
+          } else {
+            toast({ description: "Failed to enable push notifications", variant: "destructive" });
+          }
+        }
+      }
+    } catch (error) {
+      toast({ description: "An error occurred", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!pushSupported) {
+    return (
+      <div className="p-6 rounded-2xl bg-card border border-white/5">
+        <h3 className="font-bold flex items-center gap-2 mb-4">
+          <Smartphone className="w-4 h-4 text-orange-400" /> Push Notifications
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Push notifications are not supported in your browser.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 rounded-2xl bg-card border border-white/5">
+      <h3 className="font-bold flex items-center gap-2 mb-4">
+        <Smartphone className="w-4 h-4 text-orange-400" /> Push Notifications
+      </h3>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors">
+          <div>
+            <div className="font-medium text-sm">Enable Push Notifications</div>
+            <div className="text-xs text-muted-foreground">
+              {permissionStatus === 'denied' 
+                ? 'Blocked in browser settings' 
+                : 'Get instant alerts for contributions, pool milestones, and more'}
+            </div>
+          </div>
+          <Switch
+            checked={pushEnabled}
+            onCheckedChange={handleTogglePush}
+            disabled={isLoading || permissionStatus === 'denied'}
+            data-testid="switch-pushNotifications"
+          />
+        </div>
+        {permissionStatus === 'denied' && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <div>
+              Push notifications are blocked. To enable them, click the lock icon in your browser's address bar and allow notifications.
+            </div>
+          </div>
+        )}
+        {pushEnabled && (
+          <div className="text-xs text-muted-foreground px-3">
+            You'll receive notifications for:
+            <ul className="list-disc list-inside mt-1 space-y-0.5">
+              <li>New contributions to your pools</li>
+              <li>Pool milestone alerts (90% funded)</li>
+              <li>Pool completion celebrations</li>
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function Settings() {
@@ -604,6 +713,8 @@ export default function Settings() {
               ))}
             </div>
           </div>
+
+          <PushNotificationsSection />
 
           <div className="p-6 rounded-2xl bg-card border border-white/5">
             <h3 className="font-bold flex items-center gap-2 mb-4">
