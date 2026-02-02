@@ -57,6 +57,10 @@ export default function PoolDetails() {
   const [selectedFollowers, setSelectedFollowers] = useState<string[]>([]);
   const [inviteEmails, setInviteEmails] = useState("");
   const [invitePhones, setInvitePhones] = useState("");
+  const [showInlineEmail, setShowInlineEmail] = useState(false);
+  const [showInlineSMS, setShowInlineSMS] = useState(false);
+  const [quickEmail, setQuickEmail] = useState("");
+  const [quickPhone, setQuickPhone] = useState("");
   const [isSendingInvites, setIsSendingInvites] = useState(false);
   const [autoContributeDialogOpen, setAutoContributeDialogOpen] = useState(false);
   const [autoContributeAmount, setAutoContributeAmount] = useState("");
@@ -184,6 +188,20 @@ export default function PoolDetails() {
     const phones = invitePhones.split(/[,\n]/).map(p => p.trim()).filter(p => p);
     if (phones.length === 0) return;
     inviteMutation.mutate({ method: 'sms', recipients: phones });
+  };
+
+  const handleQuickEmailInvite = () => {
+    if (!quickEmail.trim()) return;
+    inviteMutation.mutate({ method: 'email', recipients: [quickEmail.trim()] });
+    setQuickEmail("");
+    setShowInlineEmail(false);
+  };
+
+  const handleQuickSMSInvite = () => {
+    if (!quickPhone.trim()) return;
+    inviteMutation.mutate({ method: 'sms', recipients: [quickPhone.trim()] });
+    setQuickPhone("");
+    setShowInlineSMS(false);
   };
 
   const toggleFollowerSelection = (followerId: string) => {
@@ -741,21 +759,79 @@ export default function PoolDetails() {
                             </Button>
                             <Button 
                               variant="outline" 
-                              className="h-12 border-white/10 hover:bg-white/5 justify-start"
-                              onClick={shareViaEmail}
+                              className={`h-12 border-white/10 hover:bg-white/5 justify-start ${showInlineEmail ? 'bg-primary/20 border-primary/50' : ''}`}
+                              onClick={() => { setShowInlineEmail(!showInlineEmail); setShowInlineSMS(false); }}
                               data-testid="button-share-email"
                             >
                               <Mail className="w-4 h-4 mr-2" /> Email
                             </Button>
                             <Button 
                               variant="outline" 
-                              className="h-12 border-white/10 hover:bg-white/5 justify-start"
-                              onClick={shareViaSMS}
+                              className={`h-12 border-white/10 hover:bg-white/5 justify-start ${showInlineSMS ? 'bg-primary/20 border-primary/50' : ''}`}
+                              onClick={() => { setShowInlineSMS(!showInlineSMS); setShowInlineEmail(false); }}
                               data-testid="button-share-sms"
                             >
                               <MessageSquare className="w-4 h-4 mr-2" /> Text/SMS
                             </Button>
                           </div>
+                          
+                          {showInlineEmail && (
+                            <div className="space-y-2 p-3 rounded-lg bg-white/5 border border-white/10">
+                              <Label htmlFor="quick-email" className="text-sm">Send email invite</Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  id="quick-email"
+                                  type="email"
+                                  value={quickEmail}
+                                  onChange={(e) => setQuickEmail(e.target.value)}
+                                  placeholder="friend@example.com"
+                                  className="flex-1 bg-white/5 border-white/10"
+                                  data-testid="input-quick-email"
+                                />
+                                <Button 
+                                  onClick={handleQuickEmailInvite}
+                                  disabled={!quickEmail.trim() || inviteMutation.isPending}
+                                  className="shrink-0"
+                                  data-testid="button-send-quick-email"
+                                >
+                                  {inviteMutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Send className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {showInlineSMS && (
+                            <div className="space-y-2 p-3 rounded-lg bg-white/5 border border-white/10">
+                              <Label htmlFor="quick-phone" className="text-sm">Send SMS invite</Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  id="quick-phone"
+                                  type="tel"
+                                  value={quickPhone}
+                                  onChange={(e) => setQuickPhone(e.target.value)}
+                                  placeholder="+1 234 567 8901"
+                                  className="flex-1 bg-white/5 border-white/10"
+                                  data-testid="input-quick-phone"
+                                />
+                                <Button 
+                                  onClick={handleQuickSMSInvite}
+                                  disabled={!quickPhone.trim() || inviteMutation.isPending}
+                                  className="shrink-0"
+                                  data-testid="button-send-quick-sms"
+                                >
+                                  {inviteMutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Send className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
                           <div className="border-t border-white/10 pt-4">
                             <p className="text-sm text-muted-foreground mb-3">Share on social media</p>
                             <div className="flex gap-3">
