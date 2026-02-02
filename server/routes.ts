@@ -1768,6 +1768,88 @@ export async function registerRoutes(
     }
   });
 
+  // Contribute to pool using linked bank account (ACH)
+  app.post("/api/pools/:id/contribute-bank", requireAuth, async (req, res, next) => {
+    try {
+      const { amount, bankAccountId } = z.object({ 
+        amount: z.string(),
+        bankAccountId: z.string(),
+      }).parse(req.body);
+      
+      const pool = await storage.getPool(req.params.id);
+      if (!pool) {
+        return res.status(404).json({ error: "Pool not found" });
+      }
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get bank account
+      const bankAccount = await storage.getBankAccountById(bankAccountId);
+      if (!bankAccount || bankAccount.userId !== user.id) {
+        return res.status(404).json({ error: "Bank account not found" });
+      }
+
+      // Verify the bank account has Stripe Financial Connections link
+      if (!bankAccount.stripeFinancialConnectionsAccountId) {
+        return res.status(400).json({ error: "Bank account not properly linked. Please re-link in Settings." });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      
+      // Support both Replit and Azure production environments
+      let baseUrl = 'http://localhost:5000';
+      if (process.env.REPLIT_DOMAINS) {
+        baseUrl = `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
+      } else if (process.env.WEBSITE_HOSTNAME) {
+        baseUrl = `https://${process.env.WEBSITE_HOSTNAME}`;
+      } else if (process.env.APP_URL) {
+        baseUrl = process.env.APP_URL;
+      }
+
+      // Create a checkout session with US Bank Account payment method
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['us_bank_account'],
+        customer: user.stripeCustomerId || undefined,
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Contribution to ${pool.title}`,
+              description: pool.description || undefined,
+            },
+            unit_amount: Math.round(parseFloat(amount) * 100),
+          },
+          quantity: 1,
+        }],
+        mode: 'payment',
+        payment_method_options: {
+          us_bank_account: {
+            verification_method: 'instant',
+            financial_connections: {
+              permissions: ['payment_method'],
+            },
+          },
+        },
+        success_url: `${baseUrl}/pool/${pool.id}?payment=success`,
+        cancel_url: `${baseUrl}/pool/${pool.id}?payment=cancelled`,
+        metadata: {
+          poolId: pool.id,
+          userId: user.id,
+          amount,
+          paymentType: 'bank_ach',
+        },
+      });
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error('[Bank Contribute] Error:', error.message);
+      next(error);
+    }
+  });
+
   // Create checkout session for pool contribution (authenticated users)
   app.post("/api/pools/:poolId/checkout", requireAuth, async (req, res, next) => {
     try {

@@ -3,7 +3,7 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3, RefreshCw } from "lucide-react";
+import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3, RefreshCw, Building2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useRoute, useLocation } from "wouter";
 import { formatDistanceToNow, format } from "date-fns";
@@ -34,8 +34,20 @@ export default function PoolDetails() {
   const [isChippingIn, setIsChippingIn] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [paymentStep, setPaymentStep] = useState<'amount' | 'method'>('amount');
-  const [paymentMethod, setPaymentMethod] = useState<'balance' | 'stripe'>('stripe');
+  const [paymentMethod, setPaymentMethod] = useState<'balance' | 'stripe' | string>('stripe');
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Fetch linked bank accounts
+  const { data: bankAccountsData } = useQuery({
+    queryKey: ["bankAccounts"],
+    queryFn: async () => {
+      const res = await fetch('/api/bank-accounts', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch bank accounts');
+      return res.json();
+    },
+    enabled: isAuthenticated,
+  });
+  const linkedBankAccounts = bankAccountsData?.accounts || [];
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editTitle, setEditTitle] = useState("");
@@ -229,8 +241,30 @@ export default function PoolDetails() {
         if (response.url) {
           window.location.href = response.url;
         }
-      } else {
+      } else if (paymentMethod === 'balance') {
         contributeMutation.mutate(chipInAmount);
+      } else if (paymentMethod.startsWith('bank_')) {
+        // Bank account payment via ACH
+        const bankAccountId = paymentMethod.replace('bank_', '');
+        const response = await fetch('/api/pools/' + params?.id + '/contribute-bank', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: chipInAmount, bankAccountId }),
+        });
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || 'Bank payment failed');
+        }
+        const data = await response.json();
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          // Payment initiated successfully
+          toast({ description: "Bank payment initiated. It may take 1-3 business days to process." });
+          setDialogOpen(false);
+          queryClient.invalidateQueries({ queryKey: queryKeys.pool(params?.id || '') });
+        }
       }
     } catch (error: any) {
       toast({
@@ -524,6 +558,39 @@ export default function PoolDetails() {
                             </div>
                             {paymentMethod === 'balance' && <ShieldCheck className="w-5 h-5 text-primary" />}
                           </button>
+                          
+                          {/* Linked Bank Accounts */}
+                          {linkedBankAccounts.length > 0 && (
+                            <>
+                              <div className="my-3 border-t border-white/10 pt-3">
+                                <p className="text-xs text-muted-foreground mb-2">Linked Bank Accounts</p>
+                              </div>
+                              {linkedBankAccounts.map((account: any) => (
+                                <button
+                                  key={account.id}
+                                  onClick={() => setPaymentMethod(`bank_${account.id}`)}
+                                  className={`w-full p-4 rounded-xl border transition-all flex items-center gap-4 ${
+                                    paymentMethod === `bank_${account.id}` 
+                                      ? 'border-primary bg-primary/10' 
+                                      : 'border-white/10 hover:border-white/20'
+                                  }`}
+                                >
+                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                    paymentMethod === `bank_${account.id}` ? 'bg-primary text-primary-foreground' : 'bg-white/10'
+                                  }`}>
+                                    <Building2 className="w-5 h-5" />
+                                  </div>
+                                  <div className="text-left flex-1">
+                                    <p className="font-medium">{account.institutionName}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {account.accountName} ••••{account.accountMask}
+                                    </p>
+                                  </div>
+                                  {paymentMethod === `bank_${account.id}` && <ShieldCheck className="w-5 h-5 text-primary" />}
+                                </button>
+                              ))}
+                            </>
+                          )}
                         </div>
                       </div>
                     )}
