@@ -274,19 +274,53 @@ export default function Security() {
         throw new Error('Stripe not loaded');
       }
       
-      const result = await stripe.collectFinancialConnectionsAccounts({
+      // Use collectBankAccountForSetup with SetupIntent client secret
+      const result = await stripe.collectBankAccountForSetup({
         clientSecret,
+        params: {
+          payment_method_type: 'us_bank_account',
+          payment_method_data: {
+            billing_details: {
+              name: user ? `${user.firstName} ${user.lastName}` : undefined,
+              email: user?.email,
+            },
+          },
+        },
       });
       
       if (result.error) {
         throw new Error(result.error.message || 'Bank linking failed');
       }
       
-      if (result.financialConnectionsSession?.accounts && result.financialConnectionsSession.accounts.length > 0) {
-        const account = result.financialConnectionsSession.accounts[0];
-        completeBankLinkMutation.mutate({ accountId: account.id, setupIntentId });
+      // After successful bank account collection, confirm the SetupIntent
+      if (result.setupIntent?.status === 'requires_confirmation') {
+        const confirmResult = await stripe.confirmUsBankAccountSetup(clientSecret);
+        if (confirmResult.error) {
+          throw new Error(confirmResult.error.message || 'Failed to confirm bank account');
+        }
+      }
+      
+      // Get the linked Financial Connections account from the payment method
+      const paymentMethodId = result.setupIntent?.payment_method;
+      if (paymentMethodId && typeof paymentMethodId === 'string') {
+        // Fetch the payment method to get the FC account ID
+        const pmRes = await fetch(`/api/stripe/payment-method/${paymentMethodId}`, {
+          credentials: 'include',
+        });
+        if (pmRes.ok) {
+          const pmData = await pmRes.json();
+          const fcAccountId = pmData.us_bank_account?.financial_connections_account;
+          if (fcAccountId) {
+            completeBankLinkMutation.mutate({ accountId: fcAccountId, setupIntentId });
+          } else {
+            // Fallback: complete with payment method ID
+            completeBankLinkMutation.mutate({ accountId: paymentMethodId, setupIntentId });
+          }
+        } else {
+          completeBankLinkMutation.mutate({ accountId: paymentMethodId, setupIntentId });
+        }
       } else {
-        toast({ description: "No accounts were selected", variant: "destructive" });
+        toast({ description: "No bank account was linked", variant: "destructive" });
       }
     } catch (error: any) {
       if (error.message !== 'Bank linking failed') {

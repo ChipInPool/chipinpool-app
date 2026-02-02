@@ -2853,6 +2853,32 @@ export async function registerRoutes(
     }
   });
 
+  // Get payment method details (for retrieving Financial Connections account ID)
+  app.get("/api/stripe/payment-method/:paymentMethodId", requireAuth, async (req, res, next) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const { paymentMethodId } = req.params;
+      
+      const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+      
+      // Return only the necessary fields
+      res.json({
+        id: paymentMethod.id,
+        type: paymentMethod.type,
+        us_bank_account: paymentMethod.us_bank_account ? {
+          bank_name: paymentMethod.us_bank_account.bank_name,
+          last4: paymentMethod.us_bank_account.last4,
+          account_type: paymentMethod.us_bank_account.account_type,
+          financial_connections_account: paymentMethod.us_bank_account.financial_connections_account,
+          routing_number: paymentMethod.us_bank_account.routing_number,
+        } : null,
+      });
+    } catch (error: any) {
+      console.error('[Stripe PM] Retrieve error:', error.message);
+      next(error);
+    }
+  });
+
   // Complete bank linking after user authorizes in Financial Connections
   app.post("/api/stripe/financial-connections/complete", requireAuth, async (req, res, next) => {
     try {
