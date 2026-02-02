@@ -2826,7 +2826,6 @@ export async function registerRoutes(
 
       // Create SetupIntent with Financial Connections for bank account linking
       // Force instant verification to ensure Financial Connections is used (no micro-deposits fallback)
-      // Request account_numbers permission to get full account/routing numbers for payouts
       const setupIntent = await stripe.setupIntents.create({
         customer: stripeCustomerId,
         payment_method_types: ['us_bank_account'],
@@ -2834,7 +2833,7 @@ export async function registerRoutes(
           us_bank_account: {
             verification_method: 'instant', // Force instant verification via Financial Connections
             financial_connections: {
-              permissions: ['payment_method', 'balances', 'ownership', 'account_numbers'] as any,
+              permissions: ['payment_method', 'balances', 'ownership'],
             },
           },
         },
