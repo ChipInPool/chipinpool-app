@@ -276,12 +276,24 @@ export default function PoolDetails() {
         }
         const data = await response.json();
         if (data.url) {
+          // Redirect to Stripe for new bank linking
           window.location.href = data.url;
-        } else {
-          // Payment initiated successfully
-          toast({ description: "Bank payment initiated. It may take 1-3 business days to process." });
+        } else if (data.success) {
+          // Direct payment completed or processing
+          toast({ 
+            title: data.status === 'succeeded' ? 'Payment Complete!' : 'Payment Initiated',
+            description: data.message || "Bank payment initiated. It may take 1-3 business days to process.",
+          });
           setDialogOpen(false);
+          setChipInAmount('');
           queryClient.invalidateQueries({ queryKey: queryKeys.pool(params?.id || '') });
+        } else if (data.clientSecret) {
+          // Requires additional verification - could handle with Stripe.js
+          toast({ 
+            title: "Verification Required",
+            description: "Your bank requires additional verification. Please try again.",
+            variant: "destructive",
+          });
         }
       }
     } catch (error: any) {

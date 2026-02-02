@@ -151,6 +151,7 @@ export interface IStorage {
   deleteBankAccount(userId: string, accountId: string): Promise<void>;
   getBankAccountByStripeAccountId(stripeAccountId: string): Promise<BankAccount | undefined>;
   updateBankAccountByStripeAccountId(stripeAccountId: string, updates: Partial<BankAccount>): Promise<BankAccount | undefined>;
+  updateBankAccount(id: string, updates: Partial<BankAccount>): Promise<BankAccount | undefined>;
 
   // Pool transfer request operations
   createPoolTransferRequest(request: InsertPoolTransferRequest): Promise<PoolTransferRequest>;
@@ -762,6 +763,14 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db.update(bankAccounts)
       .set(updates)
       .where(eq(bankAccounts.stripeFinancialConnectionsAccountId, stripeAccountId))
+      .returning();
+    return result;
+  }
+
+  async updateBankAccount(id: string, updates: Partial<BankAccount>): Promise<BankAccount | undefined> {
+    const [result] = await db.update(bankAccounts)
+      .set(updates)
+      .where(eq(bankAccounts.id, id))
       .returning();
     return result;
   }

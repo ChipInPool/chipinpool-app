@@ -1798,8 +1798,107 @@ export async function registerRoutes(
       }
 
       const stripe = await getUncachableStripeClient();
+      const amountCents = Math.round(parseFloat(amount) * 100);
+
+      // Try to get or find the payment method for this bank account
+      let paymentMethodId = bankAccount.stripePaymentMethodId;
       
-      // Support both Replit and Azure production environments
+      // If we don't have a stored payment method but have a customer, try to find it
+      if (!paymentMethodId && user.stripeCustomerId && bankAccount.stripeFinancialConnectionsAccountId) {
+        try {
+          const paymentMethods = await stripe.paymentMethods.list({
+            customer: user.stripeCustomerId,
+            type: 'us_bank_account',
+          });
+          
+          // Find payment method matching this bank account by last4
+          const matchingPM = paymentMethods.data.find(pm => 
+            pm.us_bank_account?.last4 === bankAccount.accountMask
+          );
+          
+          if (matchingPM) {
+            paymentMethodId = matchingPM.id;
+            // Update the bank account with the found payment method
+            await storage.updateBankAccount(bankAccount.id, { stripePaymentMethodId: matchingPM.id });
+            console.log('[Bank Contribute] Found and stored payment method:', matchingPM.id);
+          }
+        } catch (e: any) {
+          console.log('[Bank Contribute] Could not retrieve payment methods:', e.message);
+        }
+      }
+
+      // If we have a payment method, use it directly without redirecting
+      if (paymentMethodId && user.stripeCustomerId) {
+        try {
+          // Create a PaymentIntent with the payment method
+          const paymentIntent = await stripe.paymentIntents.create({
+            amount: amountCents,
+            currency: 'usd',
+            customer: user.stripeCustomerId,
+            payment_method: paymentMethodId,
+            payment_method_types: ['us_bank_account'],
+            confirm: true,
+            mandate_data: {
+              customer_acceptance: {
+                type: 'online',
+                online: {
+                  ip_address: req.ip || '0.0.0.0',
+                  user_agent: req.get('user-agent') || 'ChipInPool',
+                },
+              },
+            },
+            metadata: {
+              poolId: pool.id,
+              userId: user.id,
+              bankAccountId: bankAccount.id,
+              paymentType: 'bank_ach_direct',
+            },
+          });
+
+          console.log('[Bank Contribute] Created PaymentIntent:', paymentIntent.id, 'status:', paymentIntent.status);
+
+          // ACH payments are usually 'processing' after confirmation (takes 1-3 business days)
+          if (paymentIntent.status === 'processing' || paymentIntent.status === 'succeeded') {
+            // Create the contribution record using stripeSessionId to store payment intent
+            await storage.createContribution({
+              poolId: pool.id,
+              userId: user.id,
+              amount: amount,
+              stripeSessionId: paymentIntent.id, // Store PaymentIntent ID here
+            });
+
+            // Update pool current amount
+            const currentAmount = parseFloat(pool.currentAmount || '0');
+            const newAmount = currentAmount + parseFloat(amount);
+            await storage.updatePoolAmount(pool.id, newAmount.toFixed(2));
+
+            return res.json({ 
+              success: true, 
+              status: paymentIntent.status,
+              message: paymentIntent.status === 'succeeded' 
+                ? 'Payment completed!' 
+                : 'Payment initiated. ACH transfers typically take 1-3 business days to process.',
+            });
+          } else if (paymentIntent.status === 'requires_action') {
+            // Bank may require additional verification
+            return res.json({
+              success: false,
+              status: paymentIntent.status,
+              clientSecret: paymentIntent.client_secret,
+              message: 'Additional verification required',
+            });
+          } else {
+            return res.status(400).json({ 
+              error: `Payment failed with status: ${paymentIntent.status}` 
+            });
+          }
+        } catch (paymentError: any) {
+          console.error('[Bank Contribute] Direct payment error:', paymentError.message);
+          // If direct payment fails, fall back to checkout session
+        }
+      }
+      
+      // Fall back to Stripe Checkout if no stored payment method or direct payment failed
       let baseUrl = 'http://localhost:5000';
       if (process.env.REPLIT_DOMAINS) {
         baseUrl = `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
@@ -1820,7 +1919,7 @@ export async function registerRoutes(
               name: `Contribution to ${pool.title}`,
               description: pool.description || undefined,
             },
-            unit_amount: Math.round(parseFloat(amount) * 100),
+            unit_amount: amountCents,
           },
           quantity: 1,
         }],
@@ -3001,9 +3100,10 @@ export async function registerRoutes(
       const accountSubtype = (fcAccount.subcategory as string) || 'checking';
       const isDebitCard = accountSubtype === 'debit' || accountSubtype === 'prepaid';
 
-      // Try to get routing number from the payment method attached to SetupIntent
+      // Try to get routing number and payment method from the SetupIntent
       let routingNumber: string | undefined;
       let accountNumber: string | undefined;
+      let paymentMethodId: string | undefined;
       
       if (setupIntentId) {
         try {
@@ -3012,6 +3112,10 @@ export async function registerRoutes(
           });
           
           const paymentMethod = setupIntent.payment_method as any;
+          if (paymentMethod?.id) {
+            paymentMethodId = paymentMethod.id;
+            console.log('[Stripe FC] Got payment method ID:', paymentMethodId);
+          }
           if (paymentMethod?.us_bank_account) {
             routingNumber = paymentMethod.us_bank_account.routing_number;
             console.log('[Stripe FC] Got routing number from payment method:', routingNumber);
@@ -3049,10 +3153,11 @@ export async function registerRoutes(
         console.log('[Stripe FC] Could not get account numbers:', e.message);
       }
 
-      // Create bank account record with routing/account numbers if available
+      // Create bank account record with routing/account numbers and payment method if available
       const bankAccount = await storage.createBankAccount({
         userId,
         stripeFinancialConnectionsAccountId: accountId,
+        stripePaymentMethodId: paymentMethodId,
         institutionName: fcAccount.institution_name || 'Bank Account',
         accountName: fcAccount.display_name || 'Account',
         accountMask: fcAccount.last4 || '****',

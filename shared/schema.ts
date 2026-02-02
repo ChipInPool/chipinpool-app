@@ -293,6 +293,7 @@ export const bankAccounts = pgTable("bank_accounts", {
   // Stripe Financial Connections fields
   stripeFinancialConnectionsAccountId: text("stripe_financial_connections_account_id"),
   stripeExternalAccountId: text("stripe_external_account_id"),
+  stripePaymentMethodId: text("stripe_payment_method_id"), // Payment method for direct charges
   // Legacy Plaid fields (deprecated)
   plaidAccountId: text("plaid_account_id"),
   plaidAccessToken: text("plaid_access_token"),
