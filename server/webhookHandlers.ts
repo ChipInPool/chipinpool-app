@@ -30,6 +30,10 @@ export class WebhookHandlers {
           await WebhookHandlers.handleIdentityVerified(event.data.object);
         } else if (event.type === 'identity.verification_session.requires_input') {
           await WebhookHandlers.handleIdentityFailed(event.data.object);
+        } else if (event.type === 'financial_connections.account.created') {
+          await WebhookHandlers.handleFinancialConnectionsAccountCreated(event.data.object);
+        } else if (event.type === 'financial_connections.account.refreshed_ownership') {
+          await WebhookHandlers.handleFinancialConnectionsAccountUpdated(event.data.object);
         }
       }
     } catch (err: any) {
@@ -194,6 +198,95 @@ export class WebhookHandlers {
       console.log(`KYC failed for user ${userId}`);
     } catch (err: any) {
       console.error('Error updating KYC status to failed:', err.message);
+    }
+  }
+
+  static async handleFinancialConnectionsAccountCreated(account: any): Promise<void> {
+    const accountId = account.id;
+    console.log(`[FC Webhook] Account created: ${accountId}`);
+    
+    try {
+      const stripe = await getUncachableStripeClient();
+      
+      // Check if we have this account in our database
+      const existingAccount = await storage.getBankAccountByStripeAccountId(accountId);
+      if (!existingAccount) {
+        console.log(`[FC Webhook] Account ${accountId} not found in database, skipping`);
+        return;
+      }
+
+      // Try to subscribe to get account numbers (requires Stripe approval)
+      try {
+        await (stripe.financialConnections.accounts as any).subscribe(accountId, {
+          features: ['account_numbers'],
+        });
+        console.log(`[FC Webhook] Subscribed to account numbers for ${accountId}`);
+      } catch (subErr: any) {
+        console.log(`[FC Webhook] Could not subscribe to account numbers: ${subErr.message}`);
+      }
+
+      // Retrieve the account with full details
+      const fcAccount = await stripe.financialConnections.accounts.retrieve(accountId) as any;
+      
+      // Update bank account with routing number if available
+      const updates: any = {};
+      if (fcAccount.routing_number) {
+        updates.routingNumber = fcAccount.routing_number;
+      }
+      
+      // Try to get account numbers if available
+      if (fcAccount.account_numbers && fcAccount.account_numbers.length > 0) {
+        const accountNumData = fcAccount.account_numbers[0];
+        if (accountNumData.account_number) {
+          updates.accountNumber = accountNumData.account_number;
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await storage.updateBankAccountByStripeAccountId(accountId, updates);
+        console.log(`[FC Webhook] Updated account ${accountId} with:`, Object.keys(updates));
+      }
+    } catch (err: any) {
+      console.error('[FC Webhook] Error processing account created:', err.message);
+    }
+  }
+
+  static async handleFinancialConnectionsAccountUpdated(account: any): Promise<void> {
+    const accountId = account.id;
+    console.log(`[FC Webhook] Account updated/refreshed: ${accountId}`);
+    
+    try {
+      const stripe = await getUncachableStripeClient();
+      
+      // Check if we have this account in our database
+      const existingAccount = await storage.getBankAccountByStripeAccountId(accountId);
+      if (!existingAccount) {
+        console.log(`[FC Webhook] Account ${accountId} not found in database, skipping`);
+        return;
+      }
+
+      // Retrieve the account with full details
+      const fcAccount = await stripe.financialConnections.accounts.retrieve(accountId) as any;
+      
+      // Update with any new information
+      const updates: any = {};
+      if (fcAccount.routing_number && !existingAccount.routingNumber) {
+        updates.routingNumber = fcAccount.routing_number;
+      }
+      
+      if (fcAccount.account_numbers && fcAccount.account_numbers.length > 0) {
+        const accountNumData = fcAccount.account_numbers[0];
+        if (accountNumData.account_number && !existingAccount.accountNumber) {
+          updates.accountNumber = accountNumData.account_number;
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await storage.updateBankAccountByStripeAccountId(accountId, updates);
+        console.log(`[FC Webhook] Updated account ${accountId} with:`, Object.keys(updates));
+      }
+    } catch (err: any) {
+      console.error('[FC Webhook] Error processing account update:', err.message);
     }
   }
 }
