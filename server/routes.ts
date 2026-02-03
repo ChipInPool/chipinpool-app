@@ -1831,11 +1831,20 @@ export async function registerRoutes(
           
           if (matchingPM) {
             paymentMethodId = matchingPM.id;
-            // Update the bank account with the found payment method
-            await storage.updateBankAccount(bankAccount.id, { stripePaymentMethodId: matchingPM.id });
-            console.log('[Bank Contribute] Found and stored payment method:', matchingPM.id);
+            console.log('[Bank Contribute] Found payment method:', matchingPM.id);
+            // Try to update the bank account with the found payment method (may fail if column doesn't exist)
+            try {
+              await storage.updateBankAccount(bankAccount.id, { stripePaymentMethodId: matchingPM.id });
+              console.log('[Bank Contribute] Stored payment method ID in database');
+            } catch (updateErr) {
+              console.log('[Bank Contribute] Could not store payment method ID (column may not exist yet)');
+            }
           } else {
             console.log('[Bank Contribute] No matching payment method found by last4');
+            // List all payment methods for debugging
+            paymentMethods.data.forEach((pm, i) => {
+              console.log(`[Bank Contribute] PM ${i}: ${pm.id}, last4: ${pm.us_bank_account?.last4}`);
+            });
           }
         } catch (e: any) {
           console.log('[Bank Contribute] Could not retrieve payment methods:', e.message);
@@ -1909,59 +1918,23 @@ export async function registerRoutes(
           }
         } catch (paymentError: any) {
           console.error('[Bank Contribute] Direct payment error:', paymentError.message, paymentError.code);
-          // If direct payment fails, fall back to checkout session
+          // Return the error to the user instead of silently falling back
+          return res.status(400).json({ 
+            error: `Bank payment failed: ${paymentError.message}`,
+            code: paymentError.code,
+            needsReauthorization: paymentError.code === 'payment_intent_mandate_invalid',
+          });
         }
-      } else {
-        console.log('[Bank Contribute] No payment method found, falling back to Checkout');
-        console.log('[Bank Contribute] paymentMethodId:', paymentMethodId, 'stripeCustomerId:', user.stripeCustomerId);
       }
       
-      // Fall back to Stripe Checkout if no stored payment method or direct payment failed
-      console.log('[Bank Contribute] Creating Checkout session as fallback');
-      let baseUrl = 'http://localhost:5000';
-      if (process.env.REPLIT_DOMAINS) {
-        baseUrl = `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
-      } else if (process.env.WEBSITE_HOSTNAME) {
-        baseUrl = `https://${process.env.WEBSITE_HOSTNAME}`;
-      } else if (process.env.APP_URL) {
-        baseUrl = process.env.APP_URL;
-      }
-
-      // Create a checkout session with US Bank Account payment method
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['us_bank_account'],
-        customer: user.stripeCustomerId || undefined,
-        line_items: [{
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `Contribution to ${pool.title}`,
-              description: pool.description || undefined,
-            },
-            unit_amount: amountCents,
-          },
-          quantity: 1,
-        }],
-        mode: 'payment',
-        payment_method_options: {
-          us_bank_account: {
-            verification_method: 'instant',
-            financial_connections: {
-              permissions: ['payment_method'],
-            },
-          },
-        },
-        success_url: `${baseUrl}/pool/${pool.id}?payment=success`,
-        cancel_url: `${baseUrl}/pool/${pool.id}?payment=cancelled`,
-        metadata: {
-          poolId: pool.id,
-          userId: user.id,
-          amount,
-          paymentType: 'bank_ach',
-        },
+      // No payment method found - user needs to re-link their bank account
+      console.log('[Bank Contribute] No payment method found for bank account');
+      console.log('[Bank Contribute] paymentMethodId:', paymentMethodId, 'stripeCustomerId:', user.stripeCustomerId);
+      
+      return res.status(400).json({ 
+        error: "Your bank account needs to be re-linked to enable direct payments. Please go to Settings and re-link your bank account.",
+        needsRelink: true,
       });
-
-      res.json({ url: session.url });
     } catch (error: any) {
       console.error('[Bank Contribute] Error:', error.message);
       next(error);
@@ -3534,8 +3507,14 @@ export async function registerRoutes(
                 pm.us_bank_account?.last4 === account.accountMask
               );
               if (matchingPM) {
-                await storage.updateBankAccount(account.id, { stripePaymentMethodId: matchingPM.id });
-                console.log('[Bank Accounts] Auto-synced PM for account:', account.id);
+                try {
+                  await storage.updateBankAccount(account.id, { stripePaymentMethodId: matchingPM.id });
+                  console.log('[Bank Accounts] Auto-synced PM for account:', account.id);
+                } catch (updateErr) {
+                  console.log('[Bank Accounts] Could not update PM (column may not exist):', account.id);
+                }
+              } else {
+                console.log('[Bank Accounts] No matching PM for mask:', account.accountMask, 'Available PMs:', paymentMethods.data.map(pm => pm.us_bank_account?.last4));
               }
             }
             
@@ -3555,6 +3534,44 @@ export async function registerRoutes(
         hasPaymentMethod: !!account.stripePaymentMethodId,
       }));
       res.json({ accounts: accountsWithPayoutStatus });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Debug endpoint to check Stripe payment methods
+  app.get("/api/bank-accounts/debug-stripe", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      const accounts = await storage.getBankAccountsByUser(userId);
+      
+      let stripePaymentMethods: any[] = [];
+      if (user?.stripeCustomerId) {
+        const stripe = await getUncachableStripeClient();
+        const pms = await stripe.paymentMethods.list({
+          customer: user.stripeCustomerId,
+          type: 'us_bank_account',
+        });
+        stripePaymentMethods = pms.data.map(pm => ({
+          id: pm.id,
+          last4: pm.us_bank_account?.last4,
+          bank_name: pm.us_bank_account?.bank_name,
+          account_type: pm.us_bank_account?.account_type,
+        }));
+      }
+      
+      res.json({
+        stripeCustomerId: user?.stripeCustomerId,
+        localAccounts: accounts.map(a => ({
+          id: a.id,
+          mask: a.accountMask,
+          institutionName: a.institutionName,
+          fcAccountId: a.stripeFinancialConnectionsAccountId,
+          paymentMethodId: a.stripePaymentMethodId || null,
+        })),
+        stripePaymentMethods,
+      });
     } catch (error) {
       next(error);
     }
