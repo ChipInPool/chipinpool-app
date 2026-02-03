@@ -1800,27 +1800,42 @@ export async function registerRoutes(
       const stripe = await getUncachableStripeClient();
       const amountCents = Math.round(parseFloat(amount) * 100);
 
+      console.log('[Bank Contribute] Starting payment for pool:', pool.id, 'amount:', amount);
+      console.log('[Bank Contribute] Bank account:', {
+        id: bankAccount.id,
+        mask: bankAccount.accountMask,
+        fcAccountId: bankAccount.stripeFinancialConnectionsAccountId,
+        storedPaymentMethodId: bankAccount.stripePaymentMethodId,
+      });
+
       // Try to get or find the payment method for this bank account
       let paymentMethodId = bankAccount.stripePaymentMethodId;
       
       // If we don't have a stored payment method but have a customer, try to find it
-      if (!paymentMethodId && user.stripeCustomerId && bankAccount.stripeFinancialConnectionsAccountId) {
+      if (!paymentMethodId && user.stripeCustomerId) {
         try {
+          console.log('[Bank Contribute] Looking up payment methods for customer:', user.stripeCustomerId);
           const paymentMethods = await stripe.paymentMethods.list({
             customer: user.stripeCustomerId,
             type: 'us_bank_account',
           });
           
+          console.log('[Bank Contribute] Found', paymentMethods.data.length, 'bank payment methods');
+          
           // Find payment method matching this bank account by last4
-          const matchingPM = paymentMethods.data.find(pm => 
-            pm.us_bank_account?.last4 === bankAccount.accountMask
-          );
+          const matchingPM = paymentMethods.data.find(pm => {
+            const pmLast4 = pm.us_bank_account?.last4;
+            console.log('[Bank Contribute] Comparing PM last4:', pmLast4, 'to bank mask:', bankAccount.accountMask);
+            return pmLast4 === bankAccount.accountMask;
+          });
           
           if (matchingPM) {
             paymentMethodId = matchingPM.id;
             // Update the bank account with the found payment method
             await storage.updateBankAccount(bankAccount.id, { stripePaymentMethodId: matchingPM.id });
             console.log('[Bank Contribute] Found and stored payment method:', matchingPM.id);
+          } else {
+            console.log('[Bank Contribute] No matching payment method found by last4');
           }
         } catch (e: any) {
           console.log('[Bank Contribute] Could not retrieve payment methods:', e.message);
@@ -1893,12 +1908,16 @@ export async function registerRoutes(
             });
           }
         } catch (paymentError: any) {
-          console.error('[Bank Contribute] Direct payment error:', paymentError.message);
+          console.error('[Bank Contribute] Direct payment error:', paymentError.message, paymentError.code);
           // If direct payment fails, fall back to checkout session
         }
+      } else {
+        console.log('[Bank Contribute] No payment method found, falling back to Checkout');
+        console.log('[Bank Contribute] paymentMethodId:', paymentMethodId, 'stripeCustomerId:', user.stripeCustomerId);
       }
       
       // Fall back to Stripe Checkout if no stored payment method or direct payment failed
+      console.log('[Bank Contribute] Creating Checkout session as fallback');
       let baseUrl = 'http://localhost:5000';
       if (process.env.REPLIT_DOMAINS) {
         baseUrl = `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
@@ -3089,8 +3108,35 @@ export async function registerRoutes(
 
       // Check if already linked
       const existingAccounts = await storage.getBankAccountsByUser(userId);
-      const alreadyLinked = existingAccounts.some(a => a.stripeFinancialConnectionsAccountId === accountId);
-      if (alreadyLinked) {
+      const existingAccount = existingAccounts.find(a => a.stripeFinancialConnectionsAccountId === accountId);
+      
+      // If account exists but doesn't have a payment method, try to update it
+      if (existingAccount) {
+        // Try to get the payment method from SetupIntent if we don't have one stored
+        if (!existingAccount.stripePaymentMethodId && setupIntentId) {
+          try {
+            const setupIntent = await stripe.setupIntents.retrieve(setupIntentId, {
+              expand: ['payment_method'],
+            });
+            const paymentMethod = setupIntent.payment_method as any;
+            if (paymentMethod?.id) {
+              await storage.updateBankAccount(existingAccount.id, { stripePaymentMethodId: paymentMethod.id });
+              console.log('[Stripe FC] Updated existing account with payment method:', paymentMethod.id);
+              return res.json({ 
+                message: "Bank account updated with payment method",
+                account: {
+                  id: existingAccount.id,
+                  institutionName: existingAccount.institutionName,
+                  accountMask: existingAccount.accountMask,
+                  accountType: existingAccount.accountType,
+                  hasPaymentMethod: true,
+                }
+              });
+            }
+          } catch (e: any) {
+            console.log('[Stripe FC] Could not retrieve payment method for existing account:', e.message);
+          }
+        }
         return res.status(400).json({ error: "This bank account is already linked" });
       }
 
@@ -3186,6 +3232,56 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error('[Stripe FC] Complete linking error:', error.message);
+      next(error);
+    }
+  });
+
+  // Sync payment methods for existing bank accounts
+  app.post("/api/bank-accounts/sync-payment-methods", requireAuth, async (req, res, next) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.stripeCustomerId) {
+        return res.status(400).json({ error: "No Stripe customer found" });
+      }
+
+      // Get all bank accounts for the user
+      const bankAccounts = await storage.getBankAccountsByUser(userId);
+      
+      // Get all payment methods from Stripe
+      const paymentMethods = await stripe.paymentMethods.list({
+        customer: user.stripeCustomerId,
+        type: 'us_bank_account',
+      });
+
+      console.log('[Sync PM] Found', paymentMethods.data.length, 'payment methods for customer');
+
+      let updatedCount = 0;
+      for (const bankAccount of bankAccounts) {
+        if (bankAccount.stripePaymentMethodId) {
+          continue; // Already has a payment method
+        }
+
+        // Try to find matching payment method by last4
+        const matchingPM = paymentMethods.data.find(pm => 
+          pm.us_bank_account?.last4 === bankAccount.accountMask
+        );
+
+        if (matchingPM) {
+          await storage.updateBankAccount(bankAccount.id, { stripePaymentMethodId: matchingPM.id });
+          console.log('[Sync PM] Updated bank account', bankAccount.id, 'with PM:', matchingPM.id);
+          updatedCount++;
+        }
+      }
+
+      res.json({ 
+        message: `Synced ${updatedCount} bank account(s) with payment methods`,
+        updatedCount,
+      });
+    } catch (error: any) {
+      console.error('[Sync PM] Error:', error.message);
       next(error);
     }
   });
@@ -3417,12 +3513,46 @@ export async function registerRoutes(
   // Get user's linked bank accounts
   app.get("/api/bank-accounts", requireAuth, async (req, res, next) => {
     try {
-      const accounts = await storage.getBankAccountsByUser(req.session.userId!);
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      let accounts = await storage.getBankAccountsByUser(userId);
+      
+      // Auto-sync payment methods for accounts that don't have one
+      if (user?.stripeCustomerId) {
+        const accountsNeedingSync = accounts.filter(a => !a.stripePaymentMethodId && a.stripeFinancialConnectionsAccountId);
+        
+        if (accountsNeedingSync.length > 0) {
+          try {
+            const stripe = await getUncachableStripeClient();
+            const paymentMethods = await stripe.paymentMethods.list({
+              customer: user.stripeCustomerId,
+              type: 'us_bank_account',
+            });
+
+            for (const account of accountsNeedingSync) {
+              const matchingPM = paymentMethods.data.find(pm => 
+                pm.us_bank_account?.last4 === account.accountMask
+              );
+              if (matchingPM) {
+                await storage.updateBankAccount(account.id, { stripePaymentMethodId: matchingPM.id });
+                console.log('[Bank Accounts] Auto-synced PM for account:', account.id);
+              }
+            }
+            
+            // Refresh accounts after sync
+            accounts = await storage.getBankAccountsByUser(userId);
+          } catch (e: any) {
+            console.log('[Bank Accounts] Auto-sync failed:', e.message);
+          }
+        }
+      }
+      
       // Add flag indicating if account can be used for payouts
       // Now supports both Stripe Financial Connections and legacy Plaid
       const accountsWithPayoutStatus = accounts.map(account => ({
         ...account,
         canReceivePayouts: !!(account.stripeFinancialConnectionsAccountId || (account.plaidAccessToken && account.plaidAccountId)),
+        hasPaymentMethod: !!account.stripePaymentMethodId,
       }));
       res.json({ accounts: accountsWithPayoutStatus });
     } catch (error) {
