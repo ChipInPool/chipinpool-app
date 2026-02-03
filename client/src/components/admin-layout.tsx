@@ -12,7 +12,8 @@ import {
   Store,
   AlertTriangle,
   Loader2,
-  Banknote
+  Banknote,
+  Key
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -27,6 +28,7 @@ const navItems = [
   { href: "/admin/transactions", icon: CreditCard, label: "Transactions" },
   { href: "/admin/withdrawals", icon: Banknote, label: "Withdrawals" },
   { href: "/admin/merchants", icon: Store, label: "Merchants" },
+  { href: "/admin/api-requests", icon: Key, label: "API Requests" },
   { href: "/admin/fraud", icon: AlertTriangle, label: "Fraud Detection" },
 ];
 

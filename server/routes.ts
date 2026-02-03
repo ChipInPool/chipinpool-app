@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import session from "express-session";
 import rateLimit from "express-rate-limit";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
-import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, bankAccounts, merchantPayouts, payMeTransactions } from "@shared/schema";
+import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, bankAccounts, merchantPayouts, payMeTransactions, apiAccessRequests } from "@shared/schema";
 import express from "express";
 import { db } from "./db";
 import { eq, desc, sql, inArray } from "drizzle-orm";
@@ -5388,7 +5388,36 @@ export async function registerRoutes(
         monthlyVolume: data.monthlyVolume,
       });
 
-      // Send notification email to admin (in real scenario)
+      // Send confirmation email to user
+      const { sendEmail } = await import('./notificationService');
+      const confirmationHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
+            <h1 style="color: #d4ff00; margin: 0 0 16px;">API Access Request Received 📝</h1>
+            <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
+              Hey ${user.firstName},<br><br>
+              We've received your ChipInPay API access request for <strong>${data.companyName}</strong>.
+            </p>
+            <div style="background: rgba(255,255,255,0.1); padding: 16px; border-radius: 8px; margin: 16px 0;">
+              <p style="color: #94a3b8; margin: 0;">
+                <strong>Company:</strong> ${data.companyName}<br>
+                <strong>Website:</strong> ${data.website}<br>
+                <strong>Expected Volume:</strong> ${data.monthlyVolume}
+              </p>
+            </div>
+            <p style="color: #94a3b8; font-size: 14px; margin: 24px 0 0;">
+              Our team will review your application and get back to you within 2-3 business days.
+            </p>
+          </div>
+          <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
+            ChipIn - Pool funds together. Pay smarter.
+          </p>
+        </div>
+      `;
+      
+      sendEmail(user.email, '📝 API Access Request Received - ChipIn', confirmationHtml)
+        .catch(err => console.error('[Email] Failed to send API request confirmation:', err));
+
       console.log(`[Developer API] New access request from ${user.email}:`, {
         companyName: data.companyName,
         website: data.website,
@@ -6327,6 +6356,70 @@ export async function registerRoutes(
         .offset(offset);
 
       res.json({ logs });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin: Get API access requests
+  app.get("/api/admin/api-requests", requireAdmin, async (req, res, next) => {
+    try {
+      const status = req.query.status as string || 'all';
+      
+      let query = db.select({
+        id: apiAccessRequests.id,
+        userId: apiAccessRequests.userId,
+        companyName: apiAccessRequests.companyName,
+        website: apiAccessRequests.website,
+        useCase: apiAccessRequests.useCase,
+        monthlyVolume: apiAccessRequests.monthlyVolume,
+        status: apiAccessRequests.status,
+        createdAt: apiAccessRequests.createdAt,
+        user: {
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        }
+      })
+        .from(apiAccessRequests)
+        .leftJoin(users, eq(apiAccessRequests.userId, users.id))
+        .orderBy(desc(apiAccessRequests.createdAt));
+      
+      if (status !== 'all') {
+        query = query.where(eq(apiAccessRequests.status, status)) as any;
+      }
+      
+      const requests = await query;
+      res.json({ requests });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin: Approve/reject API access request
+  app.post("/api/admin/api-requests/:id/update", requireAdmin, async (req: any, res, next) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      
+      if (!['approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ error: "Status must be 'approved' or 'rejected'" });
+      }
+      
+      await db.update(apiAccessRequests)
+        .set({ status })
+        .where(eq(apiAccessRequests.id, id));
+      
+      // Log admin action
+      await db.insert(adminAuditLogs).values({
+        adminId: req.adminUser.id,
+        action: `${status}_api_request`,
+        targetType: 'api_access_request',
+        targetId: id,
+        details: JSON.stringify({ status }),
+      });
+      
+      res.json({ success: true, message: `API access request ${status}` });
     } catch (error) {
       next(error);
     }
