@@ -40,7 +40,15 @@ export default function PoolAnalytics() {
   }
 
   const pool = poolData?.pool;
-  const contributions: Contribution[] = poolData?.contributions || [];
+  // Map contributors from pool data to contributions format
+  const contributions: Contribution[] = (pool?.contributors || []).map((c: any) => ({
+    id: c.id || crypto.randomUUID(),
+    userId: c.user?.id || null,
+    userName: c.user?.firstName ? `${c.user.firstName} ${c.user.lastName || ''}`.trim() : c.user?.name || 'Anonymous',
+    userAvatar: c.user?.avatarUrl || c.user?.avatar || null,
+    amount: c.amount,
+    createdAt: c.date || c.createdAt,
+  }));
 
   const progressPercentage = pool ? Math.min(100, (parseFloat(pool.currentAmount) / parseFloat(pool.targetAmount)) * 100) : 0;
   const daysRemaining = pool?.deadline ? differenceInDays(new Date(pool.deadline), new Date()) : 0;
