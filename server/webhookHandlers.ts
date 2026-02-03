@@ -1,5 +1,7 @@
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
 import { storage } from './storage';
+import { sendPoolContributionNotification, sendWalletActivityNotification, sendPoolCompletedNotification } from './notificationService';
+import { sendPushNotification } from './pushService';
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string): Promise<void> {
@@ -63,6 +65,30 @@ export class WebhookHandlers {
         const success = await storage.createWalletDeposit(userId, amount, sessionId);
         if (success) {
           console.log(`Wallet deposit processed: $${amount} for user ${userId} (session: ${sessionId})`);
+          
+          // Send wallet deposit notification
+          const user = await storage.getUser(userId);
+          if (user) {
+            await storage.createNotification({
+              userId: user.id,
+              type: 'contribution',
+              title: 'Wallet Deposit Successful',
+              message: `$${amount} has been added to your wallet.`,
+              link: '/wallet',
+            });
+            
+            // Send email/SMS notification
+            sendWalletActivityNotification(
+              user.email,
+              user.phone,
+              `${user.firstName} ${user.lastName}`,
+              'deposit',
+              amount,
+              'completed',
+              user.notifyEmail,
+              user.notifySMS
+            ).catch(err => console.error('[Notification] Wallet deposit notification failed:', err));
+          }
         } else {
           console.log(`Wallet deposit already processed for session ${sessionId}`);
         }
@@ -91,12 +117,85 @@ export class WebhookHandlers {
       if (contribution) {
         console.log(`Stripe payment processed: $${amount} to pool ${poolId} (session: ${sessionId})`);
         
-        // Check if pool reached target and handle merchant checkout session completion
+        // Send notification to pool creator about the contribution
         const pool = await storage.getPool(poolId);
+        if (pool) {
+          const poolCreator = await storage.getUser(pool.creatorId);
+          let contributorName = 'Someone';
+          if (guestEmail) {
+            contributorName = session.metadata.guestName || 'A guest';
+          } else if (userId) {
+            const contributor = await storage.getUser(userId);
+            if (contributor) {
+              contributorName = `${contributor.firstName} ${contributor.lastName || ''}`.trim();
+            }
+          }
+          
+          // Create in-app notification
+          await storage.createNotification({
+            userId: pool.creatorId,
+            type: 'contribution',
+            title: 'New Contribution',
+            message: `${contributorName} chipped in $${amount} to "${pool.title}"`,
+            link: `/pool/${pool.id}`,
+          });
+          
+          // Send email/SMS notification to pool creator (only if contributor is not the creator)
+          if (poolCreator && pool.creatorId !== userId) {
+            sendPoolContributionNotification(
+              poolCreator.email,
+              poolCreator.phone,
+              `${poolCreator.firstName} ${poolCreator.lastName}`,
+              contributorName,
+              pool.id,
+              pool.title,
+              amount,
+              poolCreator.notifyEmail,
+              poolCreator.notifySMS
+            ).catch(err => console.error('[Notification] Pool contribution notification failed:', err));
+            
+            // Send push notification
+            sendPushNotification(
+              pool.creatorId,
+              'New Contribution! 💰',
+              `${contributorName} just contributed $${amount} to "${pool.title}"`
+            ).catch(err => console.error('[Push] Contribution notification failed:', err));
+          }
+        }
+        
+        // Check if pool reached target and handle merchant checkout session completion
         if (pool && parseFloat(pool.currentAmount) >= parseFloat(pool.targetAmount)) {
           // Mark pool as completed if not already
           if (pool.status !== 'completed') {
             await storage.updatePoolStatus(pool.id, 'completed');
+            
+            // Send pool completion notification
+            await storage.createNotification({
+              userId: pool.creatorId,
+              type: 'goal_reached',
+              title: 'Goal Reached! 🎉',
+              message: `${pool.title} has been fully funded!`,
+              link: `/pool/${pool.id}`,
+            });
+            
+            if (poolCreator) {
+              sendPoolCompletedNotification(
+                poolCreator.email,
+                poolCreator.phone,
+                `${poolCreator.firstName} ${poolCreator.lastName}`,
+                pool.id,
+                pool.title,
+                pool.targetAmount,
+                poolCreator.notifyEmail,
+                poolCreator.notifySMS
+              ).catch(err => console.error('[Notification] Pool completed notification failed:', err));
+              
+              sendPushNotification(
+                pool.creatorId,
+                'Goal Reached! 🎉',
+                `Congratulations! "${pool.title}" has been fully funded!`
+              ).catch(err => console.error('[Push] Pool completion notification failed:', err));
+            }
           }
           
           // Check if this pool is linked to a merchant checkout session

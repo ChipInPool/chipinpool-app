@@ -1665,6 +1665,31 @@ export async function registerRoutes(
       const newBalance = (cardBalance - transactionAmount).toFixed(2);
       await storage.updateCardBalance(card.id, newBalance);
 
+      // Send card transaction notification to pool creator
+      const user = await storage.getUser(req.session.userId!);
+      if (user) {
+        await storage.createNotification({
+          userId: user.id,
+          type: 'contribution',
+          title: 'Card Transaction',
+          message: `You spent $${data.amount} at ${data.merchantName || 'a merchant'} from "${pool!.title}" card`,
+          link: `/pool/${pool!.id}`,
+        });
+        
+        // Send email/SMS notification
+        const { sendCardActivityNotification } = await import('./notificationService');
+        sendCardActivityNotification(
+          user.email,
+          user.phone,
+          `${user.firstName} ${user.lastName}`,
+          'transaction',
+          `Spent at ${data.merchantName || 'a merchant'} from "${pool!.title}" pool card`,
+          data.amount,
+          user.notifyEmail,
+          user.notifySMS
+        ).catch(err => console.error('[Notification] Card transaction notification failed:', err));
+      }
+
       res.json({ transaction, newBalance });
     } catch (error) {
       next(error);
