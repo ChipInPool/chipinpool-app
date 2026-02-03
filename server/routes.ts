@@ -820,6 +820,138 @@ export async function registerRoutes(
     }
   });
 
+  // Public pool viewing - no auth required for shared links
+  app.get("/api/pools/:id/public", async (req, res, next) => {
+    try {
+      const pool = await storage.getPool(req.params.id);
+      if (!pool) {
+        return res.status(404).json({ message: "Pool not found" });
+      }
+
+      // Check if pool allows public viewing
+      if (pool.status !== 'active' && pool.status !== 'completed') {
+        return res.status(403).json({ message: "This pool is no longer active" });
+      }
+
+      const [creator, contributions] = await Promise.all([
+        storage.getUser(pool.creatorId),
+        storage.getContributionsByPool(pool.id),
+      ]);
+
+      // Get contributors with limited user info (privacy)
+      const contributorsData = await Promise.all(
+        contributions.map(async (c) => {
+          if (!c.userId) {
+            return {
+              user: { name: c.guestEmail ? 'Guest' : 'Anonymous', avatar: null },
+              amount: c.amount,
+              date: c.createdAt.toISOString(),
+            };
+          }
+          const user = await storage.getUser(c.userId);
+          return {
+            user: user ? { 
+              name: `${user.firstName} ${user.lastName?.[0] || ''}`.trim(), 
+              avatar: user.avatar 
+            } : null,
+            amount: c.amount,
+            date: c.createdAt.toISOString(),
+          };
+        })
+      );
+
+      res.json({
+        pool: {
+          id: pool.id,
+          creatorId: 'private',
+          title: pool.title,
+          description: pool.description,
+          targetAmount: pool.targetAmount,
+          currentAmount: pool.currentAmount,
+          deadline: pool.deadline,
+          status: pool.status,
+          category: pool.category,
+          creator: { 
+            name: creator ? `${creator.firstName[0]}***` : 'Anonymous',
+            firstName: creator?.firstName?.[0] ? `${creator.firstName[0]}***` : 'A',
+            lastName: '',
+            avatar: null,
+          },
+          contributors: [],
+          contributorCount: contributions.length,
+          comments: [],
+        },
+        isPublic: true,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Guest contribution via Stripe (no auth required)
+  app.post("/api/pools/:id/contribute-guest", async (req, res, next) => {
+    try {
+      const { amount, email, name } = z.object({ 
+        amount: z.string().refine(val => {
+          const num = parseFloat(val);
+          return !isNaN(num) && num >= 1 && num <= 10000;
+        }, "Amount must be between $1 and $10,000"),
+        email: z.string().email().optional(),
+        name: z.string().min(1).max(100).optional(),
+      }).parse(req.body);
+      
+      const pool = await storage.getPool(req.params.id);
+      if (!pool) {
+        return res.status(404).json({ message: "Pool not found" });
+      }
+      
+      if (pool.status !== 'active') {
+        return res.status(400).json({ message: "This pool is no longer accepting contributions" });
+      }
+
+      const amountCents = Math.round(parseFloat(amount) * 100);
+      const stripe = await getUncachableStripeClient();
+      
+      // Get the base URL for success/cancel redirects
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? 'https://chipinpool.azurewebsites.net'
+        : `http://localhost:5000`;
+
+      // Create a Stripe Checkout session for guest payment
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Contribution to ${pool.title}`,
+              description: `Guest contribution to pool`,
+            },
+            unit_amount: amountCents,
+          },
+          quantity: 1,
+        }],
+        mode: 'payment',
+        success_url: `${baseUrl}/pool/${pool.id}?contributed=true&guest=true`,
+        cancel_url: `${baseUrl}/pool/${pool.id}`,
+        customer_email: email,
+        metadata: {
+          poolId: pool.id,
+          amount: amount,
+          type: 'pool_contribution',
+          guestName: name || 'Anonymous Guest',
+        },
+      });
+
+      res.json({ 
+        checkoutUrl: session.url,
+        sessionId: session.id,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get("/api/pools/:id", requireAuth, async (req, res, next) => {
     try {
       const pool = await storage.getPool(req.params.id);

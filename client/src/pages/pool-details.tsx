@@ -67,11 +67,26 @@ export default function PoolDetails() {
   const [autoContributeFrequency, setAutoContributeFrequency] = useState<'weekly' | 'monthly' | 'quarterly'>('monthly');
   const [startImmediately, setStartImmediately] = useState(true);
 
+  // Fetch pool data - use public endpoint if not authenticated
   const { data: poolData, isLoading: poolLoading } = useQuery({
-    queryKey: queryKeys.pool(params?.id || ''),
-    queryFn: () => api.pools.get(params?.id || ''),
-    enabled: !!params?.id && isAuthenticated,
+    queryKey: isAuthenticated ? queryKeys.pool(params?.id || '') : ['public-pool', params?.id],
+    queryFn: async () => {
+      if (isAuthenticated) {
+        return api.pools.get(params?.id || '');
+      }
+      // Public endpoint for guest viewing
+      const res = await fetch(`/api/pools/${params?.id}/public`);
+      if (!res.ok) throw new Error('Pool not found');
+      return res.json();
+    },
+    enabled: !!params?.id && !authLoading,
   });
+  
+  const isPublicView = !isAuthenticated && poolData?.isPublic;
+  
+  // Guest contribution state
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestName, setGuestName] = useState("");
 
   const contributeMutation = useMutation({
     mutationFn: (amount: string) => api.pools.contribute(params?.id || '', amount),
@@ -212,15 +227,34 @@ export default function PoolDetails() {
     );
   };
 
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      setLocation("/login");
+  // Guest contribution handler
+  const handleGuestContribute = async () => {
+    if (!chipInAmount || parseFloat(chipInAmount) < 1) {
+      toast({ title: "Invalid amount", description: "Please enter at least $1", variant: "destructive" });
+      return;
     }
-  }, [authLoading, isAuthenticated, setLocation]);
-
-  if (!authLoading && !isAuthenticated) {
-    return null;
-  }
+    setIsChippingIn(true);
+    try {
+      const res = await fetch(`/api/pools/${params?.id}/contribute-guest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          amount: chipInAmount, 
+          email: guestEmail || undefined,
+          name: guestName || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to process contribution');
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setIsChippingIn(false);
+    }
+  };
 
   if (poolLoading || authLoading) {
     return (
@@ -417,9 +451,20 @@ export default function PoolDetails() {
             </div>
 
             <div className="p-6 rounded-2xl bg-card border border-white/5">
-              <h3 className="font-display font-bold text-xl mb-6">Contributors ({contributors.length})</h3>
+              <h3 className="font-display font-bold text-xl mb-6">
+                Contributors ({isPublicView ? (pool.contributorCount || 0) : contributors.length})
+              </h3>
               <div className="space-y-4">
-                {contributors.length === 0 ? (
+                {isPublicView ? (
+                  (pool.contributorCount || 0) === 0 ? (
+                    <p className="text-muted-foreground text-sm">No contributions yet. Be the first!</p>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">
+                      {pool.contributorCount} {pool.contributorCount === 1 ? 'person has' : 'people have'} contributed to this pool. 
+                      <Link href="/login" className="text-primary hover:underline ml-1">Sign in</Link> to see details.
+                    </p>
+                  )
+                ) : contributors.length === 0 ? (
                   <p className="text-muted-foreground text-sm">No contributions yet. Be the first!</p>
                 ) : (
                   contributors.map((c: any, i: number) => (
@@ -539,6 +584,34 @@ export default function PoolDetails() {
                             data-testid="input-chip-amount"
                           />
                         </div>
+                        {/* Guest info fields for public view */}
+                        {isPublicView && (
+                          <div className="space-y-4 border-t border-white/10 pt-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="guest-name">Your Name (optional)</Label>
+                              <Input
+                                id="guest-name"
+                                value={guestName}
+                                onChange={(e) => setGuestName(e.target.value)}
+                                placeholder="Enter your name"
+                                className="bg-white/5 border-white/10"
+                                data-testid="input-guest-name"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="guest-email">Email (optional - for receipt)</Label>
+                              <Input
+                                id="guest-email"
+                                type="email"
+                                value={guestEmail}
+                                onChange={(e) => setGuestEmail(e.target.value)}
+                                placeholder="your@email.com"
+                                className="bg-white/5 border-white/10"
+                                data-testid="input-guest-email"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="py-4 animate-in fade-in slide-in-from-right-4">
@@ -640,9 +713,21 @@ export default function PoolDetails() {
                         )}
                       </div>
                       {paymentStep === 'amount' ? (
-                        <Button type="button" className="w-full sm:w-auto font-bold" onClick={() => setPaymentStep('method')} disabled={!chipInAmount}>
-                          Continue
-                        </Button>
+                        isPublicView ? (
+                          <Button 
+                            type="button" 
+                            className="w-full sm:w-auto font-bold" 
+                            onClick={handleGuestContribute} 
+                            disabled={!chipInAmount || isChippingIn}
+                            data-testid="button-guest-checkout"
+                          >
+                            {isChippingIn ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</> : "Continue to Payment"}
+                          </Button>
+                        ) : (
+                          <Button type="button" className="w-full sm:w-auto font-bold" onClick={() => setPaymentStep('method')} disabled={!chipInAmount}>
+                            Continue
+                          </Button>
+                        )
                       ) : (
                         <Button type="submit" className="w-full sm:w-auto font-bold" onClick={handleChipIn} disabled={isChippingIn || contributeMutation.isPending} data-testid="button-confirm-payment">
                           {(isChippingIn || contributeMutation.isPending) ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</> : "Confirm Payment"}
@@ -652,6 +737,20 @@ export default function PoolDetails() {
                   </DialogContent>
                 </Dialog>
 
+                {/* Sign in prompt for guests */}
+                {isPublicView && (
+                  <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Want more features? Sign in to track your contributions and set up recurring payments.
+                    </p>
+                    <Button variant="outline" size="sm" asChild className="border-white/20">
+                      <Link href="/login">Sign In</Link>
+                    </Button>
+                  </div>
+                )}
+
+                {/* Auto-contribute - only for authenticated users */}
+                {isAuthenticated && (
                 <Dialog open={autoContributeDialogOpen} onOpenChange={setAutoContributeDialogOpen}>
                   <DialogTrigger asChild>
                     <Button 
@@ -733,7 +832,10 @@ export default function PoolDetails() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+                )}
 
+                {/* Authenticated user actions - hide for guests */}
+                {isAuthenticated && (
                 <div className={`grid gap-3 ${isCreator ? 'grid-cols-3' : 'grid-cols-2'}`}>
                   <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
                     <DialogTrigger asChild>
@@ -1090,6 +1192,7 @@ export default function PoolDetails() {
                     </Dialog>
                   )}
                 </div>
+                )}
               </div>
               
               <div className="mt-8 pt-6 border-t border-white/5 text-center">
