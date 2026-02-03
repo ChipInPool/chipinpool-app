@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import heroImage from "@assets/generated_images/developer_api_documentation_abstract_visualization_with_code_blocks.png";
 
 export default function ApiDocs() {
@@ -16,8 +17,22 @@ export default function ApiDocs() {
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  
+  const handleRequestApiKeys = () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Login Required",
+        description: "Please log in to request API access.",
+        variant: "destructive",
+      });
+      setLocation("/login");
+      return;
+    }
+    setShowRequestForm(true);
+  };
 
   const [formData, setFormData] = useState({
     companyName: "",
@@ -77,7 +92,7 @@ export default function ApiDocs() {
               <Button 
                 size="lg" 
                 className="h-12 px-8 font-bold shadow-lg shadow-primary/20"
-                onClick={() => setShowRequestForm(true)}
+                onClick={handleRequestApiKeys}
                 data-testid="button-request-api-keys"
               >
                 Request API Keys

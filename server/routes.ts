@@ -1672,7 +1672,7 @@ export async function registerRoutes(
           userId: user.id,
           type: 'contribution',
           title: 'Card Transaction',
-          message: `You spent $${data.amount} at ${data.merchantName || 'a merchant'} from "${pool!.title}" card`,
+          message: `You spent $${data.amount} at ${data.merchant || 'a merchant'} from "${pool!.title}" card`,
           link: `/pool/${pool!.id}`,
         });
         
@@ -1683,7 +1683,7 @@ export async function registerRoutes(
           user.phone,
           `${user.firstName} ${user.lastName}`,
           'transaction',
-          `Spent at ${data.merchantName || 'a merchant'} from "${pool!.title}" pool card`,
+          `Spent at ${data.merchant || 'a merchant'} from "${pool!.title}" pool card`,
           data.amount,
           user.notifyEmail,
           user.notifySMS
