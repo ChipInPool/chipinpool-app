@@ -48,6 +48,53 @@ declare module "express-session" {
   }
 }
 
+// Helper to get client IP address from request (handles proxies like Azure)
+function getClientIp(req: express.Request): string {
+  // Check x-forwarded-for header (common for proxies/load balancers)
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const ips = typeof forwarded === 'string' ? forwarded.split(',') : forwarded;
+    const firstIp = ips[0]?.trim();
+    if (firstIp && isValidIpAddress(firstIp)) {
+      return firstIp;
+    }
+  }
+  
+  // Check x-real-ip header
+  const realIp = req.headers['x-real-ip'];
+  if (realIp && typeof realIp === 'string' && isValidIpAddress(realIp)) {
+    return realIp;
+  }
+  
+  // Fall back to req.ip or socket address
+  const ip = req.ip || req.socket?.remoteAddress;
+  if (ip && isValidIpAddress(ip)) {
+    return ip;
+  }
+  
+  // Default fallback - use a valid IPv4 address
+  return '127.0.0.1';
+}
+
+function isValidIpAddress(ip: string): boolean {
+  // Remove IPv6 prefix if present (::ffff:)
+  const cleanIp = ip.replace(/^::ffff:/, '');
+  
+  // IPv4 regex
+  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (ipv4Regex.test(cleanIp)) {
+    return true;
+  }
+  
+  // IPv6 regex (simplified)
+  const ipv6Regex = /^[0-9a-fA-F:]+$/;
+  if (ipv6Regex.test(ip) && ip.includes(':')) {
+    return true;
+  }
+  
+  return false;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -1866,7 +1913,7 @@ export async function registerRoutes(
               customer_acceptance: {
                 type: 'online',
                 online: {
-                  ip_address: req.ip || '0.0.0.0',
+                  ip_address: getClientIp(req),
                   user_agent: req.get('user-agent') || 'ChipInPool',
                 },
               },
