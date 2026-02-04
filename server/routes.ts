@@ -2837,7 +2837,36 @@ export async function registerRoutes(
       console.log(`[Wallet Withdraw] Manual payout request created: ${withdrawal.id} for $${amount}`);
       console.log(`[Wallet Withdraw] Bank: ${finalAccountHolderName}, Routing: ${finalRoutingNumber}, Account: ****${accountLast4}`);
 
-      // Send notification
+      // Send admin notification email
+      const { sendEmail } = await import('./notificationService');
+      const adminWithdrawalHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
+            <h1 style="color: #d4ff00; margin: 0 0 16px;">💰 New Withdrawal Request</h1>
+            <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
+              A new withdrawal request requires review.
+            </p>
+            <div style="background: rgba(255,255,255,0.1); padding: 16px; border-radius: 8px; margin: 16px 0;">
+              <p style="color: #94a3b8; margin: 0;">
+                <strong>User:</strong> ${user.firstName} ${user.lastName}<br>
+                <strong>Email:</strong> ${user.email}<br>
+                <strong>Amount:</strong> $${parseFloat(amount).toFixed(2)}<br>
+                <strong>Bank:</strong> ${finalAccountHolderName}<br>
+                <strong>Account:</strong> ****${accountLast4}<br>
+                <strong>Withdrawal ID:</strong> ${withdrawal.id}
+              </p>
+            </div>
+            <p style="color: #94a3b8; font-size: 14px; margin: 24px 0 0;">
+              Please review this request in the admin portal.
+            </p>
+          </div>
+        </div>
+      `;
+      
+      sendEmail('payments@chipinpool.com', '💰 New Withdrawal Request - Action Required', adminWithdrawalHtml)
+        .catch(err => console.error('[Email] Failed to send admin withdrawal notification:', err));
+
+      // Send user notification
       sendWalletActivityNotification(
         user.email,
         user.phone,
@@ -5417,6 +5446,34 @@ export async function registerRoutes(
       
       sendEmail(user.email, '📝 API Access Request Received - ChipIn', confirmationHtml)
         .catch(err => console.error('[Email] Failed to send API request confirmation:', err));
+
+      // Send admin notification email
+      const adminApiRequestHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
+            <h1 style="color: #d4ff00; margin: 0 0 16px;">🔑 New API Access Request</h1>
+            <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
+              A new developer has requested API access.
+            </p>
+            <div style="background: rgba(255,255,255,0.1); padding: 16px; border-radius: 8px; margin: 16px 0;">
+              <p style="color: #94a3b8; margin: 0;">
+                <strong>Requester:</strong> ${user.firstName} ${user.lastName}<br>
+                <strong>Email:</strong> ${user.email}<br>
+                <strong>Company:</strong> ${data.companyName}<br>
+                <strong>Website:</strong> ${data.website}<br>
+                <strong>Use Case:</strong> ${data.useCase}<br>
+                <strong>Expected Volume:</strong> ${data.monthlyVolume}
+              </p>
+            </div>
+            <p style="color: #94a3b8; font-size: 14px; margin: 24px 0 0;">
+              Please review this request in the admin portal at /admin/api-requests.
+            </p>
+          </div>
+        </div>
+      `;
+      
+      sendEmail('mail@chipinpool.com', '🔑 New API Access Request - Action Required', adminApiRequestHtml)
+        .catch(err => console.error('[Email] Failed to send admin API request notification:', err));
 
       console.log(`[Developer API] New access request from ${user.email}:`, {
         companyName: data.companyName,
