@@ -21,9 +21,15 @@ interface ApiAccessRequest {
   id: string;
   companyName: string;
   website: string;
-  email: string;
+  useCase: string;
+  monthlyVolume: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
+  user: {
+    email: string;
+    firstName: string;
+    lastName: string;
+  } | null;
 }
 
 export default function AdminApiRequests() {
@@ -37,7 +43,8 @@ export default function AdminApiRequests() {
     queryFn: async () => {
       const res = await fetch("/api/admin/api-requests", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch API access requests");
-      return res.json();
+      const data = await res.json();
+      return data.requests || [];
     },
   });
 
@@ -75,9 +82,10 @@ export default function AdminApiRequests() {
   };
 
   const filteredRequests = requests.filter((request) => {
+    const email = request.user?.email || '';
     const matchesSearch =
       request.companyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      request.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       request.website.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || request.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -181,7 +189,7 @@ export default function AdminApiRequests() {
                         {request.website} <ExternalLink className="w-3 h-3" />
                       </a>
                     </TableCell>
-                    <TableCell>{request.email}</TableCell>
+                    <TableCell>{request.user?.email || 'N/A'}</TableCell>
                     <TableCell>{getStatusBadge(request.status)}</TableCell>
                     <TableCell>{format(new Date(request.createdAt), "MMM d, yyyy")}</TableCell>
                     <TableCell>
