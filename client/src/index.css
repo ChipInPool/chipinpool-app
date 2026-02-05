@@ -76,59 +76,92 @@
 }
 
 .light {
-  /* Light Theme - Clean Minimalist Finance */
-  --background: 0 0% 100%;
-  --foreground: 210 13% 50%;
+  /* Light Theme - Modern Clean Finance */
+  --background: 210 20% 98%;
+  --foreground: 222 47% 11%;
 
-  /* Card: Pure White */
+  /* Card: Clean White with subtle warmth */
   --card: 0 0% 100%;
-  --card-foreground: 210 100% 12%;
+  --card-foreground: 222 47% 11%;
 
   /* Popover */
   --popover: 0 0% 100%;
-  --popover-foreground: 210 100% 12%;
+  --popover-foreground: 222 47% 11%;
 
-  /* Primary: Deep Navy Blue (#001F3F) */
-  --primary: 210 100% 12%;
+  /* Primary: Teal-Navy (#0F766E) - modern fintech feel */
+  --primary: 173 80% 26%;
   --primary-foreground: 0 0% 100%;
 
-  /* Secondary: Light Gray */
-  --secondary: 210 20% 96%;
-  --secondary-foreground: 210 100% 12%;
+  /* Secondary: Cool Gray */
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
 
-  /* Muted: Very Light Gray */
-  --muted: 210 20% 96%;
-  --muted-foreground: 210 13% 50%;
+  /* Muted: Soft Gray */
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
 
-  /* Accent: Mint Green (#7FFFD4) */
-  --accent: 160 100% 40%;
-  --accent-foreground: 210 100% 12%;
+  /* Accent: Vibrant Teal */
+  --accent: 172 66% 50%;
+  --accent-foreground: 222 47% 11%;
 
   /* Destructive */
-  --destructive: 0 72% 51%;
+  --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  /* Borders - subtle */
-  --border: 210 20% 90%;
-  --input: 210 20% 96%;
-  --ring: 210 100% 12%;
+  /* Borders - refined */
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 173 80% 26%;
 }
 
-/* Light mode specific overrides for minimalist design */
+/* Light mode specific overrides for polished design */
 .light .glass {
-  @apply bg-primary/5 backdrop-blur-lg border border-primary/10;
+  @apply bg-white/80 backdrop-blur-lg border border-border shadow-sm;
 }
 
 .light .glass-card {
-  @apply bg-white border border-border;
+  @apply bg-white border border-border shadow-sm hover:shadow-md transition-shadow;
 }
 
 .light nav {
-  @apply border-b border-border bg-white/95;
+  @apply border-b border-border bg-white/95 shadow-sm backdrop-blur-sm;
 }
 
 .light footer {
-  @apply border-t border-border;
+  @apply border-t border-border bg-white;
+}
+
+/* Light mode card improvements */
+.light [data-slot="card"] {
+  @apply shadow-sm hover:shadow-md transition-shadow duration-200;
+}
+
+/* Light mode button improvements */
+.light button[data-slot="button"] {
+  @apply shadow-sm;
+}
+
+/* Light mode input styling */
+.light input, .light textarea, .light select {
+  @apply bg-white border-border focus:border-primary/50 focus:ring-primary/20;
+}
+
+/* Light mode table improvements */
+.light table {
+  @apply bg-white;
+}
+
+.light th {
+  @apply bg-muted/50 text-foreground font-semibold;
+}
+
+.light tr:hover {
+  @apply bg-muted/30;
+}
+
+/* Light mode badge styling */
+.light [data-slot="badge"] {
+  @apply shadow-sm;
 }
 
 @layer base {
