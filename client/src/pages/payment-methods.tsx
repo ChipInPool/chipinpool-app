@@ -186,7 +186,7 @@ export default function PaymentMethods() {
   const debitCardsList = bankAccounts.filter((a: any) => a.accountType === 'debit');
   
   // Check if user can receive payouts (has at least one linked bank or debit card)
-  const canReceivePayouts = bankAccountsList.length > 0 || debitCardsList.length > 0;
+  const canReceivePayouts = bankAccountsList.length > 0; /* HIDDEN: || debitCardsList.length > 0 */
 
   const completeBankLinkMutation = useMutation({
     mutationFn: async ({ accountId, setupIntentId }: { accountId: string; setupIntentId?: string }) => {
@@ -397,7 +397,7 @@ export default function PaymentMethods() {
               <Shield className="w-6 h-6 text-primary" />
               <div>
                 <CardTitle>Withdrawal Status</CardTitle>
-                <CardDescription>Link a bank account or debit card to receive funds</CardDescription>
+                <CardDescription>Link a bank account to receive funds</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -415,7 +415,7 @@ export default function PaymentMethods() {
                 <Clock className="w-5 h-5 text-yellow-400" />
                 <div>
                   <p className="text-sm font-medium text-yellow-400">Link a Payment Method</p>
-                  <p className="text-xs text-muted-foreground">Add a bank account for free ACH transfers or a debit card for instant payouts</p>
+                  <p className="text-xs text-muted-foreground">Add a bank account for free ACH transfers</p>
                 </div>
               </div>
             )}
@@ -423,7 +423,7 @@ export default function PaymentMethods() {
         </Card>
 
         <Tabs defaultValue="bank" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-1">
             <TabsTrigger value="bank" className="flex items-center gap-2" data-testid="tab-bank-accounts">
               <Building className="w-4 h-4" />
               Bank Accounts
@@ -431,6 +431,7 @@ export default function PaymentMethods() {
                 <Badge variant="secondary" className="ml-1">{bankAccountsList.length}</Badge>
               )}
             </TabsTrigger>
+            {/* HIDDEN: Debit card tab temporarily disabled
             <TabsTrigger value="debit" className="flex items-center gap-2" data-testid="tab-debit-cards">
               <CreditCard className="w-4 h-4" />
               Debit Cards
@@ -438,6 +439,7 @@ export default function PaymentMethods() {
                 <Badge variant="secondary" className="ml-1">{debitCardsList.length}</Badge>
               )}
             </TabsTrigger>
+            */}
           </TabsList>
 
           <TabsContent value="bank" className="space-y-4">
@@ -549,6 +551,7 @@ export default function PaymentMethods() {
             </Card>
           </TabsContent>
 
+          {/* HIDDEN: Debit card tab content temporarily disabled
           <TabsContent value="debit" className="space-y-4">
             <Card className="bg-white/[0.02] border-white/5">
               <CardHeader>
@@ -634,6 +637,7 @@ export default function PaymentMethods() {
               </CardContent>
             </Card>
           </TabsContent>
+          */}
         </Tabs>
 
         <Card className="bg-white/[0.02] border-white/5">
@@ -648,7 +652,7 @@ export default function PaymentMethods() {
               <div className="space-y-2 p-4 bg-white/5 rounded-lg">
                 <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold">1</div>
                 <h3 className="font-medium">Link a Payment Method</h3>
-                <p className="text-sm text-muted-foreground">Connect your bank account or debit card securely through Stripe</p>
+                <p className="text-sm text-muted-foreground">Connect your bank account securely through Stripe</p>
               </div>
               <div className="space-y-2 p-4 bg-white/5 rounded-lg">
                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">2</div>
@@ -665,6 +669,7 @@ export default function PaymentMethods() {
         </Card>
       </div>
 
+      {/* HIDDEN: Debit card dialog temporarily disabled
       <Dialog open={showDebitCardDialog} onOpenChange={setShowDebitCardDialog}>
         <DialogContent className="bg-card border-white/10">
           <DialogHeader>
@@ -689,6 +694,7 @@ export default function PaymentMethods() {
           )}
         </DialogContent>
       </Dialog>
+      */}
 
       <Dialog open={showAccountNumberDialog} onOpenChange={(open) => {
         if (!open) {

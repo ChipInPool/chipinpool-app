@@ -71,7 +71,8 @@ export default function AcceptTransfer() {
   const transferRequest: TransferRequest | null = transferData?.request || null;
   const allBankAccounts: BankAccount[] = Array.isArray(bankAccountsData) ? bankAccountsData : (bankAccountsData?.accounts || []);
   // Only show accounts that can receive payouts (have Plaid credentials)
-  const bankAccounts = allBankAccounts.filter(a => a.canReceivePayouts);
+  // HIDDEN: Also filter out debit cards temporarily - was: allBankAccounts.filter(a => a.canReceivePayouts)
+  const bankAccounts = allBankAccounts.filter(a => a.canReceivePayouts).filter((a: any) => a.accountType !== 'debit');
   const hasNonPayableAccounts = allBankAccounts.length > 0 && bankAccounts.length === 0;
 
   // Get selected account and detect if it's a debit card
@@ -419,8 +420,8 @@ export default function AcceptTransfer() {
                     <span className="text-sm font-medium">Payout Speed</span>
                   </div>
                   
-                  {/* For Debit Cards - Always Instant, no choice */}
-                  {isDebitCard ? (
+                  {/* HIDDEN: Debit card instant payout section temporarily disabled */}
+                  {false && isDebitCard && (
                     <div className="p-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -444,87 +445,85 @@ export default function AcceptTransfer() {
                         Debit card payouts are always instant via push-to-card.
                       </p>
                     </div>
-                  ) : (
-                    <>
-                      {/* Standard Option - Bank Account */}
-                      <button
-                        type="button"
-                        onClick={() => setPayoutSpeed('standard')}
-                        className={`w-full p-4 rounded-lg border text-left transition-all ${
-                          payoutSpeed === 'standard'
-                            ? "border-primary bg-primary/5"
-                            : "border-white/10 hover:border-white/20"
-                        }`}
-                        data-testid="payout-speed-standard"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <RefreshCw className="w-5 h-5 text-cyan-400" />
-                            <div>
-                              <div className="font-medium text-sm">Standard ACH</div>
-                              <div className="text-xs text-muted-foreground">1-3 business days</div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-medium text-sm text-green-500">Free</div>
-                            <div className="text-xs text-muted-foreground">
-                              You receive ${rawAmount.toFixed(2)}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-
-                      {/* Instant Option - Bank Account via RTP */}
-                      <button
-                        type="button"
-                        onClick={() => setPayoutSpeed('instant')}
-                        className={`w-full p-4 rounded-lg border text-left transition-all ${
-                          payoutSpeed === 'instant'
-                            ? "border-primary bg-primary/5"
-                            : "border-white/10 hover:border-white/20"
-                        }`}
-                        data-testid="payout-speed-instant"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Zap className="w-5 h-5 text-yellow-500" />
-                            <div>
-                              <div className="font-medium text-sm flex items-center gap-2">
-                                Instant RTP
-                                <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded">FAST</span>
-                              </div>
-                              <div className="text-xs text-muted-foreground">Arrives in seconds</div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-medium text-sm text-yellow-500">1.5% fee</div>
-                            <div className="text-xs text-muted-foreground">
-                              You receive ${(rawAmount - rawAmount * INSTANT_FEE_RATE).toFixed(2)}
-                            </div>
-                          </div>
-                        </div>
-                        {payoutSpeed === 'instant' && (
-                          <div className="mt-2 pt-2 border-t border-white/10 text-xs text-muted-foreground">
-                            <div className="flex justify-between">
-                              <span>Amount:</span>
-                              <span>${rawAmount.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-yellow-500">
-                              <span>Instant fee (1.5%):</span>
-                              <span>-${(rawAmount * INSTANT_FEE_RATE).toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between font-medium text-foreground">
-                              <span>You receive:</span>
-                              <span>${netAmount.toFixed(2)}</span>
-                            </div>
-                          </div>
-                        )}
-                      </button>
-                      <p className="text-xs text-muted-foreground">
-                        Note: Instant RTP may not be available for all banks. If unavailable, we'll use standard ACH.
-                      </p>
-                    </>
                   )}
+                  {/* Bank Account payout options (was inside else branch of isDebitCard ternary) */}
+                  {/* Standard Option - Bank Account */}
+                  <button
+                    type="button"
+                    onClick={() => setPayoutSpeed('standard')}
+                    className={`w-full p-4 rounded-lg border text-left transition-all ${
+                      payoutSpeed === 'standard'
+                        ? "border-primary bg-primary/5"
+                        : "border-white/10 hover:border-white/20"
+                    }`}
+                    data-testid="payout-speed-standard"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <RefreshCw className="w-5 h-5 text-cyan-400" />
+                        <div>
+                          <div className="font-medium text-sm">Standard ACH</div>
+                          <div className="text-xs text-muted-foreground">1-3 business days</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium text-sm text-green-500">Free</div>
+                        <div className="text-xs text-muted-foreground">
+                          You receive ${rawAmount.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Instant Option - Bank Account via RTP */}
+                  <button
+                    type="button"
+                    onClick={() => setPayoutSpeed('instant')}
+                    className={`w-full p-4 rounded-lg border text-left transition-all ${
+                      payoutSpeed === 'instant'
+                        ? "border-primary bg-primary/5"
+                        : "border-white/10 hover:border-white/20"
+                    }`}
+                    data-testid="payout-speed-instant"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Zap className="w-5 h-5 text-yellow-500" />
+                        <div>
+                          <div className="font-medium text-sm flex items-center gap-2">
+                            Instant RTP
+                            <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded">FAST</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">Arrives in seconds</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium text-sm text-yellow-500">1.5% fee</div>
+                        <div className="text-xs text-muted-foreground">
+                          You receive ${(rawAmount - rawAmount * INSTANT_FEE_RATE).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                    {payoutSpeed === 'instant' && (
+                      <div className="mt-2 pt-2 border-t border-white/10 text-xs text-muted-foreground">
+                        <div className="flex justify-between">
+                          <span>Amount:</span>
+                          <span>${rawAmount.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-yellow-500">
+                          <span>Instant fee (1.5%):</span>
+                          <span>-${(rawAmount * INSTANT_FEE_RATE).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between font-medium text-foreground">
+                          <span>You receive:</span>
+                          <span>${netAmount.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </button>
+                  <p className="text-xs text-muted-foreground">
+                    Note: Instant RTP may not be available for all banks. If unavailable, we'll use standard ACH.
+                  </p>
                 </div>
               )}
 
