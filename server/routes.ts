@@ -4152,7 +4152,13 @@ export async function registerRoutes(
                   status: 'pending',
                 });
               } else {
-                throw new Error('Connect account not ready for payouts');
+                // Connect account not ready - fall through to manual payout
+                console.log('[Payout] Connect account not ready for payouts, using manual processing');
+                payoutTransferId = `manual_${withdrawal.id}`;
+                await storage.updateWalletWithdrawal(withdrawal.id, {
+                  plaidTransferId: payoutTransferId,
+                  status: 'pending_review',
+                });
               }
             } else {
               // Regular user without Connect - check for stored bank details
