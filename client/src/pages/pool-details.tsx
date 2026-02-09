@@ -411,34 +411,34 @@ export default function PoolDetails() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            <div className="relative rounded-3xl overflow-hidden aspect-video border border-white/5 bg-card/50">
+            <div className={`relative rounded-3xl overflow-hidden border border-white/5 bg-card/50 ${pool.image ? 'aspect-video' : ''}`}>
               {pool.image && (
                 <>
                   <img src={pool.image} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-linear-to-t from-background/90 via-transparent to-transparent" />
                 </>
               )}
-              <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-                <div className="flex items-center gap-3 mb-2">
+              <div className={`${pool.image ? 'absolute bottom-0 left-0 right-0' : 'relative'} p-6 md:p-8`}>
+                <div className="flex flex-wrap items-center gap-3 mb-3">
                   <span className="px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider backdrop-blur-md">
                     {pool.category}
                   </span>
-                  <div className="flex items-center gap-1.5 text-xs text-white/80 font-medium bg-black/40 px-2 py-1 rounded-full backdrop-blur-md">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium bg-muted/50 dark:bg-black/40 dark:text-white/80 px-2 py-1 rounded-full backdrop-blur-md">
                     <Clock className="w-3.5 h-3.5" />
                     {pool.status === 'active' ? `Ends ${formatDistanceToNow(new Date(pool.deadline), { addSuffix: true })}` : 'Completed'}
                   </div>
                 </div>
-                <h1 className="text-3xl md:text-5xl font-display font-bold text-white mb-2">{pool.title}</h1>
+                <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground dark:text-white mb-3 break-words">{pool.title}</h1>
                 <Link 
                   href={isCreator ? '/profile' : `/user/${pool.creatorId}`}
-                  className="flex items-center gap-3 text-white/80 hover:text-white transition-colors w-fit"
+                  className="flex items-center gap-3 text-muted-foreground dark:text-white/80 hover:text-foreground dark:hover:text-white transition-colors w-fit"
                   data-testid={`link-pool-creator-${pool.creatorId}`}
                 >
-                  <Avatar className="w-6 h-6 border border-white/20">
+                  <Avatar className="w-6 h-6 border border-border dark:border-white/20">
                     <AvatarImage src={creator.avatar} />
                     <AvatarFallback>{creator.name?.[0]}</AvatarFallback>
                   </Avatar>
-                  <span className="text-sm">Created by <span className="font-semibold text-white">{creator.name}</span></span>
+                  <span className="text-sm">Created by <span className="font-semibold text-foreground dark:text-white">{creator.name}</span></span>
                 </Link>
               </div>
             </div>
