@@ -1063,6 +1063,7 @@ export async function registerRoutes(
         description: z.string().optional(),
         targetAmount: z.string().optional(),
         deadline: z.string().optional(),
+        image: z.string().optional(),
       });
 
       const data = updateSchema.parse(req.body);
@@ -1071,6 +1072,7 @@ export async function registerRoutes(
         description: data.description,
         targetAmount: data.targetAmount,
         deadline: data.deadline ? new Date(data.deadline) : undefined,
+        image: data.image,
       });
 
       res.json({ pool: updatedPool });

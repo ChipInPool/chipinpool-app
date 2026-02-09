@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3, RefreshCw, Building2 } from "lucide-react";
+import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3, RefreshCw, Building2, ImagePlus, Upload, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useRoute, useLocation } from "wouter";
 import { formatDistanceToNow, format } from "date-fns";
@@ -66,6 +66,9 @@ export default function PoolDetails() {
   const [autoContributeAmount, setAutoContributeAmount] = useState("");
   const [autoContributeFrequency, setAutoContributeFrequency] = useState<'weekly' | 'monthly' | 'quarterly'>('monthly');
   const [startImmediately, setStartImmediately] = useState(true);
+  const [editImage, setEditImage] = useState("");
+  const [isUploadingPoolImage, setIsUploadingPoolImage] = useState(false);
+  const poolImageInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch pool data - use public endpoint if not authenticated
   const { data: poolData, isLoading: poolLoading } = useQuery({
@@ -114,7 +117,7 @@ export default function PoolDetails() {
   });
 
   const updatePoolMutation = useMutation({
-    mutationFn: (data: { title?: string; description?: string; targetAmount?: string; deadline?: string }) => 
+    mutationFn: (data: { title?: string; description?: string; targetAmount?: string; deadline?: string; image?: string }) => 
       api.pools.update(params?.id || '', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.pool(params?.id || '') });
@@ -341,12 +344,49 @@ export default function PoolDetails() {
     }
   };
 
+  const handlePoolImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ description: "Image must be under 5MB", variant: "destructive" });
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      toast({ description: "Please select an image file", variant: "destructive" });
+      return;
+    }
+    setIsUploadingPoolImage(true);
+    try {
+      const urlRes = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+      });
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json();
+      const uploadRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      if (!uploadRes.ok) throw new Error("Failed to upload image");
+      setEditImage(objectPath);
+      toast({ description: "Image uploaded successfully" });
+    } catch (err: any) {
+      toast({ description: err.message || "Failed to upload image", variant: "destructive" });
+    } finally {
+      setIsUploadingPoolImage(false);
+    }
+  };
+
   const handleEditPool = () => {
     updatePoolMutation.mutate({
       title: editTitle,
       description: editDescription,
       targetAmount: editTargetAmount,
       deadline: editDeadline ? new Date(editDeadline).toISOString() : undefined,
+      image: editImage || undefined,
     });
   };
 
@@ -355,6 +395,7 @@ export default function PoolDetails() {
     setEditDescription(pool.description || "");
     setEditTargetAmount(pool.targetAmount || "");
     setEditDeadline(pool.deadline ? format(new Date(pool.deadline), 'yyyy-MM-dd') : "");
+    setEditImage(pool.image || "");
     setEditDialogOpen(true);
   };
 
@@ -1117,6 +1158,54 @@ export default function PoolDetails() {
                           <DialogDescription>Update your pool details</DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label>Pool Image</Label>
+                            <div className="relative rounded-xl overflow-hidden border border-white/10 bg-white/5">
+                              {editImage ? (
+                                <div className="relative">
+                                  <img src={editImage} alt="Pool" className="w-full h-32 object-cover" data-testid="img-edit-pool-image" />
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditImage("")}
+                                    className="absolute top-2 right-2 p-1 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+                                    data-testid="button-remove-pool-image"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="h-32 flex flex-col items-center justify-center text-muted-foreground">
+                                  <ImagePlus className="w-8 h-8 mb-2" />
+                                  <span className="text-sm">No image</span>
+                                </div>
+                              )}
+                              <div className="p-2 border-t border-white/10">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full"
+                                  disabled={isUploadingPoolImage}
+                                  onClick={() => poolImageInputRef.current?.click()}
+                                  data-testid="button-upload-pool-image"
+                                >
+                                  {isUploadingPoolImage ? (
+                                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading...</>
+                                  ) : (
+                                    <><Upload className="w-4 h-4 mr-2" /> {editImage ? 'Change Image' : 'Upload Image'}</>
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                            <input
+                              type="file"
+                              ref={poolImageInputRef}
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handlePoolImageUpload}
+                              data-testid="input-pool-image-file"
+                            />
+                          </div>
                           <div className="space-y-2">
                             <Label htmlFor="edit-title">Title</Label>
                             <Input 

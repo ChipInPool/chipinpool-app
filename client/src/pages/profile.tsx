@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Layout } from "@/components/layout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PoolCard } from "@/components/pool-card";
-import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus, Clock, Users, UserPlus, ChevronDown, ChevronUp, Building, AlertCircle, Receipt, RefreshCw, Loader2, CreditCard, Trash2, Check } from "lucide-react";
+import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus, Clock, Users, UserPlus, ChevronDown, ChevronUp, Building, AlertCircle, Receipt, RefreshCw, Loader2, CreditCard, Trash2, Check, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -35,6 +35,50 @@ export default function Profile() {
   const [followingDialogOpen, setFollowingDialogOpen] = useState(false);
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
   const [payoutMethodsDialogOpen, setPayoutMethodsDialogOpen] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ description: "Image must be under 5MB", variant: "destructive" });
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      toast({ description: "Please select an image file", variant: "destructive" });
+      return;
+    }
+    setIsUploadingAvatar(true);
+    try {
+      const urlRes = await fetch("/api/user/avatar/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json();
+      const uploadRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      if (!uploadRes.ok) throw new Error("Failed to upload image");
+      const saveRes = await fetch("/api/user/avatar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ objectPath }),
+      });
+      if (!saveRes.ok) throw new Error("Failed to save avatar");
+      toast({ description: "Avatar updated successfully" });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user });
+    } catch (err: any) {
+      toast({ description: err.message || "Failed to upload avatar", variant: "destructive" });
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   const handleSyncWallet = async () => {
     setIsSyncing(true);
@@ -299,11 +343,19 @@ export default function Profile() {
 
           <div className="absolute -bottom-16 left-8 right-8 flex items-end justify-between">
             <div className="flex items-end gap-6">
-              <div className="relative">
+              <div className="relative group cursor-pointer" onClick={() => avatarInputRef.current?.click()} data-testid="button-avatar-upload">
+                <input type="file" ref={avatarInputRef} accept="image/*" className="hidden" onChange={handleAvatarUpload} data-testid="input-avatar-file" />
                 <Avatar className="w-32 h-32 border-4 border-background shadow-xl">
                   <AvatarImage src={user.avatar || undefined} />
                   <AvatarFallback>{user.firstName?.[0] || 'U'}</AvatarFallback>
                 </Avatar>
+                <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  {isUploadingAvatar ? (
+                    <Loader2 className="w-8 h-8 text-white animate-spin" />
+                  ) : (
+                    <Camera className="w-8 h-8 text-white" />
+                  )}
+                </div>
                 <div className="absolute bottom-2 right-2 w-6 h-6 bg-green-500 border-2 border-background rounded-full" title="Online" />
               </div>
               <div className="pb-2 mb-2">

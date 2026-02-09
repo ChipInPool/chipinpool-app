@@ -61,7 +61,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: string }) =>
+    update: (id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: string; image?: string }) =>
       fetchApi(`/api/pools/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),

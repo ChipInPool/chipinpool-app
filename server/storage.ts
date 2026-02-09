@@ -33,7 +33,7 @@ export interface IStorage {
   getPoolsByCreator(creatorId: string): Promise<Pool[]>;
   getPoolsByContributor(userId: string): Promise<Pool[]>;
   createPool(pool: InsertPool): Promise<Pool>;
-  updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date }): Promise<Pool | undefined>;
+  updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date; image?: string }): Promise<Pool | undefined>;
   updatePoolAmount(id: string, amount: string): Promise<void>;
   updatePoolStatus(id: string, status: 'active' | 'completed' | 'expired'): Promise<void>;
   
@@ -222,12 +222,13 @@ export class DatabaseStorage implements IStorage {
     return pool;
   }
 
-  async updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date }): Promise<Pool | undefined> {
+  async updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date; image?: string }): Promise<Pool | undefined> {
     const updates: any = { updatedAt: new Date() };
     if (data.title !== undefined) updates.title = data.title;
     if (data.description !== undefined) updates.description = data.description;
     if (data.targetAmount !== undefined) updates.targetAmount = data.targetAmount;
     if (data.deadline !== undefined) updates.deadline = data.deadline;
+    if (data.image !== undefined) updates.image = data.image;
     
     const [pool] = await db.update(pools).set(updates).where(eq(pools.id, id)).returning();
     return pool;
