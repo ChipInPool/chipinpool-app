@@ -4107,75 +4107,17 @@ export async function registerRoutes(
         const isStripeLinked = !!bankAccount.stripeFinancialConnectionsAccountId;
         
         if (isStripeLinked) {
-          // For regular users with Financial Connections linked accounts
-          // We need bank account details to process payouts
+          // Stripe Financial Connections linked accounts
+          // Route to manual admin processing (Mercury/Plaid Transfer)
           try {
-            const stripe = await getUncachableStripeClient();
+            console.log('[Payout] Stripe FC-linked bank account, routing to admin review');
+            console.log('[Payout] Bank:', bankAccount.institutionName, '****' + bankAccount.accountMask);
             
-            // Check if user has a Connect account (optional for enhanced payouts)
-            if (creator?.stripeConnectId) {
-              // User has Connect - use transfers + payouts
-              const connectAccount = await stripe.accounts.retrieve(creator.stripeConnectId);
-              if (connectAccount.payouts_enabled) {
-                // Transfer funds from platform to Connect account
-                const stripeTransfer = await stripe.transfers.create({
-                  amount: Math.round(netAmount * 100),
-                  currency: 'usd',
-                  destination: creator.stripeConnectId,
-                  description: `ChipIn Pool Withdrawal${payoutSpeed === 'instant' ? ' (Instant)' : ''}`,
-                  metadata: {
-                    poolId,
-                    withdrawalId: withdrawal.id,
-                    payoutSpeed,
-                  },
-                });
-                
-                payoutTransferId = stripeTransfer.id;
-                
-                // For instant payouts via debit card
-                if (payoutSpeed === 'instant') {
-                  try {
-                    await stripe.payouts.create({
-                      amount: Math.round(netAmount * 100),
-                      currency: 'usd',
-                      method: 'instant',
-                    }, {
-                      stripeAccount: creator.stripeConnectId,
-                    });
-                  } catch (instantError: any) {
-                    console.log('[Payout] Instant payout not available:', instantError.message);
-                  }
-                }
-                
-                await storage.updateWalletWithdrawal(withdrawal.id, {
-                  plaidTransferId: payoutTransferId,
-                  status: 'pending',
-                });
-              } else {
-                // Connect account not ready - fall through to manual payout
-                console.log('[Payout] Connect account not ready for payouts, using manual processing');
-                payoutTransferId = `manual_${withdrawal.id}`;
-                await storage.updateWalletWithdrawal(withdrawal.id, {
-                  plaidTransferId: payoutTransferId,
-                  status: 'pending_review',
-                });
-              }
-            } else {
-              // Regular user without Connect - check for stored bank details
-              if (!bankAccount.routingNumber || !bankAccount.accountNumber) {
-                throw new Error('Bank account details not available. Please re-link your bank account.');
-              }
-              
-              // For regular users, we'll mark as pending and process via platform-managed payout
-              // This requires manual processing or integration with a payout service
-              console.log('[Payout] Marked for platform-managed ACH payout to:', bankAccount.accountMask);
-              payoutTransferId = `manual_${withdrawal.id}`;
-              
-              await storage.updateWalletWithdrawal(withdrawal.id, {
-                plaidTransferId: payoutTransferId,
-                status: 'pending', // Will be processed by platform admin
-              });
-            }
+            payoutTransferId = `manual_${withdrawal.id}`;
+            await storage.updateWalletWithdrawal(withdrawal.id, {
+              plaidTransferId: payoutTransferId,
+              status: 'pending_review',
+            });
             
           } catch (stripeError: any) {
             console.error('[Payout] Stripe Transfer error:', stripeError.message);
