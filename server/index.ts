@@ -189,6 +189,39 @@ app.use((req, res, next) => {
   // Start cron jobs for recurring contributions
   startCronJobs();
 
+  // Auto-seed badges if not yet initialized
+  (async () => {
+    try {
+      const { storage } = await import("./storage");
+      const existingBadges = await storage.getAllBadges();
+      if (existingBadges.length === 0) {
+        const defaultBadges = [
+          { name: "First Contribution", icon: "💰", color: "#10B981", description: "Made your first contribution to a pool", category: "contribution" as const, criteria: "first_contribution", threshold: 1, pointsAwarded: 50, rarity: "common" },
+          { name: "Generous Giver", icon: "🎁", color: "#3B82F6", description: "Contributed $100+ total", category: "contribution" as const, criteria: "total_contributed_100", threshold: 100, pointsAwarded: 100, rarity: "uncommon" },
+          { name: "Big Spender", icon: "💎", color: "#8B5CF6", description: "Contributed $500+ total", category: "contribution" as const, criteria: "total_contributed_500", threshold: 500, pointsAwarded: 250, rarity: "rare" },
+          { name: "Whale", icon: "🐳", color: "#EC4899", description: "Contributed $1000+ total", category: "contribution" as const, criteria: "total_contributed_1000", threshold: 1000, pointsAwarded: 500, rarity: "epic" },
+          { name: "Pool Creator", icon: "🏊", color: "#06B6D4", description: "Created your first pool", category: "pool" as const, criteria: "first_pool", threshold: 1, pointsAwarded: 50, rarity: "common" },
+          { name: "Pool Master", icon: "👑", color: "#F59E0B", description: "Created 5+ pools", category: "pool" as const, criteria: "pools_created_5", threshold: 5, pointsAwarded: 150, rarity: "uncommon" },
+          { name: "Pool Legend", icon: "🏆", color: "#EF4444", description: "Created 10+ pools", category: "pool" as const, criteria: "pools_created_10", threshold: 10, pointsAwarded: 300, rarity: "rare" },
+          { name: "Goal Crusher", icon: "🎯", color: "#14B8A6", description: "Completed a pool goal", category: "milestone" as const, criteria: "pool_completed", threshold: 1, pointsAwarded: 100, rarity: "uncommon" },
+          { name: "Social Butterfly", icon: "🦋", color: "#A855F7", description: "Following 10+ users", category: "social" as const, criteria: "following_10", threshold: 10, pointsAwarded: 50, rarity: "common" },
+          { name: "Popular", icon: "⭐", color: "#FBBF24", description: "Have 10+ followers", category: "social" as const, criteria: "followers_10", threshold: 10, pointsAwarded: 100, rarity: "uncommon" },
+          { name: "3-Day Streak", icon: "🔥", color: "#F97316", description: "Contributed for 3 days in a row", category: "streak" as const, criteria: "streak_3", threshold: 3, pointsAwarded: 30, rarity: "common" },
+          { name: "Week Warrior", icon: "⚡", color: "#EAB308", description: "7-day contribution streak", category: "streak" as const, criteria: "streak_7", threshold: 7, pointsAwarded: 100, rarity: "uncommon" },
+          { name: "Monthly Master", icon: "🌟", color: "#D946EF", description: "30-day contribution streak", category: "streak" as const, criteria: "streak_30", threshold: 30, pointsAwarded: 500, rarity: "legendary" },
+          { name: "Early Adopter", icon: "🚀", color: "#6366F1", description: "Joined ChipIn early", category: "special" as const, criteria: "early_adopter", threshold: null, pointsAwarded: 100, rarity: "rare" },
+          { name: "Verified", icon: "✅", color: "#22C55E", description: "Completed KYC verification", category: "milestone" as const, criteria: "kyc_verified", threshold: 1, pointsAwarded: 100, rarity: "common" },
+        ];
+        for (const badge of defaultBadges) {
+          await storage.createBadge(badge);
+        }
+        console.log(`[Gamification] Seeded ${defaultBadges.length} badges`);
+      }
+    } catch (err) {
+      console.error('[Gamification] Error seeding badges:', err);
+    }
+  })();
+
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
