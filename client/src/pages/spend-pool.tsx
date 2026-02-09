@@ -1025,8 +1025,8 @@ export default function SpendPool() {
 
         <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-display font-bold mb-2">Spend Pool Funds</h1>
-            <p className="text-muted-foreground">Use the collected funds securely online or transfer to a merchant.</p>
+            <h1 className="text-3xl font-display font-bold mb-2">Transfer Pool Funds</h1>
+            <p className="text-muted-foreground">Transfer collected funds to your bank account or send to a contributor.</p>
           </div>
           <div className="flex items-center gap-4">
             <button
@@ -1056,144 +1056,25 @@ export default function SpendPool() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+          {/* HIDDEN: Virtual Pool Card section - will be re-enabled when BaaS partner is found
           <div className="md:col-span-7 space-y-6">
             <div className="p-1 rounded-3xl bg-linear-to-b from-white/10 to-transparent">
               <div className="bg-card/50 backdrop-blur-xl rounded-[22px] p-6 border border-white/5">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-lg font-semibold">Virtual Pool Card</h2>
-                    <p className="text-xs text-muted-foreground">Generated for "{pool.title}"</p>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-8 border-white/10"
-                    onClick={handleToggleCardDetails}
-                    disabled={cardDetailsLoading}
-                    data-testid="button-toggle-card-details"
-                  >
-                    {cardDetailsLoading ? (
-                      <RefreshCw className="w-3.5 h-3.5 mr-2 animate-spin" />
-                    ) : showCardDetails ? (
-                      <EyeOff className="w-3.5 h-3.5 mr-2" />
-                    ) : (
-                      <Eye className="w-3.5 h-3.5 mr-2" />
-                    )}
-                    {cardDetailsLoading ? "Loading..." : showCardDetails ? "Hide Numbers" : "Show Numbers"}
-                  </Button>
-                </div>
-
-                <div className="mb-8">
-                  <VirtualCard 
-                    balance={currentBalance} 
-                    poolName={pool.title}
-                    cardNumber={formatCardNumber()}
-                    cvc="•••"
-                    expiry={expiry}
-                  />
-                </div>
-
-                <AnimatePresence>
-                  {showCardDetails && (
-                    <motion.div 
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="p-3 rounded-lg bg-white/5 border border-white/5">
-                          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Card Number</div>
-                          <div id="stripe-card-number" className="font-mono text-sm font-medium text-foreground min-h-[24px]">
-                            {!stripeElementsReady && <span className="animate-pulse">Loading...</span>}
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="p-3 rounded-lg bg-white/5 border border-white/5">
-                            <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Expiry</div>
-                            <div id="stripe-card-expiry" className="font-mono text-sm font-medium text-foreground min-h-[24px]">
-                              {!stripeElementsReady && <span className="animate-pulse">Loading...</span>}
-                            </div>
-                          </div>
-                          <div className="p-3 rounded-lg bg-white/5 border border-white/5">
-                            <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">CVC</div>
-                            <div id="stripe-card-cvc" className="font-mono text-sm font-medium text-foreground min-h-[24px]">
-                              {!stripeElementsReady && <span className="animate-pulse">Loading...</span>}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-xs flex items-start gap-2">
-                        <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
-                        <p>This is a single-use virtual card. It will lock automatically after the full balance is spent.</p>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                ... virtual card UI ...
               </div>
             </div>
           </div>
+          */}
 
-          <div className="md:col-span-5 space-y-6">
+          <div className="md:col-span-12 space-y-6">
             <div className="rounded-2xl bg-card border border-white/10 overflow-hidden">
               <div className="flex border-b border-white/10">
-                <button 
-                  onClick={() => setActiveTab('virtual')}
-                  className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'virtual' ? 'bg-white/5 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-white/5'}`}
-                >
-                  Online Checkout
-                </button>
-                <button 
-                  onClick={() => setActiveTab('transfer')}
-                  className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'transfer' ? 'bg-white/5 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-white/5'}`}
-                >
+                <div className="flex-1 py-3 text-sm font-medium text-center bg-white/5 text-primary border-b-2 border-primary">
                   Direct Transfer
-                </button>
+                </div>
               </div>
 
               <div className="p-6">
-                {activeTab === 'virtual' ? (
-                  <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      Shop online with your virtual card. Browse stores and pay at checkout using your card details.
-                    </p>
-                    
-                    <Button 
-                      className="w-full group bg-gradient-to-r from-primary to-primary/80" 
-                      onClick={() => openMerchantBrowser('https://www.amazon.com')}
-                      data-testid="button-shop-now"
-                    >
-                      <Globe className="w-4 h-4 mr-2" />
-                      Shop Now
-                      <ChevronRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                    </Button>
-
-                    <div className="pt-2">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Popular Stores</p>
-                      <div className="grid grid-cols-4 gap-2">
-                        {POPULAR_MERCHANTS.slice(0, 8).map((merchant) => (
-                          <button
-                            key={merchant.name}
-                            onClick={() => openMerchantBrowser(merchant.url)}
-                            className={`p-3 rounded-xl bg-gradient-to-br ${merchant.color} border border-white/5 hover:border-white/20 transition-all hover:scale-105 flex flex-col items-center gap-1`}
-                            data-testid={`button-merchant-${merchant.name.toLowerCase()}`}
-                          >
-                            <span className="text-xl">{merchant.icon}</span>
-                            <span className="text-[10px] font-medium truncate w-full text-center">{merchant.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-start gap-2">
-                      <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                      <p className="text-xs text-blue-300">
-                        Use your virtual card details at checkout. Click "Show Card Details" above to reveal your full card number, expiry, and CVC.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
                   <TransferSection 
                     poolId={params?.id || ''} 
                     balance={currentBalance} 
@@ -1202,7 +1083,6 @@ export default function SpendPool() {
                       refetchTransactions();
                     }}
                   />
-                )}
               </div>
             </div>
 
