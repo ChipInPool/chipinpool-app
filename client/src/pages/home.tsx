@@ -1,8 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { PoolCard } from "@/components/pool-card";
-import { ArrowRight, Plus, Wallet, TrendingUp, Users, CreditCard, Bell, Clock, DollarSign, Activity, Expand } from "lucide-react";
+import { ArrowRight, Plus, Wallet, TrendingUp, Users, CreditCard, Bell, Clock, DollarSign, Activity, Expand, Compass } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery } from "@tanstack/react-query";
@@ -11,10 +11,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format, formatDistanceToNow } from "date-fns";
+import { GuidedTour } from "@/components/guided-tour";
+import { FeatureTooltip } from "@/components/feature-tooltip";
 
 export default function Home() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const [, setLocation] = useLocation();
+  const [showTour, setShowTour] = useState(false);
 
   const { data: poolsData, isLoading: poolsLoading } = useQuery({
     queryKey: queryKeys.pools,
@@ -53,6 +56,21 @@ export default function Home() {
     }
   }, [authLoading, isAuthenticated, setLocation]);
 
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      const tourCompleted = localStorage.getItem("chipin_tour_completed");
+      if (!tourCompleted) {
+        const timer = setTimeout(() => setShowTour(true), 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [authLoading, isAuthenticated]);
+
+  const handleTourClose = () => {
+    setShowTour(false);
+    localStorage.setItem("chipin_tour_completed", "true");
+  };
+
   if (authLoading) {
     return (
       <Layout>
@@ -73,13 +91,26 @@ export default function Home() {
         <h1 className="text-3xl font-display font-bold mb-2">
           Welcome back, {user?.firstName}!
         </h1>
-        <p className="text-muted-foreground">Here's what's happening with your pools and wallet.</p>
+        <div className="flex items-center gap-3">
+          <p className="text-muted-foreground">Here's what's happening with your pools and wallet.</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-primary flex items-center gap-1.5"
+            onClick={() => setShowTour(true)}
+            data-testid="button-take-tour"
+          >
+            <Compass className="w-4 h-4" /> Take a Tour
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Card className="bg-white/[0.02] border-white/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Wallet Balance</CardTitle>
+            <FeatureTooltip id="stat-wallet" title="Wallet Balance" description="Your ChipIn wallet holds your funds. Deposit money via Stripe to start contributing to pools.">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Wallet Balance</CardTitle>
+            </FeatureTooltip>
             <Wallet className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
@@ -92,7 +123,9 @@ export default function Home() {
 
         <Card className="bg-white/[0.02] border-white/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active Pools</CardTitle>
+            <FeatureTooltip id="stat-active-pools" title="Active Pools" description="Pools you've created that are currently accepting contributions.">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Active Pools</CardTitle>
+            </FeatureTooltip>
             <TrendingUp className="h-4 w-4 text-green-400" />
           </CardHeader>
           <CardContent>
@@ -103,7 +136,9 @@ export default function Home() {
 
         <Card className="bg-white/[0.02] border-white/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Contributed</CardTitle>
+            <FeatureTooltip id="stat-total-contributed" title="Total Contributed" description="The total amount you've contributed across all pools you've joined.">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Contributed</CardTitle>
+            </FeatureTooltip>
             <DollarSign className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
@@ -114,7 +149,9 @@ export default function Home() {
 
         <Card className="bg-white/[0.02] border-white/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pools Created</CardTitle>
+            <FeatureTooltip id="stat-pools-created" title="Pools Created" description="The number of pools you've started. Create pools for trips, gifts, events, and more.">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Pools Created</CardTitle>
+            </FeatureTooltip>
             <Users className="h-4 w-4 text-purple-400" />
           </CardHeader>
           <CardContent>
@@ -300,6 +337,8 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      <GuidedTour isOpen={showTour} onClose={handleTourClose} />
     </Layout>
   );
 }

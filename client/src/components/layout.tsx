@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FeatureTooltip } from "@/components/feature-tooltip";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -83,10 +84,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
               Recurring
             </Link>
             <Link href="/split-calculator" className={`text-sm font-medium hover:text-primary transition-colors ${location === '/split-calculator' ? 'text-primary' : 'text-muted-foreground'}`}>
-              Split
+              <FeatureTooltip id="nav-split" title="Split Calculator" description="Quickly calculate how to split a bill among friends and create a pool from the result.">
+                <span>Split</span>
+              </FeatureTooltip>
             </Link>
             <Link href="/rewards" className={`text-sm font-medium hover:text-primary transition-colors ${location === '/rewards' ? 'text-primary' : 'text-muted-foreground'}`}>
-              Rewards
+              <FeatureTooltip id="nav-rewards" title="Rewards" description="Earn badges, points, and climb the leaderboard by contributing to pools and being active.">
+                <span>Rewards</span>
+              </FeatureTooltip>
             </Link>
             <Link href="/api-docs" className={`text-sm font-medium hover:text-primary transition-colors ${location === '/api-docs' ? 'text-primary' : 'text-muted-foreground'}`}>
               Developers
