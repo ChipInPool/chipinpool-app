@@ -7052,6 +7052,111 @@ export async function registerRoutes(
     }
   });
 
+  // ========== SPEND NOW PARTNER MARKETPLACE ==========
+
+  app.get("/api/partners/categories", requireAuth, async (req, res, next) => {
+    try {
+      const allPartners = await db.select().from(merchants)
+        .where(
+          and(
+            eq(merchants.status, 'approved'),
+            eq(merchants.isPartnered, true),
+            eq(merchants.spendNowEnabled, true),
+          )
+        );
+      
+      const categoryCounts: Record<string, number> = {};
+      allPartners.forEach(m => {
+        const cat = m.partnerCategory || 'other';
+        categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+      });
+      
+      res.json({ categories: categoryCounts, total: allPartners.length });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/partners", requireAuth, async (req, res, next) => {
+    try {
+      const { category, search, featured } = req.query;
+      
+      let query = db.select().from(merchants)
+        .where(
+          and(
+            eq(merchants.status, 'approved'),
+            eq(merchants.isPartnered, true),
+            eq(merchants.spendNowEnabled, true),
+          )
+        )
+        .orderBy(desc(merchants.isFeatured), desc(merchants.displayPriority), merchants.companyName);
+      
+      let results = await query;
+      
+      if (category && category !== 'all') {
+        results = results.filter(m => m.partnerCategory === category);
+      }
+      if (search) {
+        const s = (search as string).toLowerCase();
+        results = results.filter(m => 
+          m.companyName.toLowerCase().includes(s) || 
+          (m.shortDescription && m.shortDescription.toLowerCase().includes(s)) ||
+          (m.description && m.description.toLowerCase().includes(s))
+        );
+      }
+      if (featured === 'true') {
+        results = results.filter(m => m.isFeatured);
+      }
+      
+      const partners = results.map(m => ({
+        id: m.id,
+        companyName: m.companyName,
+        website: m.website,
+        logo: m.logo,
+        bannerImage: m.bannerImage,
+        shortDescription: m.shortDescription,
+        description: m.description,
+        partnerCategory: m.partnerCategory,
+        promoText: m.promoText,
+        discountPercent: m.discountPercent,
+        partnerShopUrl: m.partnerShopUrl,
+        isFeatured: m.isFeatured,
+        businessType: m.businessType,
+      }));
+      
+      res.json(partners);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/partners/:id", requireAuth, async (req, res, next) => {
+    try {
+      const merchant = await storage.getMerchant(req.params.id);
+      if (!merchant || !merchant.isPartnered || !merchant.spendNowEnabled || merchant.status !== 'approved') {
+        return res.status(404).json({ error: "Partner not found" });
+      }
+      
+      res.json({
+        id: merchant.id,
+        companyName: merchant.companyName,
+        website: merchant.website,
+        logo: merchant.logo,
+        bannerImage: merchant.bannerImage,
+        shortDescription: merchant.shortDescription,
+        description: merchant.description,
+        partnerCategory: merchant.partnerCategory,
+        promoText: merchant.promoText,
+        discountPercent: merchant.discountPercent,
+        partnerShopUrl: merchant.partnerShopUrl,
+        isFeatured: merchant.isFeatured,
+        businessType: merchant.businessType,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // ========== ADMIN MERCHANT MANAGEMENT ==========
 
   // List all merchants (admin)
@@ -7247,6 +7352,16 @@ export async function registerRoutes(
         description: z.string().optional().transform(v => v === '' ? null : v),
         contactEmail: z.string().email().optional(),
         contactPhone: z.string().optional().transform(v => v === '' ? null : v),
+        isPartnered: z.boolean().optional(),
+        spendNowEnabled: z.boolean().optional(),
+        isFeatured: z.boolean().optional(),
+        partnerCategory: z.enum(['electronics', 'fashion', 'travel', 'food', 'entertainment', 'home', 'health', 'sports', 'education', 'services', 'other']).optional().nullable(),
+        bannerImage: z.string().optional().transform(v => v === '' ? null : v),
+        shortDescription: z.string().optional().transform(v => v === '' ? null : v),
+        promoText: z.string().optional().transform(v => v === '' ? null : v),
+        discountPercent: z.string().optional().transform(v => v === '' ? null : v),
+        partnerShopUrl: z.string().url().optional().or(z.literal('')).transform(v => v === '' ? null : v),
+        displayPriority: z.number().int().optional(),
       });
 
       const data = schema.parse(req.body);
@@ -7265,6 +7380,16 @@ export async function registerRoutes(
       if (data.description !== undefined) updates.description = data.description;
       if (data.contactEmail !== undefined) updates.contactEmail = data.contactEmail;
       if (data.contactPhone !== undefined) updates.contactPhone = data.contactPhone;
+      if (data.isPartnered !== undefined) updates.isPartnered = data.isPartnered;
+      if (data.spendNowEnabled !== undefined) updates.spendNowEnabled = data.spendNowEnabled;
+      if (data.isFeatured !== undefined) updates.isFeatured = data.isFeatured;
+      if (data.partnerCategory !== undefined) updates.partnerCategory = data.partnerCategory;
+      if (data.bannerImage !== undefined) updates.bannerImage = data.bannerImage;
+      if (data.shortDescription !== undefined) updates.shortDescription = data.shortDescription;
+      if (data.promoText !== undefined) updates.promoText = data.promoText;
+      if (data.discountPercent !== undefined) updates.discountPercent = data.discountPercent;
+      if (data.partnerShopUrl !== undefined) updates.partnerShopUrl = data.partnerShopUrl;
+      if (data.displayPriority !== undefined) updates.displayPriority = data.displayPriority;
 
       await storage.updateMerchant(merchant.id, updates);
 

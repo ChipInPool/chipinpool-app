@@ -45,6 +45,8 @@ Preferred communication style: Simple, everyday language.
 - **Virtual Cards**: Stripe Issuing virtual cards linked to pools.
 - **Admin Portal**: Comprehensive interface for user, pool, transaction management, and audit logging.
 - **ChipInPay Merchant Integration**: API for third-party merchants to integrate ChipIn's checkout system.
+- **Spend Now Marketplace**: Curated partner storefront where users browse partnered businesses and shop directly using pool funds via ChipInPay. Admin manages partnerships (categories, featured status, promo text, discount offers) through the merchant admin portal.
+- **Email Template System**: Centralized email template engine (`server/emailTemplates.ts`) with consistent branding (navy/mint green theme), responsive layout, and reusable components (headings, buttons, info cards, alerts, verification codes).
 - **Multi-Factor Authentication (MFA)**: TOTP-based 2FA with recovery codes.
 - **Authentication**: Session-based, bcrypt hashed passwords, social login (planned). User registration includes SMS verification.
 

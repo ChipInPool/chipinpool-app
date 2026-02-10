@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/admin-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Search, CheckCircle, Clock, XCircle, ExternalLink, Store, Plus, ArrowLeft, BarChart3, Key, DollarSign, Activity, Settings } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Search, CheckCircle, Clock, XCircle, ExternalLink, Store, Plus, ArrowLeft, BarChart3, Key, DollarSign, Activity, Settings, Globe, Star, Tag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -29,6 +31,16 @@ interface Merchant {
   pendingBalance: string;
   webhookUrl: string | null;
   createdAt: string;
+  isPartnered: boolean;
+  spendNowEnabled: boolean;
+  isFeatured: boolean;
+  partnerCategory: string | null;
+  bannerImage: string | null;
+  shortDescription: string | null;
+  promoText: string | null;
+  discountPercent: string | null;
+  partnerShopUrl: string | null;
+  displayPriority: number;
 }
 
 interface MerchantDetails {
@@ -62,6 +74,7 @@ export default function AdminMerchants() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedMerchantId, setSelectedMerchantId] = useState<string | null>(null);
+  const [partnersOnly, setPartnersOnly] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [createForm, setCreateForm] = useState({
@@ -183,6 +196,64 @@ export default function AdminMerchants() {
     setEditDialogOpen(true);
   };
 
+  const [partnershipForm, setPartnershipForm] = useState({
+    isPartnered: false,
+    spendNowEnabled: false,
+    isFeatured: false,
+    partnerCategory: "" as string,
+    shortDescription: "",
+    promoText: "",
+    discountPercent: "",
+    partnerShopUrl: "",
+    bannerImage: "",
+    displayPriority: "0",
+  });
+
+  const loadPartnershipForm = (merchant: Merchant) => {
+    setPartnershipForm({
+      isPartnered: merchant.isPartnered || false,
+      spendNowEnabled: merchant.spendNowEnabled || false,
+      isFeatured: merchant.isFeatured || false,
+      partnerCategory: merchant.partnerCategory || "",
+      shortDescription: merchant.shortDescription || "",
+      promoText: merchant.promoText || "",
+      discountPercent: merchant.discountPercent || "",
+      partnerShopUrl: merchant.partnerShopUrl || "",
+      bannerImage: merchant.bannerImage || "",
+      displayPriority: String(merchant.displayPriority || 0),
+    });
+  };
+
+  useEffect(() => {
+    if (merchantDetails?.merchant) {
+      loadPartnershipForm(merchantDetails.merchant);
+    }
+  }, [merchantDetails?.merchant?.id, merchantDetails?.merchant?.isPartnered, merchantDetails?.merchant?.spendNowEnabled, merchantDetails?.merchant?.isFeatured]);
+
+  const savePartnershipMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await fetch(`/api/admin/merchants/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to save partnership settings");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "merchants"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "merchant", selectedMerchantId] });
+      toast({ description: "Partnership settings saved successfully" });
+    },
+    onError: (err: any) => {
+      toast({ description: err.message || "Failed to save partnership settings", variant: "destructive" });
+    },
+  });
+
   const createMerchantMutation = useMutation({
     mutationFn: async (data: typeof createForm) => {
       const res = await fetch("/api/admin/merchants", {
@@ -239,7 +310,8 @@ export default function AdminMerchants() {
       merchant.companyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       merchant.contactEmail.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || merchant.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesPartners = !partnersOnly || merchant.isPartnered;
+    return matchesSearch && matchesStatus && matchesPartners;
   });
 
   if (isLoading) {
@@ -644,6 +716,225 @@ export default function AdminMerchants() {
             </CardContent>
           </Card>
         )}
+
+        {/* Spend Now Partnership Section */}
+        <Card className="mt-6 border-2 border-transparent bg-gradient-to-r from-primary/5 via-blue-500/5 to-purple-500/5 relative overflow-hidden">
+          <div className="absolute inset-0 rounded-lg border-2 border-transparent bg-gradient-to-r from-primary/20 via-blue-500/20 to-purple-500/20 pointer-events-none" style={{ mask: 'linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0)', WebkitMask: 'linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0)', maskComposite: 'xor', WebkitMaskComposite: 'xor' }} />
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Store className="w-5 h-5 text-primary" />
+              Spend Now Partnership
+              {partnershipForm.isPartnered && (
+                <Badge variant="outline" className="text-green-600 border-green-600 ml-2" data-testid="badge-partner">
+                  <Store className="w-3 h-3 mr-1" /> Partner
+                </Badge>
+              )}
+              {partnershipForm.isFeatured && (
+                <Badge variant="outline" className="text-yellow-600 border-yellow-600" data-testid="badge-featured">
+                  <Star className="w-3 h-3 mr-1" /> Featured
+                </Badge>
+              )}
+              {partnershipForm.spendNowEnabled && (
+                <Badge variant="outline" className="text-blue-600 border-blue-600" data-testid="badge-spend-now">
+                  Spend Now
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                savePartnershipMutation.mutate({
+                  id: merchant.id,
+                  data: {
+                    isPartnered: partnershipForm.isPartnered,
+                    spendNowEnabled: partnershipForm.spendNowEnabled,
+                    isFeatured: partnershipForm.isFeatured,
+                    partnerCategory: partnershipForm.partnerCategory || null,
+                    shortDescription: partnershipForm.shortDescription || null,
+                    promoText: partnershipForm.promoText || null,
+                    discountPercent: partnershipForm.discountPercent || null,
+                    partnerShopUrl: partnershipForm.partnerShopUrl || null,
+                    bannerImage: partnershipForm.bannerImage || null,
+                    displayPriority: parseInt(partnershipForm.displayPriority) || 0,
+                  },
+                });
+              }}
+              className="space-y-6"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="flex items-center justify-between p-4 border rounded-lg bg-background">
+                  <div className="flex items-center gap-2">
+                    <Store className="w-4 h-4 text-green-600" />
+                    <Label htmlFor="isPartnered">Partner Status</Label>
+                  </div>
+                  <Switch
+                    id="isPartnered"
+                    checked={partnershipForm.isPartnered}
+                    onCheckedChange={(checked) => setPartnershipForm({ ...partnershipForm, isPartnered: checked })}
+                    data-testid="switch-is-partnered"
+                  />
+                </div>
+                <div className="flex items-center justify-between p-4 border rounded-lg bg-background">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-blue-600" />
+                    <Label htmlFor="spendNowEnabled">Spend Now</Label>
+                  </div>
+                  <Switch
+                    id="spendNowEnabled"
+                    checked={partnershipForm.spendNowEnabled}
+                    onCheckedChange={(checked) => setPartnershipForm({ ...partnershipForm, spendNowEnabled: checked })}
+                    data-testid="switch-spend-now-enabled"
+                  />
+                </div>
+                <div className="flex items-center justify-between p-4 border rounded-lg bg-background">
+                  <div className="flex items-center gap-2">
+                    <Star className="w-4 h-4 text-yellow-600" />
+                    <Label htmlFor="isFeatured">Featured</Label>
+                  </div>
+                  <Switch
+                    id="isFeatured"
+                    checked={partnershipForm.isFeatured}
+                    onCheckedChange={(checked) => setPartnershipForm({ ...partnershipForm, isFeatured: checked })}
+                    data-testid="switch-is-featured"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="partnerCategory">Partner Category</Label>
+                  <Select
+                    value={partnershipForm.partnerCategory}
+                    onValueChange={(value) => setPartnershipForm({ ...partnershipForm, partnerCategory: value })}
+                  >
+                    <SelectTrigger data-testid="select-partner-category">
+                      <SelectValue placeholder="Select category..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="electronics">Electronics</SelectItem>
+                      <SelectItem value="fashion">Fashion</SelectItem>
+                      <SelectItem value="travel">Travel</SelectItem>
+                      <SelectItem value="food">Food</SelectItem>
+                      <SelectItem value="entertainment">Entertainment</SelectItem>
+                      <SelectItem value="home">Home</SelectItem>
+                      <SelectItem value="health">Health</SelectItem>
+                      <SelectItem value="sports">Sports</SelectItem>
+                      <SelectItem value="education">Education</SelectItem>
+                      <SelectItem value="services">Services</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="displayPriority">Display Priority</Label>
+                  <Input
+                    id="displayPriority"
+                    type="number"
+                    min="0"
+                    value={partnershipForm.displayPriority}
+                    onChange={(e) => setPartnershipForm({ ...partnershipForm, displayPriority: e.target.value })}
+                    placeholder="Higher = shown first"
+                    data-testid="input-display-priority"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="shortDescription">Short Description (max 150 chars)</Label>
+                <Textarea
+                  id="shortDescription"
+                  value={partnershipForm.shortDescription}
+                  onChange={(e) => setPartnershipForm({ ...partnershipForm, shortDescription: e.target.value.slice(0, 150) })}
+                  maxLength={150}
+                  rows={2}
+                  placeholder="Brief description for the partner listing..."
+                  data-testid="input-short-description"
+                />
+                <p className="text-xs text-muted-foreground mt-1">{partnershipForm.shortDescription.length}/150</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="promoText" className="flex items-center gap-1">
+                    <Tag className="w-3 h-3" /> Promo Text
+                  </Label>
+                  <Input
+                    id="promoText"
+                    value={partnershipForm.promoText}
+                    onChange={(e) => setPartnershipForm({ ...partnershipForm, promoText: e.target.value })}
+                    placeholder='e.g. "10% off for ChipIn users!"'
+                    data-testid="input-promo-text"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="discountPercent">Discount Percent</Label>
+                  <Input
+                    id="discountPercent"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={partnershipForm.discountPercent}
+                    onChange={(e) => setPartnershipForm({ ...partnershipForm, discountPercent: e.target.value })}
+                    placeholder="Optional discount %"
+                    data-testid="input-discount-percent"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="partnerShopUrl" className="flex items-center gap-1">
+                    <Globe className="w-3 h-3" /> Partner Shop URL
+                  </Label>
+                  <Input
+                    id="partnerShopUrl"
+                    type="url"
+                    value={partnershipForm.partnerShopUrl}
+                    onChange={(e) => setPartnershipForm({ ...partnershipForm, partnerShopUrl: e.target.value })}
+                    placeholder="https://shop.example.com"
+                    data-testid="input-partner-shop-url"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="bannerImage">Banner Image URL</Label>
+                  <Input
+                    id="bannerImage"
+                    type="url"
+                    value={partnershipForm.bannerImage}
+                    onChange={(e) => setPartnershipForm({ ...partnershipForm, bannerImage: e.target.value })}
+                    placeholder="https://example.com/banner.jpg"
+                    data-testid="input-banner-image"
+                  />
+                </div>
+              </div>
+
+              {partnershipForm.bannerImage && (
+                <div className="border rounded-lg p-2">
+                  <p className="text-xs text-muted-foreground mb-2">Banner Preview</p>
+                  <img
+                    src={partnershipForm.bannerImage}
+                    alt="Banner preview"
+                    className="w-full h-32 object-cover rounded-md"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={savePartnershipMutation.isPending}
+                data-testid="button-save-partnership"
+              >
+                {savePartnershipMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Save Partnership Settings
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </AdminLayout>
     );
   }
@@ -880,6 +1171,16 @@ export default function AdminMerchants() {
                 <option value="suspended">Suspended</option>
                 <option value="rejected">Rejected</option>
               </select>
+              <Button
+                variant={partnersOnly ? "default" : "outline"}
+                size="sm"
+                onClick={() => setPartnersOnly(!partnersOnly)}
+                className="whitespace-nowrap"
+                data-testid="button-filter-partners"
+              >
+                <Store className="w-4 h-4 mr-1" />
+                Partners Only
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -896,9 +1197,24 @@ export default function AdminMerchants() {
                   data-testid={`merchant-${merchant.id}`}
                 >
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <p className="font-medium">{merchant.companyName}</p>
                       {getStatusBadge(merchant.status)}
+                      {merchant.isPartnered && (
+                        <Badge className="bg-green-100 text-green-700 border-green-300 hover:bg-green-100" data-testid={`badge-partner-${merchant.id}`}>
+                          <Store className="w-3 h-3 mr-1" /> Partner
+                        </Badge>
+                      )}
+                      {merchant.isFeatured && (
+                        <Badge className="bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-100" data-testid={`badge-featured-${merchant.id}`}>
+                          <Star className="w-3 h-3 mr-1" /> Featured
+                        </Badge>
+                      )}
+                      {merchant.spendNowEnabled && (
+                        <Badge className="bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-100" data-testid={`badge-spend-now-${merchant.id}`}>
+                          Spend Now
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground">{merchant.contactEmail}</p>
                     <p className="text-xs text-muted-foreground">

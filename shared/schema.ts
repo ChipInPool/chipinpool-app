@@ -475,6 +475,7 @@ export const insertAdminAuditLogSchema = createInsertSchema(adminAuditLogs).omit
 export const merchantStatusEnum = pgEnum('merchant_status', ['pending', 'approved', 'suspended', 'rejected']);
 export const checkoutSessionStatusEnum = pgEnum('checkout_session_status', ['pending', 'collecting', 'completed', 'expired', 'cancelled', 'refunded']);
 export const webhookEventEnum = pgEnum('webhook_event', ['session.created', 'session.collecting', 'session.completed', 'session.expired', 'session.cancelled', 'contribution.received']);
+export const partnerCategoryEnum = pgEnum('partner_category', ['electronics', 'fashion', 'travel', 'food', 'entertainment', 'home', 'health', 'sports', 'education', 'services', 'other']);
 
 export const merchants = pgTable("merchants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -495,6 +496,16 @@ export const merchants = pgTable("merchants", {
   stripeConnectId: text("stripe_connect_id"),
   webhookUrl: text("webhook_url"),
   webhookSecret: text("webhook_secret"),
+  isPartnered: boolean("is_partnered").notNull().default(false),
+  spendNowEnabled: boolean("spend_now_enabled").notNull().default(false),
+  isFeatured: boolean("is_featured").notNull().default(false),
+  partnerCategory: partnerCategoryEnum("partner_category"),
+  bannerImage: text("banner_image"),
+  shortDescription: text("short_description"),
+  promoText: text("promo_text"),
+  discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }),
+  partnerShopUrl: text("partner_shop_url"),
+  displayPriority: integer("display_priority").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

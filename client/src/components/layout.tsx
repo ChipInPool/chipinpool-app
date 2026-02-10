@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAuth } from "@/lib/auth-context";
 import { api, queryKeys } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Wallet, Menu, Bell, Moon, Sun, LogOut, Shield, Settings, CreditCard } from "lucide-react";
+import { Plus, Wallet, Menu, Bell, Moon, Sun, LogOut, Shield, Settings, CreditCard, ShoppingBag } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -87,6 +87,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <FeatureTooltip id="nav-split" title="Split Calculator" description="Quickly calculate how to split a bill among friends and create a pool from the result.">
                 <span>Split</span>
               </FeatureTooltip>
+            </Link>
+            <Link href="/spend-now" className={`text-sm font-medium hover:text-primary transition-colors ${location === '/spend-now' ? 'text-primary' : 'text-muted-foreground'}`}>
+              Spend Now
             </Link>
             <Link href="/rewards" className={`text-sm font-medium hover:text-primary transition-colors ${location === '/rewards' ? 'text-primary' : 'text-muted-foreground'}`}>
               <FeatureTooltip id="nav-rewards" title="Rewards" description="Earn badges, points, and climb the leaderboard by contributing to pools and being active.">
@@ -257,6 +260,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <Link href="/explore" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Explore Pools</Link>
                     <Link href="/recurring" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Recurring</Link>
                     <Link href="/split-calculator" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Split Calculator</Link>
+                    <Link href="/spend-now" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}><ShoppingBag className="w-5 h-5" /> Spend Now</Link>
                     <Link href="/rewards" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Rewards</Link>
                     <Link href="/profile" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>My Profile</Link>
                     <Link href="/payment-methods" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}><CreditCard className="w-5 h-5" /> Payment Methods</Link>

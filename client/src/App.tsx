@@ -47,6 +47,7 @@ import AcceptTransfer from "@/pages/accept-transfer";
 import Rewards from "@/pages/rewards";
 import PaymentMethods from "@/pages/payment-methods";
 import PayMe from "@/pages/pay-me";
+import SpendNow from "@/pages/spend-now";
 
 function Router() {
   return (
@@ -91,6 +92,7 @@ function Router() {
       <Route path="/chipinpay/checkout/:sessionId" component={ChipInPayCheckout} />
       <Route path="/transfer/:requestId/accept" component={AcceptTransfer} />
       <Route path="/rewards" component={Rewards} />
+      <Route path="/spend-now" component={SpendNow} />
       <Route path="/@:username/:amount" component={PayMe} />
       <Route path="/@:username" component={PayMe} />
       <Route component={NotFound} />
