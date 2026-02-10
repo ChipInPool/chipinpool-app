@@ -791,17 +791,28 @@ export async function registerRoutes(
   app.post("/api/user/avatar/upload-url", requireAuth, async (req, res, next) => {
     try {
       const userId = req.session.userId!;
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      let uploadURL: string | null = null;
+      let lastError: any = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          uploadURL = await objectStorageService.getObjectEntityUploadURL();
+          break;
+        } catch (err) {
+          lastError = err;
+          console.error(`Avatar upload URL attempt ${attempt + 1} failed:`, err instanceof Error ? err.message : err);
+          if (attempt < 2) await new Promise(r => setTimeout(r, 500));
+        }
+      }
+      if (!uploadURL) {
+        console.error("All avatar upload URL attempts failed:", lastError);
+        return res.status(500).json({ error: "Storage service temporarily unavailable. Please try again." });
+      }
       const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-      
-      // Store the object path with user association for later validation
-      // The path includes a UUID that ties it to this request
       res.json({ 
         uploadURL, 
         objectPath,
-        // Include constraints that client should follow (enforced on avatar update)
         constraints: {
-          maxSizeBytes: 5 * 1024 * 1024, // 5MB
+          maxSizeBytes: 5 * 1024 * 1024,
           allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
         }
       });

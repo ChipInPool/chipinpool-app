@@ -45,15 +45,28 @@ export function registerObjectStorageRoutes(app: Express): void {
         });
       }
 
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      let uploadURL: string | null = null;
+      let lastError: any = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          uploadURL = await objectStorageService.getObjectEntityUploadURL();
+          break;
+        } catch (err) {
+          lastError = err;
+          console.error(`Upload URL attempt ${attempt + 1} failed:`, err instanceof Error ? err.message : err);
+          if (attempt < 2) await new Promise(r => setTimeout(r, 500));
+        }
+      }
+      if (!uploadURL) {
+        console.error("All upload URL attempts failed:", lastError);
+        return res.status(500).json({ error: "Storage service temporarily unavailable. Please try again." });
+      }
 
-      // Extract object path from the presigned URL for later reference
       const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
 
       res.json({
         uploadURL,
         objectPath,
-        // Echo back the metadata for client convenience
         metadata: { name, size, contentType },
       });
     } catch (error) {

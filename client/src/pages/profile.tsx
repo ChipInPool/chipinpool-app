@@ -51,10 +51,11 @@ export default function Profile() {
     }
     setIsUploadingAvatar(true);
     try {
-      const urlRes = await fetch("/api/user/avatar/upload-url", {
+      const urlRes = await fetch("/api/uploads/request-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
       });
       if (!urlRes.ok) {
         if (urlRes.status === 401) {
