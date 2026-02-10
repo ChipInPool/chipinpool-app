@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { uploadFile } from "@/lib/upload";
 import { Layout } from "@/components/layout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -51,28 +52,7 @@ export default function Profile() {
     }
     setIsUploadingAvatar(true);
     try {
-      const urlRes = await fetch("/api/uploads/request-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
-      });
-      if (!urlRes.ok) {
-        if (urlRes.status === 401) {
-          toast({ description: "Session expired. Please log in again.", variant: "destructive" });
-          setIsUploadingAvatar(false);
-          return;
-        }
-        const errData = await urlRes.json().catch(() => ({}));
-        throw new Error(errData.error || errData.message || `Upload failed (${urlRes.status})`);
-      }
-      const { uploadURL, objectPath } = await urlRes.json();
-      const uploadRes = await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
-      if (!uploadRes.ok) throw new Error("Failed to upload image to storage");
+      const objectPath = await uploadFile(file);
       const saveRes = await fetch("/api/user/avatar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

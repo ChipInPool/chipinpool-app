@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { uploadFile } from "@/lib/upload";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,29 +51,7 @@ export default function CreatePool() {
   // Image upload mutation
   const uploadImageMutation = useMutation({
     mutationFn: async (file: File) => {
-      // Step 1: Get presigned upload URL
-      const urlRes = await fetch("/api/uploads/request-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          name: file.name,
-          size: file.size,
-          contentType: file.type,
-        }),
-      });
-      if (!urlRes.ok) throw new Error("Failed to get upload URL");
-      const { uploadURL, objectPath } = await urlRes.json();
-
-      // Step 2: Upload file directly to presigned URL
-      const uploadRes = await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type || "image/jpeg" },
-      });
-      if (!uploadRes.ok) throw new Error("Failed to upload image");
-
-      return objectPath;
+      return await uploadFile(file);
     },
     onSuccess: (objectPath) => {
       setCoverImage(objectPath);

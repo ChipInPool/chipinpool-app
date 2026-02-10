@@ -1,6 +1,6 @@
 import { BlobServiceClient, BlobSASPermissions, generateBlobSASQueryParameters, StorageSharedKeyCredential, ContainerClient } from "@azure/storage-blob";
 import { randomUUID } from "crypto";
-import { Response } from "express";
+import { Response, Request } from "express";
 
 let ReplitObjectStorageService: any = null;
 let ReplitObjectNotFoundError: any = null;
@@ -43,6 +43,22 @@ export class FileStorageService {
       if (this.azureContainerClient) {
         await this.azureContainerClient.createIfNotExists();
         console.log(`[FileStorage] Azure container '${this.containerName}' ready`);
+      }
+      if (this.azureBlobServiceClient) {
+        try {
+          await this.azureBlobServiceClient.setProperties({
+            cors: [{
+              allowedOrigins: "*",
+              allowedMethods: "PUT,GET,HEAD,OPTIONS",
+              allowedHeaders: "Content-Type,x-ms-blob-type,x-ms-blob-content-type",
+              exposedHeaders: "Content-Length,Content-Type",
+              maxAgeInSeconds: 3600,
+            }],
+          });
+          console.log("[FileStorage] Azure CORS rules configured");
+        } catch (corsErr) {
+          console.error("[FileStorage] Failed to set CORS rules:", corsErr);
+        }
       }
     } catch (err) {
       console.error("[FileStorage] Failed to init Azure container:", err);
@@ -219,6 +235,45 @@ export class FileStorageService {
   private extractAccountKey(connStr: string): string | null {
     const match = connStr.match(/AccountKey=([^;]+)/i);
     return match ? match[1] : null;
+  }
+
+  async uploadBuffer(buffer: Buffer, contentType: string): Promise<string> {
+    if (isAzureStorage()) {
+      return this.uploadBufferToAzure(buffer, contentType);
+    }
+    return this.uploadBufferToReplit(buffer, contentType);
+  }
+
+  private async uploadBufferToAzure(buffer: Buffer, contentType: string): Promise<string> {
+    if (!this.azureContainerClient) {
+      throw new Error("Azure storage not configured");
+    }
+
+    const blobId = randomUUID();
+    const blobName = `uploads/${blobId}`;
+    const blockBlobClient = this.azureContainerClient.getBlockBlobClient(blobName);
+
+    await blockBlobClient.uploadData(buffer, {
+      blobHTTPHeaders: { blobContentType: contentType },
+    });
+
+    return `/objects/uploads/${blobId}`;
+  }
+
+  private async uploadBufferToReplit(buffer: Buffer, contentType: string): Promise<string> {
+    const { uploadURL, objectPath } = await this.getReplitUploadURL();
+
+    const res = await fetch(uploadURL, {
+      method: "PUT",
+      body: buffer,
+      headers: { "Content-Type": contentType },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Replit upload failed: ${res.status}`);
+    }
+
+    return objectPath;
   }
 
   getReplitService(): any {

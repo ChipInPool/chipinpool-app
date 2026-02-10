@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { ObjectNotFoundError } from "./objectStorage";
-import { fileStorageService } from "../../fileStorage";
+import { fileStorageService, isAzureStorage } from "../../fileStorage";
+import express from "express";
 
 export function registerObjectStorageRoutes(app: Express): void {
   app.post("/api/uploads/request-url", async (req, res) => {
@@ -38,6 +39,40 @@ export function registerObjectStorageRoutes(app: Express): void {
     } catch (error) {
       console.error("Error generating upload URL:", error);
       res.status(500).json({ error: "Failed to generate upload URL" });
+    }
+  });
+
+  app.post("/api/uploads/direct", express.raw({ type: ["image/*"], limit: "10mb" }), async (req, res) => {
+    try {
+      const contentType = req.headers["content-type"] || "application/octet-stream";
+      const buffer = req.body as Buffer;
+
+      if (!buffer || buffer.length === 0) {
+        return res.status(400).json({ error: "No file data received" });
+      }
+
+      let objectPath: string | null = null;
+      let lastError: any = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          objectPath = await fileStorageService.uploadBuffer(buffer, contentType);
+          break;
+        } catch (err) {
+          lastError = err;
+          console.error(`Direct upload attempt ${attempt + 1} failed:`, err instanceof Error ? err.message : err);
+          if (attempt < 2) await new Promise(r => setTimeout(r, 500));
+        }
+      }
+
+      if (!objectPath) {
+        console.error("All direct upload attempts failed:", lastError);
+        return res.status(500).json({ error: "Storage service temporarily unavailable. Please try again." });
+      }
+
+      res.json({ objectPath });
+    } catch (error) {
+      console.error("Error in direct upload:", error);
+      res.status(500).json({ error: "Failed to upload file" });
     }
   });
 

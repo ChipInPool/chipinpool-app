@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { uploadFile } from "@/lib/upload";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -357,20 +358,7 @@ export default function PoolDetails() {
     }
     setIsUploadingPoolImage(true);
     try {
-      const urlRes = await fetch("/api/uploads/request-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
-      });
-      if (!urlRes.ok) throw new Error("Failed to get upload URL");
-      const { uploadURL, objectPath } = await urlRes.json();
-      const uploadRes = await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
-      if (!uploadRes.ok) throw new Error("Failed to upload image");
+      const objectPath = await uploadFile(file);
       setEditImage(objectPath);
       toast({ description: "Image uploaded successfully" });
     } catch (err: any) {
