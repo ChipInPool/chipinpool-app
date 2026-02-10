@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+*.tsbuildinfo
+dist/
+
+# Environment files
+.env.local
+.env.development
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
