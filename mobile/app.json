@@ -12,11 +12,13 @@
       "resizeMode": "contain",
       "backgroundColor": "#001F3F"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.chipinpool.app",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "infoPlist": {
         "NSCameraUsageDescription": "ChipIn needs camera access for identity verification and profile photos.",
         "NSPhotoLibraryUsageDescription": "ChipIn needs photo library access to upload profile photos.",
@@ -34,7 +36,12 @@
       },
       "package": "com.chipinpool.app",
       "versionCode": 1,
-      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE", "VIBRATE", "RECEIVE_BOOT_COMPLETED"]
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -51,9 +58,15 @@
       ],
       "expo-updates"
     ],
-    "owner": "donpsqs",
+    "owner": "chipinpool",
     "runtimeVersion": {
       "policy": "appVersion"
+    },
+    "extra": {
+      "apiUrl": "https://chipinpool.replit.app",
+      "eas": {
+        "projectId": "36899060-b8b7-49a1-90d0-fc1b0062c7a7"
+      }
     }
   }
 }
