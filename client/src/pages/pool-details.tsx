@@ -4,7 +4,8 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3, RefreshCw, Building2, ImagePlus, Upload, X } from "lucide-react";
+import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3, RefreshCw, Building2, ImagePlus, Upload, X, Activity, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useRoute, useLocation } from "wouter";
 import { formatDistanceToNow, format } from "date-fns";
@@ -49,6 +50,16 @@ export default function PoolDetails() {
     enabled: isAuthenticated,
   });
   const linkedBankAccounts = bankAccountsData?.accounts || [];
+
+  const { data: poolActivityData } = useQuery({
+    queryKey: ["poolActivity", params?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/pools/${params?.id}/activity`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load pool activity");
+      return res.json();
+    },
+    enabled: !!params?.id && isAuthenticated,
+  });
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editTitle, setEditTitle] = useState("");
@@ -457,7 +468,12 @@ export default function PoolDetails() {
                     {pool.status === 'active' ? `Ends ${formatDistanceToNow(new Date(pool.deadline), { addSuffix: true })}` : 'Completed'}
                   </div>
                 </div>
-                <h1 className="text-2xl md:text-4xl font-display font-bold text-foreground dark:text-white mb-2 md:mb-3 break-words">{pool.title}</h1>
+                <div className="flex flex-wrap items-center gap-2 mb-2 md:mb-3">
+                  <h1 className="text-2xl md:text-4xl font-display font-bold text-foreground dark:text-white break-words">{pool.title}</h1>
+                  {pool.status === 'completed' && pool.category === 'Purchase' && (
+                    <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Purchased</Badge>
+                  )}
+                </div>
                 <Link 
                   href={isCreator ? '/profile' : `/user/${pool.creatorId}`}
                   className="flex items-center gap-3 text-muted-foreground dark:text-white/80 hover:text-foreground dark:hover:text-white transition-colors w-fit"
@@ -521,6 +537,66 @@ export default function PoolDetails() {
                 )}
               </div>
             </div>
+
+            {poolActivityData && (
+              <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5" data-testid="pool-activity-section">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-primary" /> Pool Activity
+                  </h3>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Raised</div>
+                    <div className="text-lg font-bold text-green-400" data-testid="text-pool-raised">
+                      ${parseFloat(poolActivityData.summary?.raised || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Spent</div>
+                    <div className="text-lg font-bold text-red-400" data-testid="text-pool-spent">
+                      ${parseFloat(poolActivityData.summary?.spent || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-center">
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Remaining</div>
+                    <div className="text-lg font-bold text-blue-400" data-testid="text-pool-remaining">
+                      ${parseFloat(poolActivityData.summary?.remaining || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {(poolActivityData.activities || []).length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No activity yet</p>
+                  ) : (
+                    (poolActivityData.activities || []).map((activity: any) => (
+                      <div key={activity.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/5 transition-colors" data-testid={`pool-activity-${activity.id}`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                          activity.type === 'contribution' ? 'bg-green-500/20' : 'bg-red-500/20'
+                        }`}>
+                          {activity.type === 'contribution' ? (
+                            <ArrowDownLeft className="w-4 h-4 text-green-400" />
+                          ) : (
+                            <ArrowUpRight className="w-4 h-4 text-red-400" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{activity.description}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
+                          </p>
+                        </div>
+                        <div className={`text-sm font-bold whitespace-nowrap ${
+                          activity.type === 'contribution' ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {activity.type === 'contribution' ? '+' : '-'}${parseFloat(activity.amount).toFixed(2)}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
 
             <CommentsSection comments={comments} poolId={pool.id} />
           </div>

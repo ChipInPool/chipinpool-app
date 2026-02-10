@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PoolCard } from "@/components/pool-card";
-import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus, Clock, Users, UserPlus, ChevronDown, ChevronUp, Building, AlertCircle, Receipt, RefreshCw, Loader2, CreditCard, Trash2, Check, Camera } from "lucide-react";
+import { Star, MapPin, Calendar, Link as LinkIcon, Trophy, Target, Wallet, Plus, Minus, Clock, Users, UserPlus, ChevronDown, ChevronUp, Building, AlertCircle, Receipt, RefreshCw, Loader2, CreditCard, Trash2, Check, Camera, ArrowUpRight, ArrowDownLeft, ShoppingBag, TrendingUp, TrendingDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { formatDistanceToNow } from "date-fns";
 
 export default function Profile() {
   const { toast } = useToast();
@@ -25,6 +26,7 @@ export default function Profile() {
   const searchString = useSearch();
   const queryClient = useQueryClient();
   
+  const [activeTab, setActiveTab] = useState<'pools' | 'activity'>('activity');
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
   const [amount, setAmount] = useState("");
@@ -237,6 +239,16 @@ export default function Profile() {
     queryKey: queryKeys.following(user?.id || ""),
     queryFn: () => api.users.getFollowing(user?.id || ""),
     enabled: isAuthenticated && !!user?.id,
+  });
+
+  const { data: userActivityData, isLoading: activityLoading } = useQuery({
+    queryKey: ["userActivity"],
+    queryFn: async () => {
+      const res = await fetch("/api/user/activity", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load activity");
+      return res.json();
+    },
+    enabled: isAuthenticated,
   });
 
   const { data: plaidStatus } = useQuery({
@@ -615,46 +627,114 @@ export default function Profile() {
 
           <div className="lg:col-span-8 space-y-6 md:space-y-8">
             <div className="flex items-center border-b border-white/10 pb-4">
-              <button className="flex-1 md:flex-none text-base md:text-lg font-bold border-b-2 border-primary pb-4 -mb-4.5 px-2 py-2 min-h-[44px]">My Pools</button>
-              <button className="flex-1 md:flex-none text-base md:text-lg font-medium text-muted-foreground hover:text-foreground transition-colors px-2 py-2 min-h-[44px]">Activity</button>
+              <button 
+                className={`flex-1 md:flex-none text-base md:text-lg font-bold pb-4 -mb-4.5 px-2 py-2 min-h-[44px] transition-colors ${activeTab === 'pools' ? 'border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => setActiveTab('pools')}
+                data-testid="tab-my-pools"
+              >
+                My Pools
+              </button>
+              <button 
+                className={`flex-1 md:flex-none text-base md:text-lg font-bold pb-4 -mb-4.5 px-2 py-2 min-h-[44px] transition-colors ${activeTab === 'activity' ? 'border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => setActiveTab('activity')}
+                data-testid="tab-activity"
+              >
+                Activity
+              </button>
             </div>
 
-            {poolsLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[1, 2].map((i) => (
-                  <Skeleton key={i} className="h-[300px] rounded-xl" />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {userPools.length > 0 && (
-                  <section>
-                    <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mb-4">Created by You</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {userPools.map((pool: any) => (
-                        <PoolCard key={pool.id} pool={pool} />
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {joinedPools.length > 0 && (
-                  <section>
-                    <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mb-4">Chipped In</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {joinedPools.map((pool: any) => (
-                        <PoolCard key={pool.id} pool={pool} />
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {userPools.length === 0 && joinedPools.length === 0 && (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <p>No pools yet. Create your first pool to get started!</p>
+            {activeTab === 'pools' ? (
+              <>
+                {poolsLoading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[1, 2].map((i) => (
+                      <Skeleton key={i} className="h-[300px] rounded-xl" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {userPools.length > 0 && (
+                      <section>
+                        <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mb-4">Created by You</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {userPools.map((pool: any) => (
+                            <PoolCard key={pool.id} pool={pool} />
+                          ))}
+                        </div>
+                      </section>
+                    )}
+                    {joinedPools.length > 0 && (
+                      <section>
+                        <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mb-4">Chipped In</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {joinedPools.map((pool: any) => (
+                            <PoolCard key={pool.id} pool={pool} />
+                          ))}
+                        </div>
+                      </section>
+                    )}
+                    {userPools.length === 0 && joinedPools.length === 0 && (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <p>No pools yet. Create your first pool to get started!</p>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
+              </>
+            ) : (
+              <>
+                {activityLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Skeleton key={i} className="h-16 rounded-xl" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {(userActivityData?.activities || []).length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <p>No activity yet. Start contributing to pools!</p>
+                      </div>
+                    ) : (
+                      (userActivityData?.activities || []).map((activity: any) => (
+                        <div key={activity.id} className="flex items-center gap-3 p-3 md:p-4 rounded-xl bg-card border border-white/5 hover:border-white/10 transition-colors" data-testid={`activity-item-${activity.id}`}>
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                            activity.type === 'contribution' ? 'bg-blue-500/20' :
+                            activity.type === 'deposit' ? 'bg-green-500/20' :
+                            activity.type === 'withdrawal' ? 'bg-orange-500/20' :
+                            activity.type === 'spend' ? 'bg-red-500/20' :
+                            'bg-muted'
+                          }`}>
+                            {activity.type === 'contribution' && <ArrowUpRight className="w-5 h-5 text-blue-400" />}
+                            {activity.type === 'deposit' && <ArrowDownLeft className="w-5 h-5 text-green-400" />}
+                            {activity.type === 'withdrawal' && <ArrowUpRight className="w-5 h-5 text-orange-400" />}
+                            {activity.type === 'spend' && <ShoppingBag className="w-5 h-5 text-red-400" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{activity.description}</p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>{formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}</span>
+                              {activity.poolTitle && (
+                                <>
+                                  <span>·</span>
+                                  <Link href={`/pool/${activity.poolId}`} className="text-primary hover:underline truncate">
+                                    {activity.poolTitle}
+                                  </Link>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className={`text-sm font-bold whitespace-nowrap ${
+                            activity.direction === 'in' ? 'text-green-400' : 'text-foreground'
+                          }`}>
+                            {activity.direction === 'in' ? '+' : '-'}${parseFloat(activity.amount).toFixed(2)}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

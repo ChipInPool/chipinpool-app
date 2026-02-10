@@ -5,10 +5,10 @@ import session from "express-session";
 import rateLimit from "express-rate-limit";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { fileStorageService, isAzureStorage } from "./fileStorage";
-import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, bankAccounts, merchantPayouts, payMeTransactions, apiAccessRequests } from "@shared/schema";
+import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, walletDeposits, bankAccounts, merchantPayouts, payMeTransactions, apiAccessRequests, poolActivities } from "@shared/schema";
 import express from "express";
 import { db } from "./db";
-import { eq, desc, sql, inArray } from "drizzle-orm";
+import { eq, desc, sql, inArray, and } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
@@ -965,6 +965,58 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/pools/:id/activity", requireAuth, async (req, res, next) => {
+    try {
+      const pool = await storage.getPool(req.params.id);
+      if (!pool) return res.status(404).json({ message: "Pool not found" });
+      
+      const activities = await storage.getPoolActivities(req.params.id);
+      const poolContributions = await storage.getContributionsByPool(req.params.id);
+      
+      const contributionActivities = await Promise.all(poolContributions.map(async (c) => {
+        const user = c.userId ? await storage.getUser(c.userId) : null;
+        return {
+          id: `contrib-${c.id}`,
+          type: 'contribution' as const,
+          amount: c.amount,
+          description: user ? `${user.firstName} ${user.lastName} contributed` : (c.guestEmail ? `${c.guestEmail} contributed` : 'Guest contributed'),
+          userName: user ? `${user.firstName} ${user.lastName}` : (c.guestEmail || 'Guest'),
+          userAvatar: user?.avatar || null,
+          createdAt: c.createdAt?.toISOString() || new Date().toISOString(),
+        };
+      }));
+      
+      const spendActivities = activities.filter(a => a.type === 'spend').map(a => ({
+        id: `spend-${a.id}`,
+        type: 'spend' as const,
+        amount: a.amount,
+        description: a.description || `Spent at ${a.merchant || 'merchant'}`,
+        merchant: a.merchant,
+        userName: null,
+        userAvatar: null,
+        createdAt: a.createdAt?.toISOString() || new Date().toISOString(),
+      }));
+      
+      const allActivities = [...contributionActivities, ...spendActivities]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      const raised = parseFloat(pool.currentAmount);
+      const spent = parseFloat(pool.spentAmount);
+      const remaining = raised - spent;
+      
+      res.json({
+        activities: allActivities,
+        summary: {
+          raised: pool.currentAmount,
+          spent: pool.spentAmount,
+          remaining: remaining.toFixed(2),
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get("/api/pools/:id", requireAuth, async (req, res, next) => {
     try {
       const pool = await storage.getPool(req.params.id);
@@ -1121,6 +1173,16 @@ export async function registerRoutes(
         poolId: pool.id,
         userId: user.id,
         amount,
+      });
+
+      // Record pool activity for contribution
+      await storage.createPoolActivity({
+        poolId: pool.id,
+        userId: req.session.userId!,
+        type: 'contribution',
+        amount: amount,
+        description: `${user.firstName} ${user.lastName} contributed`,
+        referenceId: contribution.id,
       });
 
       // Update pool amount
@@ -1679,6 +1741,27 @@ export async function registerRoutes(
       // Update card balance
       const newBalance = (cardBalance - transactionAmount).toFixed(2);
       await storage.updateCardBalance(card.id, newBalance);
+
+      // Record pool activity for spending
+      await storage.createPoolActivity({
+        poolId: pool!.id,
+        userId: req.session.userId!,
+        type: 'spend',
+        amount: data.amount,
+        description: `Spent at ${data.merchant || 'merchant'}`,
+        merchant: data.merchant || null,
+        referenceId: transaction.id,
+      });
+      
+      // Update pool spent amount
+      const currentSpent = parseFloat(pool!.spentAmount);
+      const newSpentAmount = (currentSpent + transactionAmount).toFixed(2);
+      await storage.updatePoolSpentAmount(pool!.id, newSpentAmount);
+      
+      // Auto-close Purchase pools after spending
+      if (pool!.category === 'Purchase') {
+        await storage.updatePoolStatus(pool!.id, 'completed');
+      }
 
       // Send card transaction notification to pool creator
       const user = await storage.getUser(req.session.userId!);
@@ -5198,6 +5281,111 @@ export async function registerRoutes(
   });
 
   // ========== ACTIVITY FEED ROUTES ==========
+
+  app.get("/api/user/activity", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      
+      const userContributions = await db.select({
+        id: contributions.id,
+        amount: contributions.amount,
+        createdAt: contributions.createdAt,
+        poolId: contributions.poolId,
+      })
+      .from(contributions)
+      .where(eq(contributions.userId, userId))
+      .orderBy(desc(contributions.createdAt))
+      .limit(50);
+      
+      const deposits = await db.select()
+        .from(walletDeposits)
+        .where(eq(walletDeposits.userId, userId))
+        .orderBy(desc(walletDeposits.createdAt))
+        .limit(20);
+      
+      const withdrawals = await db.select()
+        .from(walletWithdrawals)
+        .where(eq(walletWithdrawals.userId, userId))
+        .orderBy(desc(walletWithdrawals.createdAt))
+        .limit(20);
+      
+      const userPools = await storage.getPoolsByCreator(userId);
+      const poolIds = userPools.map(p => p.id);
+      let spendActivities: any[] = [];
+      if (poolIds.length > 0) {
+        spendActivities = await db.select()
+          .from(poolActivities)
+          .where(and(
+            inArray(poolActivities.poolId, poolIds),
+            eq(poolActivities.type, 'spend')
+          ))
+          .orderBy(desc(poolActivities.createdAt))
+          .limit(20);
+      }
+      
+      const activities: any[] = [];
+      
+      for (const c of userContributions) {
+        const pool = await storage.getPool(c.poolId);
+        activities.push({
+          id: `contrib-${c.id}`,
+          type: 'contribution',
+          amount: c.amount,
+          description: `Contributed to "${pool?.title || 'pool'}"`,
+          poolId: c.poolId,
+          poolTitle: pool?.title || 'Unknown Pool',
+          createdAt: c.createdAt?.toISOString() || new Date().toISOString(),
+          direction: 'out',
+        });
+      }
+      
+      for (const d of deposits) {
+        activities.push({
+          id: `deposit-${d.id}`,
+          type: 'deposit',
+          amount: d.amount,
+          description: 'Added funds to wallet',
+          createdAt: d.createdAt?.toISOString() || new Date().toISOString(),
+          direction: 'in',
+        });
+      }
+      
+      for (const w of withdrawals) {
+        activities.push({
+          id: `withdraw-${w.id}`,
+          type: 'withdrawal',
+          amount: w.amount,
+          description: `Withdrawal ${w.status === 'completed' ? 'completed' : w.status === 'pending_review' ? 'pending review' : w.status}`,
+          status: w.status,
+          createdAt: w.createdAt?.toISOString() || new Date().toISOString(),
+          direction: 'out',
+        });
+      }
+      
+      for (const s of spendActivities) {
+        const pool = await storage.getPool(s.poolId);
+        activities.push({
+          id: `spend-${s.id}`,
+          type: 'spend',
+          amount: s.amount,
+          description: s.description || `Spent at ${s.merchant || 'merchant'}`,
+          merchant: s.merchant,
+          poolId: s.poolId,
+          poolTitle: pool?.title || 'Unknown Pool',
+          createdAt: s.createdAt?.toISOString() || new Date().toISOString(),
+          direction: 'out',
+        });
+      }
+      
+      activities.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      res.json({ activities: activities.slice(0, 50) });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   // Get activity feed for followed users
   app.get("/api/activity-feed", requireAuth, async (req, res, next) => {

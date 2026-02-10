@@ -2,7 +2,7 @@ import { db } from "./db";
 import { 
   users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites, walletDeposits, walletWithdrawals, verificationCodes, bankAccounts, recurringContributions, apiAccessRequests,
   merchants, merchantApiKeys, merchantCheckoutSessions, merchantWebhookDeliveries, merchantPayouts, poolTransferRequests,
-  userPoints, pointTransactions,
+  userPoints, pointTransactions, poolActivities,
   type User, type InsertUser, type Pool, type InsertPool, type Contribution, type InsertContribution,
   type Comment, type InsertComment, type Notification, type InsertNotification,
   type VirtualCard, type InsertVirtualCard, type Transaction, type InsertTransaction,
@@ -14,7 +14,8 @@ import {
   type MerchantPayout, type InsertMerchantPayout,
   type BankAccount, type InsertBankAccount, type PoolTransferRequest, type InsertPoolTransferRequest,
   type Badge, type InsertBadge, type UserBadge, type InsertUserBadge,
-  type UserPoints, type InsertUserPoints, type PointTransaction, type InsertPointTransaction
+  type UserPoints, type InsertUserPoints, type PointTransaction, type InsertPointTransaction,
+  type PoolActivity, type InsertPoolActivity
 } from "@shared/schema";
 import { eq, desc, and, sql, gt, inArray } from "drizzle-orm";
 
@@ -160,6 +161,11 @@ export interface IStorage {
   getPoolTransferRequestsByUser(userId: string): Promise<PoolTransferRequest[]>;
   getPendingTransferRequestsForUser(userId: string): Promise<PoolTransferRequest[]>;
   updatePoolTransferRequest(id: string, data: Partial<PoolTransferRequest>): Promise<PoolTransferRequest | undefined>;
+
+  // Pool activity operations
+  createPoolActivity(activity: InsertPoolActivity): Promise<PoolActivity>;
+  getPoolActivities(poolId: string): Promise<PoolActivity[]>;
+  updatePoolSpentAmount(poolId: string, amount: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -975,6 +981,21 @@ export class DatabaseStorage implements IStorage {
     );
     
     return usersData;
+  }
+
+  async createPoolActivity(activity: InsertPoolActivity): Promise<PoolActivity> {
+    const [result] = await db.insert(poolActivities).values(activity).returning();
+    return result;
+  }
+
+  async getPoolActivities(poolId: string): Promise<PoolActivity[]> {
+    return await db.select().from(poolActivities)
+      .where(eq(poolActivities.poolId, poolId))
+      .orderBy(desc(poolActivities.createdAt));
+  }
+
+  async updatePoolSpentAmount(poolId: string, amount: string): Promise<void> {
+    await db.update(pools).set({ spentAmount: amount }).where(eq(pools.id, poolId));
   }
 }
 
