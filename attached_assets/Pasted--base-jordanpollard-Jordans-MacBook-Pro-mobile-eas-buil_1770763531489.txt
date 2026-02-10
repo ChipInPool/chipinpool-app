@@ -1,0 +1,91 @@
+(base) jordanpollard@Jordans-MacBook-Pro mobile % eas build --platform ios --profile production
+Resolved "production" environment for the build. Learn more
+No environment variables with visibility "Plain text" and "Sensitive" found for the "production" environment on EAS.
+
+
+
+You need to be on SDK 46 or higher, and use expo-updates >= 0.14.4 to use appVersion runtime policy.
+✔ Using remote iOS credentials (Expo server)
+
+If you provide your Apple account credentials we will be able to generate all necessary build credentials and fully validate them.
+This is optional, but without Apple account access you will need to provide all the missing values manually and we can only run minimal validation on them.
+✔ Do you want to log in to your Apple account? … yes
+
+› Log in to your Apple Developer account to continue
+✔ Apple ID: … jojopollard44@gmail.com
+› Restoring session /Users/jordanpollard/.app-store/auth/jojopollard44@gmail.com/cookie
+› Session expired Local session
+› Using password for jojopollard44@gmail.com from your local Keychain
+  Learn more
+✔ Logged in, verify your Apple account to continue
+Two-factor Authentication (6 digit code) is enabled for jojopollard44@gmail.com. Learn more: https://support.apple.com/en-us/HT204915
+
+✔ How do you want to validate your account? … device / sms
+✔ Please enter the 6 digit code … 563169
+✔ Valid code
+✔ Logged in and verified
+› Team ChipInPool Corp. (R7BALRPQD7)
+› Provider ChipInPool Corp. (118254727)
+✔ Bundle identifier registered com.chipinpool.app
+✔ Synced capabilities: Enabled: Push Notifications
+✔ Synced capability identifiers: No updates
+✔ Fetched Apple distribution certificates
+✔ Reuse this distribution certificate?
+Cert ID: 6K4258CZF2, Serial number: 33310D34D660037BC5499311F15E9FE0, Team ID: R7BALRPQD7, Team name: ChipInPool Corp. (Company/Organization)
+    Created: 14 days ago, Updated: 14 days ago,
+    Expires: Tue, 26 Jan 2027 17:51:47 PST
+    📲 Used by: @donpsqs/chipinpool … yes
+Using distribution certificate with serial number 33310D34D660037BC5499311F15E9FE0
+✔ Generate a new Apple Provisioning Profile? … yes
+✔ Created Apple provisioning profile
+✔ Created provisioning profile
+
+Project Credentials Configuration
+
+Project                   @donpsqs/chipinpool
+Bundle Identifier         com.chipinpool.app
+                          
+App Store Configuration   
+                          
+Distribution Certificate  
+Serial Number             33310D34D660037BC5499311F15E9FE0
+Expiration Date           Tue, 26 Jan 2027 17:51:47 PST
+Apple Team                R7BALRPQD7 (ChipInPool Corp. (Company/Organization))
+Updated                   14 days ago
+                          
+Provisioning Profile      
+Developer Portal ID       62PF6PAADB
+Status                    active
+Expiration                Tue, 26 Jan 2027 17:51:47 PST
+Apple Team                R7BALRPQD7 (ChipInPool Corp. (Company/Organization))
+Updated                   2 seconds ago
+                          
+All credentials are ready to build @donpsqs/chipinpool (com.chipinpool.app)
+
+✔ Would you like to set up Push Notifications for your project? › Yes
+✔ Generate a new Apple Push Notifications service key? … yes
+✔ Created Apple push key
+✔ Created push key
+✔ Push Key assigned to chipinpool: com.chipinpool.app
+
+Bumping expo.ios.buildNumber from 1 to 2
+
+Compressing project files and uploading to EAS Build. Learn more
+✔ Compressed project files 2s (78.2 MB)
+✔ Uploaded to EAS 41s
+✔ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/donpsqs/projects/chipinpool/builds/5e6e7f8e-a492-44f2-b93f-b89f7a98dbdd
+
+Waiting for build to complete. You can press Ctrl+C to exit.
+  Build queued...
+
+Start builds sooner in the priority queue.
+Sign up for a paid plan at https://expo.dev/accounts/donpsqs/settings/billing
+
+Waiting in Free tier queue
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 
+
+✖ Build failed
+🍏 iOS build failed:
+Unknown error. See logs of the Bundle JavaScript build phase for more information.

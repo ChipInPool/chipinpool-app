@@ -48,7 +48,8 @@
           "icon": "./assets/notification-icon.png",
           "color": "#7FFFD4"
         }
-      ]
+      ],
+      "expo-updates"
     ],
     "owner": "donpsqs",
     "runtimeVersion": {
