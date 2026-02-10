@@ -242,9 +242,11 @@ export default function Settings() {
   const avatarMutation = useMutation({
     mutationFn: async (file: File) => {
       // Step 1: Get presigned upload URL
-      const urlRes = await fetch("/api/user/avatar/upload-url", {
+      const urlRes = await fetch("/api/uploads/request-url", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
       });
       if (!urlRes.ok) throw new Error("Failed to get upload URL");
       const { uploadURL, objectPath } = await urlRes.json();

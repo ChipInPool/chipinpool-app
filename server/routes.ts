@@ -3,7 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import rateLimit from "express-rate-limit";
-import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { fileStorageService, isAzureStorage } from "./fileStorage";
 import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, bankAccounts, merchantPayouts, payMeTransactions, apiAccessRequests } from "@shared/schema";
 import express from "express";
 import { db } from "./db";
@@ -151,7 +152,6 @@ export async function registerRoutes(
 
   // Register object storage routes
   registerObjectStorageRoutes(app);
-  const objectStorageService = new ObjectStorageService();
 
   // Auth middleware
   const requireAuth = (req: any, res: any, next: any) => {
@@ -755,33 +755,35 @@ export async function registerRoutes(
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
 
-      // Validate that the object exists before setting ACL
-      try {
-        const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
-        if (!objectFile) {
-          return res.status(400).json({ error: "Uploaded file not found" });
-        }
-      } catch (err) {
-        return res.status(400).json({ error: "Invalid or missing uploaded file" });
+      // Validate that the object exists
+      const exists = await fileStorageService.fileExists(objectPath);
+      if (!exists) {
+        return res.status(400).json({ error: "Uploaded file not found" });
       }
 
-      // Set the ACL policy to make the avatar public and owned by the user
-      try {
-        const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(objectPath, {
-          owner: userId,
-          visibility: "public",
-        });
-        
-        // Update user avatar URL
-        await storage.updateUser(userId, { avatar: normalizedPath });
-        
-        const updatedUser = await storage.getUser(userId);
-        const { password, ...userWithoutPassword } = updatedUser!;
-        res.json({ message: "Avatar updated successfully", user: userWithoutPassword });
-      } catch (aclError) {
-        console.error("Error setting ACL policy:", aclError);
-        return res.status(500).json({ error: "Failed to process uploaded image" });
+      // Set ACL policy on Replit storage; skip on Azure (has its own access control)
+      let normalizedPath = objectPath;
+      if (!isAzureStorage()) {
+        try {
+          const replitService = fileStorageService.getReplitService();
+          if (replitService) {
+            normalizedPath = await replitService.trySetObjectEntityAclPolicy(objectPath, {
+              owner: userId,
+              visibility: "public",
+            });
+          }
+        } catch (aclError) {
+          console.error("Error setting ACL policy:", aclError);
+          return res.status(500).json({ error: "Failed to process uploaded image" });
+        }
       }
+
+      // Update user avatar URL
+      await storage.updateUser(userId, { avatar: normalizedPath });
+      
+      const updatedUser = await storage.getUser(userId);
+      const { password, ...userWithoutPassword } = updatedUser!;
+      res.json({ message: "Avatar updated successfully", user: userWithoutPassword });
     } catch (error) {
       next(error);
     }
@@ -791,11 +793,11 @@ export async function registerRoutes(
   app.post("/api/user/avatar/upload-url", requireAuth, async (req, res, next) => {
     try {
       const userId = req.session.userId!;
-      let uploadURL: string | null = null;
+      let result: { uploadURL: string; objectPath: string } | null = null;
       let lastError: any = null;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          uploadURL = await objectStorageService.getObjectEntityUploadURL();
+          result = await fileStorageService.getUploadURL();
           break;
         } catch (err) {
           lastError = err;
@@ -803,14 +805,13 @@ export async function registerRoutes(
           if (attempt < 2) await new Promise(r => setTimeout(r, 500));
         }
       }
-      if (!uploadURL) {
+      if (!result) {
         console.error("All avatar upload URL attempts failed:", lastError);
         return res.status(500).json({ error: "Storage service temporarily unavailable. Please try again." });
       }
-      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
       res.json({ 
-        uploadURL, 
-        objectPath,
+        uploadURL: result.uploadURL, 
+        objectPath: result.objectPath,
         constraints: {
           maxSizeBytes: 5 * 1024 * 1024,
           allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
