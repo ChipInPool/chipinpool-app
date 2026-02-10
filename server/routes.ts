@@ -2999,18 +2999,27 @@ export async function registerRoutes(
       const enrichedWithdrawals = await Promise.all(pendingWithdrawals.map(async (w) => {
         const wUser = await storage.getUser(w.userId);
         
-        // Get full account number from the linked bank account
+        // Get full bank details from the linked bank account
         let fullAccountNumber: string | null = null;
+        let bankRoutingNumber: string | null = null;
+        let bankAccountHolderName: string | null = null;
+        let bankAccountType: string | null = null;
         if (w.bankAccountId) {
           const bankAccount = await storage.getBankAccountById(w.bankAccountId);
-          if (bankAccount?.accountNumber) {
-            fullAccountNumber = bankAccount.accountNumber;
+          if (bankAccount) {
+            fullAccountNumber = bankAccount.accountNumber || null;
+            bankRoutingNumber = bankAccount.routingNumber || null;
+            bankAccountHolderName = bankAccount.accountName || null;
+            bankAccountType = bankAccount.accountType || null;
           }
         }
         
         return {
           ...w,
-          fullAccountNumber, // Full account number for admin Mercury processing
+          fullAccountNumber,
+          routingNumber: w.routingNumber || bankRoutingNumber,
+          accountHolderName: w.accountHolderName || bankAccountHolderName,
+          accountType: w.accountType || bankAccountType,
           user: wUser ? {
             id: wUser.id,
             firstName: wUser.firstName,
@@ -4211,6 +4220,16 @@ export async function registerRoutes(
           instantFee > 0 ? instantFee.toFixed(2) : undefined
         );
 
+        // Save bank details on withdrawal for admin processing
+        await db.update(walletWithdrawals)
+          .set({
+            accountHolderName: bankAccount.accountName,
+            routingNumber: bankAccount.routingNumber || null,
+            accountNumberLast4: bankAccount.accountNumber ? bankAccount.accountNumber.slice(-4) : bankAccount.accountMask,
+            accountType: bankAccount.accountType,
+          })
+          .where(eq(walletWithdrawals.id, withdrawal.id));
+
         // Execute payout - Stripe for new accounts, Plaid for legacy
         let payoutTransferId: string | null = null;
         let payoutError: string | null = null;
@@ -4569,6 +4588,16 @@ export async function registerRoutes(
         payoutSpeed,
         instantFee > 0 ? instantFee.toFixed(2) : undefined
       );
+
+      // Save bank details on withdrawal for admin processing
+      await db.update(walletWithdrawals)
+        .set({
+          accountHolderName: bankAccount.accountName,
+          routingNumber: bankAccount.routingNumber || null,
+          accountNumberLast4: bankAccount.accountNumber ? bankAccount.accountNumber.slice(-4) : bankAccount.accountMask,
+          accountType: bankAccount.accountType,
+        })
+        .where(eq(walletWithdrawals.id, withdrawal.id));
 
       // Execute payout - Stripe for new accounts, Plaid for legacy
       let plaidTransferId: string | null = null;
