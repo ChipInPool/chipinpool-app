@@ -56,24 +56,36 @@ export default function Profile() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
       });
-      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      if (!urlRes.ok) {
+        if (urlRes.status === 401) {
+          toast({ description: "Session expired. Please log in again.", variant: "destructive" });
+          setIsUploadingAvatar(false);
+          return;
+        }
+        const errData = await urlRes.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || `Upload failed (${urlRes.status})`);
+      }
       const { uploadURL, objectPath } = await urlRes.json();
       const uploadRes = await fetch(uploadURL, {
         method: "PUT",
         body: file,
         headers: { "Content-Type": file.type },
       });
-      if (!uploadRes.ok) throw new Error("Failed to upload image");
+      if (!uploadRes.ok) throw new Error("Failed to upload image to storage");
       const saveRes = await fetch("/api/user/avatar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ objectPath }),
       });
-      if (!saveRes.ok) throw new Error("Failed to save avatar");
+      if (!saveRes.ok) {
+        const errData = await saveRes.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || "Failed to save avatar");
+      }
       toast({ description: "Avatar updated successfully" });
       queryClient.invalidateQueries({ queryKey: queryKeys.user });
     } catch (err: any) {
+      console.error("Avatar upload error:", err);
       toast({ description: err.message || "Failed to upload avatar", variant: "destructive" });
     } finally {
       setIsUploadingAvatar(false);
