@@ -149,6 +149,7 @@ export const pools = pgTable("pools", {
   description: text("description"),
   targetAmount: decimal("target_amount", { precision: 10, scale: 2 }).notNull(),
   currentAmount: decimal("current_amount", { precision: 10, scale: 2 }).notNull().default('0'),
+  spentAmount: decimal("spent_amount", { precision: 10, scale: 2 }).notNull().default('0'),
   category: poolCategoryEnum("category").notNull(),
   creatorId: varchar("creator_id").references(() => users.id).notNull(),
   deadline: timestamp("deadline").notNull(),
@@ -211,6 +212,18 @@ export const transactions = pgTable("transactions", {
   status: text("status").notNull().default('completed'),
   receiptUrl: text("receipt_url"),
   notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const poolActivities = pgTable("pool_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  poolId: varchar("pool_id").references(() => pools.id).notNull(),
+  userId: varchar("user_id").references(() => users.id),
+  type: text("type").notNull(), // 'contribution', 'spend', 'refund'
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  description: text("description"),
+  merchant: text("merchant"),
+  referenceId: varchar("reference_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -340,13 +353,14 @@ export const insertUserSchema = createInsertSchema(users).omit({
   plaidAccessToken: true,
   plaidAccountId: true,
 });
-export const insertPoolSchema = createInsertSchema(pools).omit({ id: true, createdAt: true, updatedAt: true, currentAmount: true, status: true });
+export const insertPoolSchema = createInsertSchema(pools).omit({ id: true, createdAt: true, updatedAt: true, currentAmount: true, spentAmount: true, status: true });
 export const insertContributionSchema = createInsertSchema(contributions).omit({ id: true, createdAt: true });
 export const insertCommentSchema = createInsertSchema(comments).omit({ id: true, createdAt: true, likes: true });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, read: true });
 export const insertVirtualCardSchema = createInsertSchema(virtualCards).omit({ id: true, createdAt: true, isActive: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true, status: true });
 export const insertInviteSchema = createInsertSchema(invites).omit({ id: true, createdAt: true, status: true });
+export const insertPoolActivitySchema = createInsertSchema(poolActivities).omit({ id: true, createdAt: true });
 export const insertRecurringContributionSchema = createInsertSchema(recurringContributions).omit({ id: true, createdAt: true, status: true });
 export const insertApiAccessRequestSchema = createInsertSchema(apiAccessRequests).omit({ id: true, createdAt: true, status: true });
 export const insertBankAccountSchema = createInsertSchema(bankAccounts).omit({ id: true, createdAt: true });
@@ -603,6 +617,8 @@ export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Invite = typeof invites.$inferSelect;
 export type InsertInvite = z.infer<typeof insertInviteSchema>;
+export type PoolActivity = typeof poolActivities.$inferSelect;
+export type InsertPoolActivity = z.infer<typeof insertPoolActivitySchema>;
 export type RecurringContribution = typeof recurringContributions.$inferSelect;
 export type InsertRecurringContribution = z.infer<typeof insertRecurringContributionSchema>;
 export type ApiAccessRequest = typeof apiAccessRequests.$inferSelect;
