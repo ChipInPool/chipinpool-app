@@ -72,6 +72,16 @@ export default function SpendNow() {
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedPoolId, setSelectedPoolId] = useState<string>('');
+  const [poolFromUrl, setPoolFromUrl] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const poolParam = params.get('pool');
+    if (poolParam) {
+      setSelectedPoolId(poolParam);
+      setPoolFromUrl(true);
+    }
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchInput), 300);
@@ -101,10 +111,10 @@ export default function SpendNow() {
   }, [poolsData, user]);
 
   useEffect(() => {
-    if (availablePools.length > 0 && !selectedPoolId) {
+    if (availablePools.length > 0 && !selectedPoolId && !poolFromUrl) {
       setSelectedPoolId(String(availablePools[0].id));
     }
-  }, [availablePools, selectedPoolId]);
+  }, [availablePools, selectedPoolId, poolFromUrl]);
 
   const partners = Array.isArray(partnersData) ? partnersData : partnersData?.partners || [];
   const categoryCounts = categoriesData?.categories || {};
@@ -151,22 +161,33 @@ export default function SpendNow() {
               <span>Spending from:</span>
             </div>
             {availablePools.length > 0 ? (
-              <div className="flex items-center gap-3 flex-1">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-1">
                 <Select value={selectedPoolId} onValueChange={setSelectedPoolId}>
-                  <SelectTrigger className="w-full sm:w-72" data-testid="select-pool-spend">
-                    <SelectValue placeholder="Select a pool" />
+                  <SelectTrigger className="w-full sm:w-80" data-testid="select-pool-spend">
+                    <SelectValue placeholder="Select a pool">
+                      {selectedPool && (
+                        <span className="flex items-center gap-2">
+                          <span className="font-medium truncate">{selectedPool.name || selectedPool.title}</span>
+                          <span className="text-muted-foreground">•</span>
+                          <span className="text-primary font-semibold">${parseFloat(selectedPool.currentAmount || selectedPool.balance || '0').toFixed(2)}</span>
+                        </span>
+                      )}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {availablePools.map((pool: any) => (
                       <SelectItem key={pool.id} value={String(pool.id)}>
-                        {pool.name} — ${parseFloat(pool.currentAmount || pool.balance || '0').toFixed(2)}
+                        <div className="flex items-center justify-between gap-4 w-full">
+                          <span className="font-medium">{pool.name || pool.title}</span>
+                          <span className="text-primary font-semibold">${parseFloat(pool.currentAmount || pool.balance || '0').toFixed(2)}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 {selectedPool && (
-                  <Badge variant="secondary" className="whitespace-nowrap">
-                    Balance: ${parseFloat(selectedPool.currentAmount || selectedPool.balance || '0').toFixed(2)}
+                  <Badge variant="secondary" className="whitespace-nowrap text-sm px-3 py-1">
+                    Available: ${parseFloat(selectedPool.currentAmount || selectedPool.balance || '0').toFixed(2)}
                   </Badge>
                 )}
               </div>

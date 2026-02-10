@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3, RefreshCw, Building2, ImagePlus, Upload, X, Activity, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3, RefreshCw, Building2, ImagePlus, Upload, X, Activity, ArrowUpRight, ArrowDownLeft, ShoppingBag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useRoute, useLocation } from "wouter";
@@ -654,6 +654,17 @@ export default function PoolDetails() {
                     >
                       <Link href={`/pool/${pool.id}/analytics`}>
                         <BarChart3 className="w-5 h-5 mr-2" /> View Analytics
+                      </Link>
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      size="lg" 
+                      className="w-full border-white/10 hover:border-primary/30 hover:text-primary transition-colors" 
+                      asChild
+                      data-testid="button-spend-now-marketplace"
+                    >
+                      <Link href={`/spend-now?pool=${pool.id}`}>
+                        <ShoppingBag className="w-5 h-5 mr-2" /> Spend Now Marketplace
                       </Link>
                     </Button>
                   </>
