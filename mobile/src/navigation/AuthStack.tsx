@@ -12,7 +12,7 @@ export type AuthStackParamList = {
   Verify2FA: undefined;
 };
 
-const Stack = createNativeStackNavigator<AuthStackParamList>();
+const Stack = createNativeStackNavigator();
 
 export default function AuthStack() {
   return (

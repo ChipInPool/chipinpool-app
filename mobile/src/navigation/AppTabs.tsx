@@ -42,9 +42,9 @@ export type ProfileStackParamList = {
   Rewards: undefined;
 };
 
-const Tab = createBottomTabNavigator<AppTabParamList>();
-const PoolsStackNav = createNativeStackNavigator<PoolsStackParamList>();
-const ProfileStackNav = createNativeStackNavigator<ProfileStackParamList>();
+const Tab = createBottomTabNavigator();
+const PoolsStackNav = createNativeStackNavigator();
+const ProfileStackNav = createNativeStackNavigator();
 
 function PoolsStackNavigator() {
   return (
