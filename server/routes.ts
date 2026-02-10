@@ -806,7 +806,8 @@ export async function registerRoutes(
         }
       });
     } catch (error) {
-      next(error);
+      console.error("Error generating avatar upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
     }
   });
 
