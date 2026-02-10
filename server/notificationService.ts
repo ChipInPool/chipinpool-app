@@ -2,6 +2,7 @@
 // Reference: Resend integration connection:conn_resend_01KF2682PY53SZZBAFJ7HQKGNX
 
 import { Resend } from 'resend';
+import { emailWrapper, emailHeading, emailText, emailHighlight, emailButton, emailInfoCard, emailDivider, emailAlert, emailVerificationCode, emailFeatureList, getBaseUrl as getTemplateBaseUrl } from './emailTemplates';
 
 interface NotificationSettings {
   apiKey: string;
@@ -195,24 +196,16 @@ export async function sendPoolContributionNotification(
   const promises: Promise<boolean>[] = [];
 
   if (notifyEmail && recipientEmail) {
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
-          <h1 style="color: #d4ff00; margin: 0 0 16px;">New Contribution!</h1>
-          <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
-            Hey ${recipientName},<br><br>
-            <strong>${contributorName}</strong> just contributed <strong style="color: #d4ff00;">$${amount}</strong> to your pool "<strong>${poolTitle}</strong>"!
-          </p>
-          <a href="${baseUrl}/pool/${poolId}" 
-             style="display: inline-block; background: #d4ff00; color: #0a1628; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-            View Pool
-          </a>
-        </div>
-        <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
-          ChipIn - Pool funds together. Pay smarter.
-        </p>
-      </div>
-    `;
+    const html = emailWrapper({
+      body: [
+        emailHeading('New Contribution!'),
+        emailText(`Hey ${recipientName},`),
+        emailText(`<strong>${contributorName}</strong> just contributed to your pool "<strong>${poolTitle}</strong>"!`),
+        emailHighlight(`$${amount}`, 'Contribution Amount'),
+        emailButton('View Pool', `${baseUrl}/pool/${poolId}`),
+      ].join(''),
+      preheaderText: `${contributorName} contributed $${amount} to ${poolTitle}`,
+    });
     promises.push(sendEmail(recipientEmail, `💰 New contribution to ${poolTitle}!`, html));
   }
 
@@ -238,24 +231,17 @@ export async function sendPoolCompletedNotification(
   const promises: Promise<boolean>[] = [];
 
   if (notifyEmail && recipientEmail) {
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
-          <h1 style="color: #d4ff00; margin: 0 0 16px;">🎉 Pool Complete!</h1>
-          <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
-            Congratulations ${recipientName}!<br><br>
-            Your pool "<strong>${poolTitle}</strong>" has reached its goal of <strong style="color: #d4ff00;">$${totalAmount}</strong>!
-          </p>
-          <a href="${baseUrl}/pool/${poolId}" 
-             style="display: inline-block; background: #d4ff00; color: #0a1628; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-            View Pool
-          </a>
-        </div>
-        <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
-          ChipIn - Pool funds together. Pay smarter.
-        </p>
-      </div>
-    `;
+    const html = emailWrapper({
+      body: [
+        emailHeading('Pool Complete!'),
+        emailText(`Congratulations ${recipientName}!`),
+        emailText(`Your pool "<strong>${poolTitle}</strong>" has reached its goal!`),
+        emailHighlight(`$${totalAmount}`, 'Goal Reached'),
+        emailAlert('All funds have been collected and are ready to use.', 'success'),
+        emailButton('View Pool', `${baseUrl}/pool/${poolId}`),
+      ].join(''),
+      preheaderText: `Your pool "${poolTitle}" reached $${totalAmount}!`,
+    });
     promises.push(sendEmail(recipientEmail, `🎉 Your pool "${poolTitle}" is complete!`, html));
   }
 
@@ -281,23 +267,15 @@ export async function sendPoolInviteNotification(
   const promises: Promise<boolean>[] = [];
 
   if (useEmail && recipientEmail) {
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
-          <h1 style="color: #d4ff00; margin: 0 0 16px;">You're Invited!</h1>
-          <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
-            <strong>${inviterName}</strong> invited you to chip in on "<strong>${poolTitle}</strong>"!
-          </p>
-          <a href="${poolLink}" 
-             style="display: inline-block; background: #d4ff00; color: #0a1628; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-            Join Pool
-          </a>
-        </div>
-        <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
-          ChipIn - Pool funds together. Pay smarter.
-        </p>
-      </div>
-    `;
+    const html = emailWrapper({
+      body: [
+        emailHeading("You're Invited!"),
+        emailText(`<strong>${inviterName}</strong> invited you to chip in on "<strong>${poolTitle}</strong>"!`),
+        emailText('ChipIn makes it easy to pool funds together with friends for trips, gifts, events, and more.'),
+        emailButton('Join Pool', poolLink),
+      ].join(''),
+      preheaderText: `${inviterName} invited you to chip in on "${poolTitle}"`,
+    });
     promises.push(sendEmail(recipientEmail, `${inviterName} invited you to chip in!`, html));
   }
 
@@ -310,25 +288,17 @@ export async function sendPoolInviteNotification(
 }
 
 export async function sendVerificationEmail(email: string, code: string): Promise<boolean> {
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
-        <h1 style="color: #d4ff00; margin: 0 0 16px;">Verify Your Email</h1>
-        <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
-          Your verification code is:
-        </p>
-        <div style="background: #0a1628; padding: 16px 32px; border-radius: 8px; display: inline-block;">
-          <span style="color: #d4ff00; font-size: 32px; font-weight: bold; letter-spacing: 8px;">${code}</span>
-        </div>
-        <p style="color: #888; font-size: 14px; margin-top: 24px;">
-          This code expires in 10 minutes.
-        </p>
-      </div>
-      <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
-        ChipIn - Pool funds together. Pay smarter.
-      </p>
-    </div>
-  `;
+  const html = emailWrapper({
+    body: [
+      emailHeading('Verify Your Email'),
+      emailText('Enter the code below to verify your email address:'),
+      emailVerificationCode(code),
+      emailText('This code expires in <strong>10 minutes</strong>.', { muted: true, small: true }),
+      emailDivider(),
+      emailText("If you didn't request this code, you can safely ignore this email.", { muted: true, small: true }),
+    ].join(''),
+    preheaderText: `Your verification code is ${code}`,
+  });
   return sendEmail(email, 'Your ChipIn Verification Code', html);
 }
 
@@ -337,25 +307,17 @@ export async function sendVerificationSMS(phone: string, code: string): Promise<
 }
 
 export async function sendPasswordResetEmail(email: string, resetLink: string): Promise<boolean> {
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
-        <h1 style="color: #d4ff00; margin: 0 0 16px;">Reset Your Password</h1>
-        <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
-          Click the button below to reset your password. This link expires in 30 minutes.
-        </p>
-        <a href="${resetLink}" style="background: #d4ff00; color: #0a1628; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">
-          Reset Password
-        </a>
-        <p style="color: #888; font-size: 14px; margin-top: 24px;">
-          If you didn't request this, you can safely ignore this email.
-        </p>
-      </div>
-      <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
-        ChipIn - Pool funds together. Pay smarter.
-      </p>
-    </div>
-  `;
+  const html = emailWrapper({
+    body: [
+      emailHeading('Reset Your Password'),
+      emailText('We received a request to reset your password. Click the button below to set a new password.'),
+      emailButton('Reset Password', resetLink),
+      emailText('This link expires in <strong>30 minutes</strong>.', { muted: true, small: true }),
+      emailDivider(),
+      emailText("If you didn't request this, you can safely ignore this email. Your password will remain unchanged.", { muted: true, small: true }),
+    ].join(''),
+    preheaderText: 'Reset your ChipIn password',
+  });
   return sendEmail(email, 'Reset Your Password - ChipInPay', html);
 }
 
@@ -365,33 +327,22 @@ export async function sendPasswordResetSMS(phone: string, resetLink: string): Pr
 
 export async function sendWelcomeEmail(email: string, name: string): Promise<boolean> {
   const baseUrl = getBaseUrl();
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
-        <h1 style="color: #d4ff00; margin: 0 0 16px;">Welcome to ChipIn! 🎉</h1>
-        <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
-          Hey ${name},<br><br>
-          Thanks for joining ChipIn! You're now part of a community that makes group payments easy and fun.
-        </p>
-        <p style="color: #ccc; font-size: 14px; margin: 0 0 24px;">
-          Here's what you can do:
-        </p>
-        <ul style="color: #ccc; font-size: 14px; margin: 0 0 24px; padding-left: 20px;">
-          <li>Create pools for trips, gifts, events, or anything</li>
-          <li>Invite friends to chip in via links, email, or SMS</li>
-          <li>Track contributions in real-time</li>
-          <li>Spend with virtual Visa cards</li>
-        </ul>
-        <a href="${baseUrl}/dashboard" 
-           style="display: inline-block; background: #d4ff00; color: #0a1628; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-          Get Started
-        </a>
-      </div>
-      <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
-        ChipIn - Pool funds together. Pay smarter.
-      </p>
-    </div>
-  `;
+  const html = emailWrapper({
+    body: [
+      emailHeading('Welcome to ChipIn!'),
+      emailText(`Hey ${name},`),
+      emailText("Thanks for joining ChipIn! You're now part of a community that makes group payments easy and fun."),
+      emailText("Here's what you can do:"),
+      emailFeatureList([
+        'Create pools for trips, gifts, events, or anything',
+        'Invite friends to chip in via links, email, or SMS',
+        'Track contributions in real-time',
+        'Spend with virtual Visa cards',
+      ]),
+      emailButton('Get Started', `${baseUrl}/dashboard`),
+    ].join(''),
+    preheaderText: `Welcome to ChipIn, ${name}! Start pooling funds with friends.`,
+  });
   return sendEmail(email, 'Welcome to ChipIn! 🎉', html);
 }
 
@@ -416,24 +367,17 @@ export async function sendSecurityAlertNotification(
   const promises: Promise<boolean>[] = [];
 
   if (notifyEmail && email) {
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
-          <h1 style="color: #ff6b6b; margin: 0 0 16px;">🔒 Security Alert</h1>
-          <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
-            Hey ${name},<br><br>
-            <strong>${alertTitles[alertType] || 'Security Update'}</strong><br><br>
-            ${details}
-          </p>
-          <p style="color: #888; font-size: 14px;">
-            If this wasn't you, please secure your account immediately.
-          </p>
-        </div>
-        <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
-          ChipIn - Pool funds together. Pay smarter.
-        </p>
-      </div>
-    `;
+    const html = emailWrapper({
+      body: [
+        emailHeading('Security Alert'),
+        emailAlert(`<strong>${alertTitles[alertType] || 'Security Update'}</strong>`, 'warning'),
+        emailText(`Hey ${name},`),
+        emailText(details),
+        emailDivider(),
+        emailText("If this wasn't you, please secure your account immediately by changing your password.", { muted: true, small: true }),
+      ].join(''),
+      preheaderText: `Security Alert: ${alertTitles[alertType]}`,
+    });
     promises.push(sendEmail(email, `🔒 ${alertTitles[alertType] || 'Security Alert'} - ChipIn`, html));
   }
 
@@ -465,24 +409,16 @@ export async function sendKycStatusNotification(
   const promises: Promise<boolean>[] = [];
 
   if (notifyEmail && email) {
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
-          <h1 style="color: #d4ff00; margin: 0 0 16px;">${info.emoji} ${info.title}</h1>
-          <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
-            Hey ${name},<br><br>
-            ${info.message}
-          </p>
-          <a href="${baseUrl}/security" 
-             style="display: inline-block; background: #d4ff00; color: #0a1628; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-            View Status
-          </a>
-        </div>
-        <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
-          ChipIn - Pool funds together. Pay smarter.
-        </p>
-      </div>
-    `;
+    const alertType = status === 'verified' ? 'success' : status === 'failed' ? 'error' : 'info';
+    const html = emailWrapper({
+      body: [
+        emailHeading(`${info.emoji} ${info.title}`),
+        emailText(`Hey ${name},`),
+        emailAlert(info.message, alertType as any),
+        emailButton('View Status', `${baseUrl}/security`),
+      ].join(''),
+      preheaderText: `${info.title}`,
+    });
     promises.push(sendEmail(email, `${info.emoji} ${info.title} - ChipIn`, html));
   }
 
@@ -515,21 +451,15 @@ export async function sendCardActivityNotification(
   const promises: Promise<boolean>[] = [];
 
   if (notifyEmail && email) {
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
-          <h1 style="color: #d4ff00; margin: 0 0 16px;">${info.emoji} ${info.title}</h1>
-          <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
-            Hey ${name},<br><br>
-            ${details}
-            ${amount ? `<br><br><strong style="color: #d4ff00; font-size: 24px;">$${amount}</strong>` : ''}
-          </p>
-        </div>
-        <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
-          ChipIn - Pool funds together. Pay smarter.
-        </p>
-      </div>
-    `;
+    const html = emailWrapper({
+      body: [
+        emailHeading(`${info.emoji} ${info.title}`),
+        emailText(`Hey ${name},`),
+        emailText(details),
+        ...(amount ? [emailHighlight(`$${amount}`, 'Transaction Amount')] : []),
+      ].join(''),
+      preheaderText: `${info.title}${amount ? ` - $${amount}` : ''}`,
+    });
     promises.push(sendEmail(email, `${info.emoji} ${info.title} - ChipIn`, html));
   }
 
@@ -568,20 +498,15 @@ export async function sendWalletActivityNotification(
   const promises: Promise<boolean>[] = [];
 
   if (notifyEmail && email) {
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
-          <h1 style="color: #d4ff00; margin: 0 0 16px;">${info.emoji} ${info.title}</h1>
-          <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
-            Hey ${name},<br><br>
-            Your ${activityType} of <strong style="color: #d4ff00;">$${amount}</strong> ${statusText[status] || 'is in progress'}.
-          </p>
-        </div>
-        <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
-          ChipIn - Pool funds together. Pay smarter.
-        </p>
-      </div>
-    `;
+    const html = emailWrapper({
+      body: [
+        emailHeading(`${info.emoji} ${info.title}`),
+        emailText(`Hey ${name},`),
+        emailText(`Your ${activityType} of <strong>$${amount}</strong> ${statusText[status] || 'is in progress'}.`),
+        emailHighlight(`$${amount}`, info.title),
+      ].join(''),
+      preheaderText: `${info.title}: $${amount} ${statusText[status]}`,
+    });
     promises.push(sendEmail(email, `${info.emoji} ${info.title} - $${amount} - ChipIn`, html));
   }
 
@@ -614,23 +539,16 @@ export async function sendAccountChangeNotification(
   const promises: Promise<boolean>[] = [];
 
   if (notifyEmail && email) {
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 32px; border-radius: 16px;">
-          <h1 style="color: #d4ff00; margin: 0 0 16px;">${info.emoji} ${info.title}</h1>
-          <p style="color: #ffffff; font-size: 16px; margin: 0 0 24px;">
-            Hey ${name},<br><br>
-            ${details}
-          </p>
-          <p style="color: #888; font-size: 14px;">
-            If you didn't make this change, please contact support immediately.
-          </p>
-        </div>
-        <p style="color: #888; font-size: 12px; margin-top: 16px; text-align: center;">
-          ChipIn - Pool funds together. Pay smarter.
-        </p>
-      </div>
-    `;
+    const html = emailWrapper({
+      body: [
+        emailHeading(`${info.emoji} ${info.title}`),
+        emailText(`Hey ${name},`),
+        emailText(details),
+        emailDivider(),
+        emailText("If you didn't make this change, please contact support immediately.", { muted: true, small: true }),
+      ].join(''),
+      preheaderText: `${info.title}: ${details}`,
+    });
     promises.push(sendEmail(email, `${info.emoji} ${info.title} - ChipIn`, html));
   }
 

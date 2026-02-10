@@ -1,5 +1,6 @@
 // Resend email client integration
 import { Resend } from 'resend';
+import { emailWrapper, emailHeading, emailText, emailButton } from './emailTemplates';
 
 let connectionSettings: any;
 
@@ -73,27 +74,21 @@ export async function sendPoolInviteEmail(
   try {
     const { client, fromEmail } = await getUncachableResendClient();
     
+    const html = emailWrapper({
+      body: [
+        emailHeading("You're Invited to ChipIn!"),
+        emailText(`<strong>${inviterName}</strong> has invited you to contribute to a pool for "<strong>${poolTitle}</strong>".`),
+        emailText('ChipIn makes it easy to pool funds with friends for trips, gifts, purchases, and more.'),
+        emailButton('View Pool & Chip In', poolUrl),
+      ].join(''),
+      preheaderText: `${inviterName} invited you to chip in for "${poolTitle}"`,
+    });
+
     const result = await client.emails.send({
       from: fromEmail,
       to: [to],
       subject: `${inviterName} invited you to chip in for "${poolTitle}"`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #1a1a2e;">You're Invited to ChipIn!</h1>
-          <p style="font-size: 16px; color: #333;">
-            <strong>${inviterName}</strong> has invited you to contribute to a pool for <strong>"${poolTitle}"</strong>.
-          </p>
-          <p style="font-size: 14px; color: #666;">
-            ChipIn makes it easy to pool funds with friends for trips, gifts, purchases, and more.
-          </p>
-          <a href="${poolUrl}" style="display: inline-block; background: linear-gradient(to right, #c8ff00, #a8d900); color: #1a1a2e; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 20px 0;">
-            View Pool & Chip In
-          </a>
-          <p style="font-size: 12px; color: #999; margin-top: 30px;">
-            If you didn't expect this email, you can safely ignore it.
-          </p>
-        </div>
-      `,
+      html,
     });
     
     // Check if Resend returned an error
