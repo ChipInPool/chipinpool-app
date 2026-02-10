@@ -172,6 +172,44 @@ export const api = {
         body: JSON.stringify({ nonce }),
       }),
   },
+  partners: {
+    list: (category?: string, search?: string) => {
+      const params = new URLSearchParams();
+      if (category) params.set('category', category);
+      if (search) params.set('search', search);
+      const query = params.toString();
+      return fetchApi<any>(`/api/partners${query ? `?${query}` : ''}`);
+    },
+    categories: () => fetchApi<any>('/api/partners/categories'),
+    get: (id: string) => fetchApi<any>(`/api/partners/${id}`),
+  },
+  notifications: {
+    list: () => fetchApi<any>('/api/notifications'),
+    markAllRead: () =>
+      fetchApi<any>('/api/notifications/mark-all-read', { method: 'POST' }),
+  },
+  activity: {
+    feed: () => fetchApi<any>('/api/activity-feed'),
+  },
+  rewards: {
+    badges: () => fetchApi<any>('/api/rewards/badges'),
+    myBadges: () => fetchApi<any>('/api/rewards/my-badges'),
+    points: () => fetchApi<any>('/api/rewards/points'),
+    history: () => fetchApi<any>('/api/rewards/history'),
+    leaderboard: () => fetchApi<any>('/api/rewards/leaderboard'),
+    initBadges: () =>
+      fetchApi<any>('/api/rewards/init-badges', { method: 'POST' }),
+  },
+  recurring: {
+    list: () => fetchApi<any>('/api/user/recurring-contributions'),
+    update: (id: string, data: any) =>
+      fetchApi<any>(`/api/recurring/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      fetchApi<any>(`/api/recurring/${id}`, { method: 'DELETE' }),
+  },
 };
 
 export { clearSessionCookie, API_URL };

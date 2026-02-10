@@ -10,6 +10,12 @@ import CardsScreen from '@/screens/CardsScreen';
 import ProfileScreen from '@/screens/ProfileScreen';
 import PaymentMethodsScreen from '@/screens/PaymentMethodsScreen';
 import CreatePoolScreen from '@/screens/CreatePoolScreen';
+import SpendNowScreen from '@/screens/SpendNowScreen';
+import SettingsScreen from '@/screens/SettingsScreen';
+import SecurityScreen from '@/screens/SecurityScreen';
+import NotificationsScreen from '@/screens/NotificationsScreen';
+import ActivityScreen from '@/screens/ActivityScreen';
+import RewardsScreen from '@/screens/RewardsScreen';
 
 export type AppTabParamList = {
   HomeTab: undefined;
@@ -23,43 +29,55 @@ export type PoolsStackParamList = {
   PoolsList: undefined;
   PoolDetails: { poolId: string };
   CreatePool: undefined;
+  SpendNow: undefined;
 };
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
   PaymentMethods: undefined;
+  Settings: undefined;
+  Security: undefined;
+  Notifications: undefined;
+  Activity: undefined;
+  Rewards: undefined;
 };
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
-const PoolsStack = createNativeStackNavigator<PoolsStackParamList>();
-const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
+const PoolsStackNav = createNativeStackNavigator<PoolsStackParamList>();
+const ProfileStackNav = createNativeStackNavigator<ProfileStackParamList>();
 
 function PoolsStackNavigator() {
   return (
-    <PoolsStack.Navigator
+    <PoolsStackNav.Navigator
       screenOptions={{
         headerStyle: { backgroundColor: '#001F3F' },
         headerTintColor: '#fff',
       }}
     >
-      <PoolsStack.Screen name="PoolsList" component={PoolsScreen} options={{ title: 'Pools' }} />
-      <PoolsStack.Screen name="PoolDetails" component={PoolDetailsScreen} options={{ title: 'Pool' }} />
-      <PoolsStack.Screen name="CreatePool" component={CreatePoolScreen} options={{ title: 'Create Pool' }} />
-    </PoolsStack.Navigator>
+      <PoolsStackNav.Screen name="PoolsList" component={PoolsScreen} options={{ title: 'Pools' }} />
+      <PoolsStackNav.Screen name="PoolDetails" component={PoolDetailsScreen} options={{ title: 'Pool' }} />
+      <PoolsStackNav.Screen name="CreatePool" component={CreatePoolScreen} options={{ title: 'Create Pool' }} />
+      <PoolsStackNav.Screen name="SpendNow" component={SpendNowScreen} options={{ title: 'Spend Now' }} />
+    </PoolsStackNav.Navigator>
   );
 }
 
 function ProfileStackNavigator() {
   return (
-    <ProfileStack.Navigator
+    <ProfileStackNav.Navigator
       screenOptions={{
         headerStyle: { backgroundColor: '#001F3F' },
         headerTintColor: '#fff',
       }}
     >
-      <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} options={{ title: 'Profile' }} />
-      <ProfileStack.Screen name="PaymentMethods" component={PaymentMethodsScreen} options={{ title: 'Payment Methods' }} />
-    </ProfileStack.Navigator>
+      <ProfileStackNav.Screen name="ProfileMain" component={ProfileScreen} options={{ title: 'Profile' }} />
+      <ProfileStackNav.Screen name="PaymentMethods" component={PaymentMethodsScreen} options={{ title: 'Payment Methods' }} />
+      <ProfileStackNav.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+      <ProfileStackNav.Screen name="Security" component={SecurityScreen} options={{ title: 'Security' }} />
+      <ProfileStackNav.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
+      <ProfileStackNav.Screen name="Activity" component={ActivityScreen} options={{ title: 'Activity' }} />
+      <ProfileStackNav.Screen name="Rewards" component={RewardsScreen} options={{ title: 'Rewards' }} />
+    </ProfileStackNav.Navigator>
   );
 }
 
@@ -69,7 +87,7 @@ export default function AppTabs() {
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap = 'home';
-          
+
           if (route.name === 'HomeTab') {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'PoolsTab') {
@@ -81,7 +99,7 @@ export default function AppTabs() {
           } else if (route.name === 'ProfileTab') {
             iconName = focused ? 'person' : 'person-outline';
           }
-          
+
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#7FFFD4',
