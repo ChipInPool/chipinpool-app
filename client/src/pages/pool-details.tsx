@@ -572,10 +572,16 @@ export default function PoolDetails() {
                     (poolActivityData.activities || []).map((activity: any) => (
                       <div key={activity.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/5 transition-colors" data-testid={`pool-activity-${activity.id}`}>
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                          activity.type === 'contribution' ? 'bg-green-500/20' : 'bg-red-500/20'
+                          activity.type === 'contribution' ? 'bg-green-500/20' : 
+                          activity.type === 'transfer' ? 'bg-blue-500/20' : 
+                          activity.type === 'withdrawal' ? 'bg-orange-500/20' : 'bg-red-500/20'
                         }`}>
                           {activity.type === 'contribution' ? (
                             <ArrowDownLeft className="w-4 h-4 text-green-400" />
+                          ) : activity.type === 'transfer' ? (
+                            <ArrowUpRight className="w-4 h-4 text-blue-400" />
+                          ) : activity.type === 'withdrawal' ? (
+                            <ArrowUpRight className="w-4 h-4 text-orange-400" />
                           ) : (
                             <ArrowUpRight className="w-4 h-4 text-red-400" />
                           )}
@@ -587,7 +593,9 @@ export default function PoolDetails() {
                           </p>
                         </div>
                         <div className={`text-sm font-bold whitespace-nowrap ${
-                          activity.type === 'contribution' ? 'text-green-400' : 'text-red-400'
+                          activity.type === 'contribution' ? 'text-green-400' : 
+                          activity.type === 'transfer' ? 'text-blue-400' :
+                          activity.type === 'withdrawal' ? 'text-orange-400' : 'text-red-400'
                         }`}>
                           {activity.type === 'contribution' ? '+' : '-'}${parseFloat(activity.amount).toFixed(2)}
                         </div>

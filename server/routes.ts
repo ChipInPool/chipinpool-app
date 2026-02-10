@@ -986,29 +986,29 @@ export async function registerRoutes(
         };
       }));
       
-      const spendActivities = activities.filter(a => a.type === 'spend').map(a => ({
-        id: `spend-${a.id}`,
-        type: 'spend' as const,
+      const otherActivities = activities.filter(a => a.type !== 'contribution').map(a => ({
+        id: `${a.type}-${a.id}`,
+        type: a.type as string,
         amount: a.amount,
-        description: a.description || `Spent at ${a.merchant || 'merchant'}`,
+        description: a.description || (a.type === 'spend' ? `Spent at ${a.merchant || 'merchant'}` : a.type === 'withdrawal' ? 'Withdrew to bank' : 'Transferred to user'),
         merchant: a.merchant,
         userName: null,
         userAvatar: null,
         createdAt: a.createdAt?.toISOString() || new Date().toISOString(),
       }));
       
-      const allActivities = [...contributionActivities, ...spendActivities]
+      const allActivities = [...contributionActivities, ...otherActivities]
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       
-      const raised = parseFloat(pool.currentAmount);
+      const raised = parseFloat(pool.currentAmount) + parseFloat(pool.spentAmount);
       const spent = parseFloat(pool.spentAmount);
-      const remaining = raised - spent;
+      const remaining = parseFloat(pool.currentAmount);
       
       res.json({
         activities: allActivities,
         summary: {
-          raised: pool.currentAmount,
-          spent: pool.spentAmount,
+          raised: raised.toFixed(2),
+          spent: spent.toFixed(2),
           remaining: remaining.toFixed(2),
         }
       });
@@ -4187,6 +4187,21 @@ export async function registerRoutes(
         const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
         await storage.updatePoolAmount(poolId, newPoolAmount);
 
+        // Record pool activity for withdrawal
+        await storage.createPoolActivity({
+          poolId,
+          userId,
+          type: 'withdrawal',
+          amount: data.amount,
+          description: `Withdrew to bank account`,
+          referenceId: transfer.id,
+        });
+        
+        // Update pool spent amount
+        const currentSpent = parseFloat(pool.spentAmount);
+        const newSpentAmount = (currentSpent + transferAmount).toFixed(2);
+        await storage.updatePoolSpentAmount(poolId, newSpentAmount);
+
         // Create wallet withdrawal record
         const withdrawal = await storage.createWalletWithdrawal(
           userId,
@@ -4526,6 +4541,25 @@ export async function registerRoutes(
       // Deduct from pool first
       const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
       await storage.updatePoolAmount(transferRequest.poolId, newPoolAmount);
+
+      // Record pool activity for transfer to user
+      const sender = await storage.getUser(transferRequest.fromUserId);
+      await storage.createPoolActivity({
+        poolId: transferRequest.poolId,
+        userId: transferRequest.fromUserId,
+        type: 'transfer',
+        amount: transferRequest.amount,
+        description: `Sent to ${recipient?.firstName || 'user'} ${recipient?.lastName || ''}`.trim(),
+        referenceId: requestId,
+      });
+      
+      // Update pool spent amount
+      const poolForSpent = await storage.getPool(transferRequest.poolId);
+      if (poolForSpent) {
+        const currentSpent = parseFloat(poolForSpent.spentAmount);
+        const newSpentAmount = (currentSpent + transferAmount).toFixed(2);
+        await storage.updatePoolSpentAmount(transferRequest.poolId, newSpentAmount);
+      }
 
       // Create wallet withdrawal record to track the payout
       const withdrawal = await storage.createWalletWithdrawal(
@@ -5314,12 +5348,30 @@ export async function registerRoutes(
       const userPools = await storage.getPoolsByCreator(userId);
       const poolIds = userPools.map(p => p.id);
       let spendActivities: any[] = [];
+      let poolWithdrawalActivities: any[] = [];
+      let poolTransferActivities: any[] = [];
       if (poolIds.length > 0) {
         spendActivities = await db.select()
           .from(poolActivities)
           .where(and(
             inArray(poolActivities.poolId, poolIds),
             eq(poolActivities.type, 'spend')
+          ))
+          .orderBy(desc(poolActivities.createdAt))
+          .limit(20);
+        poolWithdrawalActivities = await db.select()
+          .from(poolActivities)
+          .where(and(
+            inArray(poolActivities.poolId, poolIds),
+            eq(poolActivities.type, 'withdrawal')
+          ))
+          .orderBy(desc(poolActivities.createdAt))
+          .limit(20);
+        poolTransferActivities = await db.select()
+          .from(poolActivities)
+          .where(and(
+            inArray(poolActivities.poolId, poolIds),
+            eq(poolActivities.type, 'transfer')
           ))
           .orderBy(desc(poolActivities.createdAt))
           .limit(20);
@@ -5375,6 +5427,34 @@ export async function registerRoutes(
           poolId: s.poolId,
           poolTitle: pool?.title || 'Unknown Pool',
           createdAt: s.createdAt?.toISOString() || new Date().toISOString(),
+          direction: 'out',
+        });
+      }
+      
+      for (const pw of poolWithdrawalActivities) {
+        const pool = await storage.getPool(pw.poolId);
+        activities.push({
+          id: `pool-withdrawal-${pw.id}`,
+          type: 'pool_withdrawal',
+          amount: pw.amount,
+          description: pw.description || `Withdrew from pool`,
+          poolId: pw.poolId,
+          poolTitle: pool?.title || 'Unknown Pool',
+          createdAt: pw.createdAt?.toISOString() || new Date().toISOString(),
+          direction: 'out',
+        });
+      }
+      
+      for (const pt of poolTransferActivities) {
+        const pool = await storage.getPool(pt.poolId);
+        activities.push({
+          id: `pool-transfer-${pt.id}`,
+          type: 'transfer',
+          amount: pt.amount,
+          description: pt.description || `Transferred from pool`,
+          poolId: pt.poolId,
+          poolTitle: pool?.title || 'Unknown Pool',
+          createdAt: pt.createdAt?.toISOString() || new Date().toISOString(),
           direction: 'out',
         });
       }

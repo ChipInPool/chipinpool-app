@@ -702,12 +702,16 @@ export default function Profile() {
                             activity.type === 'contribution' ? 'bg-blue-500/20' :
                             activity.type === 'deposit' ? 'bg-green-500/20' :
                             activity.type === 'withdrawal' ? 'bg-orange-500/20' :
+                            activity.type === 'pool_withdrawal' ? 'bg-orange-500/20' :
+                            activity.type === 'transfer' ? 'bg-blue-500/20' :
                             activity.type === 'spend' ? 'bg-red-500/20' :
                             'bg-muted'
                           }`}>
                             {activity.type === 'contribution' && <ArrowUpRight className="w-5 h-5 text-blue-400" />}
                             {activity.type === 'deposit' && <ArrowDownLeft className="w-5 h-5 text-green-400" />}
                             {activity.type === 'withdrawal' && <ArrowUpRight className="w-5 h-5 text-orange-400" />}
+                            {activity.type === 'pool_withdrawal' && <ArrowUpRight className="w-5 h-5 text-orange-400" />}
+                            {activity.type === 'transfer' && <ArrowUpRight className="w-5 h-5 text-blue-400" />}
                             {activity.type === 'spend' && <ShoppingBag className="w-5 h-5 text-red-400" />}
                           </div>
                           <div className="flex-1 min-w-0">
