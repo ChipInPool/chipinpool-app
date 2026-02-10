@@ -33,9 +33,9 @@ export default function HomeScreen() {
     { icon: 'add', label: 'Create Pool', color: '#7FFFD4', screen: 'PoolsTab', params: { screen: 'CreatePool' } },
     { icon: 'people', label: 'Join Pool', color: '#60A5FA', screen: 'PoolsTab' },
     { icon: 'card', label: 'View Cards', color: '#F472B6', screen: 'CardsTab' },
-    { icon: 'bag-handle', label: 'Spend Now', color: '#7FFFD4', screen: 'SpendNow' },
-    { icon: 'time', label: 'Activity', color: '#60A5FA', screen: 'Activity' },
-    { icon: 'trophy', label: 'Rewards', color: '#FBBF24', screen: 'Rewards' },
+    { icon: 'bag-handle', label: 'Spend Now', color: '#7FFFD4', screen: 'PoolsTab', params: { screen: 'SpendNow' } },
+    { icon: 'time', label: 'Activity', color: '#60A5FA', screen: 'ProfileTab', params: { screen: 'Activity' } },
+    { icon: 'trophy', label: 'Rewards', color: '#FBBF24', screen: 'ProfileTab', params: { screen: 'Rewards' } },
   ];
 
   return (
@@ -51,7 +51,7 @@ export default function HomeScreen() {
           </View>
           <TouchableOpacity
             style={styles.bellContainer}
-            onPress={() => navigation.navigate('Notifications')}
+            onPress={() => navigation.navigate('ProfileTab', { screen: 'Notifications' })}
             data-testid="button-notifications"
           >
             <Ionicons name="notifications-outline" size={26} color="#fff" />
