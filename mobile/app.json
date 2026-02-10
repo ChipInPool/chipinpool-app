@@ -50,17 +50,9 @@
         }
       ]
     ],
-    "extra": {
-      "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
-      }
-    },
-    "owner": "chipinpool",
+    "owner": "donpsqs",
     "runtimeVersion": {
       "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/YOUR_EAS_PROJECT_ID"
     }
   }
 }
