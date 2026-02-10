@@ -12,9 +12,7 @@ export default function Landing() {
       <nav className="border-b border-border bg-background/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground font-bold text-lg">
-              C
-            </div>
+            <img src="/logo.png" alt="ChipInPool" className="w-8 h-8 rounded-lg object-cover" />
             <span className="font-display font-bold text-xl tracking-tight">ChipInPool</span>
           </div>
 
@@ -254,9 +252,7 @@ export default function Landing() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-6 sm:mb-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-background font-bold text-lg shadow-lg shadow-primary/20">
-                  C
-                </div>
+                <img src="/logo.png" alt="ChipInPool" className="w-8 h-8 rounded-lg object-cover" />
                 <span className="font-display font-bold text-xl tracking-tight">ChipInPool</span>
               </div>
               <p className="text-sm text-muted-foreground">Pool funds together. Pay smarter.</p>

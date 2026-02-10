@@ -5668,6 +5668,28 @@ export async function registerRoutes(
       const user = await storage.getUser(req.session.userId!);
       if (!user) return res.status(404).json({ error: "User not found" });
 
+      // Check for duplicate request from same user for same website
+      const existingRequests = await db.select()
+        .from(apiAccessRequests)
+        .where(
+          and(
+            eq(apiAccessRequests.userId, user.id),
+            eq(apiAccessRequests.website, data.website)
+          )
+        );
+      
+      if (existingRequests.length > 0) {
+        const existing = existingRequests[0];
+        return res.status(409).json({ 
+          error: `You already have a ${existing.status} API access request for this website.`,
+          existingRequest: {
+            id: existing.id,
+            status: existing.status,
+            createdAt: existing.createdAt,
+          }
+        });
+      }
+
       // Store API access request
       await storage.createApiAccessRequest({
         userId: user.id,
