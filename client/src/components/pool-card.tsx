@@ -43,16 +43,16 @@ export function PoolCard({ pool }: PoolCardProps) {
             </div>
           )}
           
-          <CardHeader className={`${pool.image ? 'pt-4' : 'pt-6'} pb-2 px-5`}>
+          <CardHeader className={`${pool.image ? 'pt-3 md:pt-4' : 'pt-4 md:pt-6'} pb-2 px-3 md:px-5`}>
             <div className="flex justify-between items-start mb-1">
-              <h3 className="font-display font-semibold text-lg leading-tight group-hover:text-primary transition-colors line-clamp-1">{pool.title}</h3>
+              <h3 className="font-display font-semibold text-base md:text-lg leading-tight group-hover:text-primary transition-colors line-clamp-1">{pool.title}</h3>
             </div>
-            <p className="text-muted-foreground text-sm line-clamp-2 min-h-[2.5rem]">{pool.description}</p>
+            <p className="text-muted-foreground text-xs md:text-sm line-clamp-2 min-h-[2rem] md:min-h-[2.5rem]">{pool.description}</p>
           </CardHeader>
           
-          <CardContent className="px-5 pb-4 flex-1">
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm font-medium">
+          <CardContent className="px-3 md:px-5 pb-3 md:pb-4 flex-1">
+            <div className="space-y-2 md:space-y-3">
+              <div className="flex justify-between text-xs md:text-sm font-medium">
                 <span className="text-muted-foreground">Collected</span>
                 <span>
                   <span className={isCompleted ? "text-primary" : "text-foreground"}>${currentAmount.toLocaleString()}</span> 
@@ -83,7 +83,7 @@ export function PoolCard({ pool }: PoolCardProps) {
             </div>
           </CardContent>
           
-          <CardFooter className="px-5 py-3 border-t border-white/5 bg-white/[0.02] flex justify-between items-center">
+          <CardFooter className="px-3 md:px-5 py-2 md:py-3 border-t border-white/5 bg-white/[0.02] flex justify-between items-center">
             <span 
               onClick={handleCreatorClick}
               onKeyDown={(e) => e.key === 'Enter' && handleCreatorClick(e as any)}

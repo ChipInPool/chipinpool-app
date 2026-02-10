@@ -120,10 +120,10 @@ export default function FAQ() {
 
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto py-12">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-display font-bold mb-4">Frequently Asked Questions</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
+      <div className="max-w-3xl mx-auto py-6 md:py-12 px-1 sm:px-0">
+        <div className="text-center mb-8 md:mb-12">
+          <h1 className="text-2xl md:text-4xl font-display font-bold mb-3 md:mb-4">Frequently Asked Questions</h1>
+          <p className="text-base md:text-xl text-muted-foreground max-w-2xl mx-auto mb-6 md:mb-8">
             Find answers to common questions about ChipIn.
           </p>
           <div className="relative max-w-md mx-auto">
@@ -150,14 +150,14 @@ export default function FAQ() {
                     <Card key={key} className="bg-card/50 border-white/10">
                       <button
                         onClick={() => toggleItem(key)}
-                        className="w-full px-6 py-4 flex items-center justify-between text-left"
+                        className="w-full px-4 md:px-6 py-3 md:py-4 flex items-center justify-between text-left"
                         data-testid={`button-faq-${catIndex}-${qIndex}`}
                       >
-                        <span className="font-medium pr-4">{item.q}</span>
+                        <span className="font-medium pr-4 text-sm md:text-base">{item.q}</span>
                         <ChevronDown className={`w-5 h-5 flex-shrink-0 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                       </button>
                       {isOpen && (
-                        <CardContent className="pt-0 pb-4 px-6">
+                        <CardContent className="pt-0 pb-3 md:pb-4 px-4 md:px-6">
                           <p className="text-muted-foreground leading-relaxed">{item.a}</p>
                         </CardContent>
                       )}
@@ -175,9 +175,9 @@ export default function FAQ() {
           </div>
         )}
 
-        <div className="mt-12 bg-gradient-to-r from-primary/10 to-blue-500/10 rounded-2xl p-8 text-center">
-          <h2 className="text-xl font-semibold mb-3">Still have questions?</h2>
-          <p className="text-muted-foreground mb-6">
+        <div className="mt-8 md:mt-12 bg-gradient-to-r from-primary/10 to-blue-500/10 rounded-2xl p-5 md:p-8 text-center">
+          <h2 className="text-lg md:text-xl font-semibold mb-2 md:mb-3">Still have questions?</h2>
+          <p className="text-sm md:text-base text-muted-foreground mb-4 md:mb-6">
             Can't find what you're looking for? Our team is here to help.
           </p>
           <a 

@@ -102,9 +102,9 @@ export default function UserProfile() {
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto">
-        <div className="relative mb-20">
-          <div className="h-64 rounded-3xl overflow-hidden relative">
+      <div className="max-w-5xl mx-auto px-1 sm:px-0">
+        <div className="relative mb-12 md:mb-20">
+          <div className="h-36 md:h-64 rounded-2xl md:rounded-3xl overflow-hidden relative">
             <div className="absolute inset-0 bg-linear-to-r from-primary/20 via-accent/20 to-purple-500/20 mix-blend-overlay" />
             <img 
               src="https://images.unsplash.com/photo-1557683316-973673baf926?w=1600&q=80" 
@@ -113,24 +113,24 @@ export default function UserProfile() {
             />
           </div>
 
-          <div className="absolute -bottom-16 left-8 right-8 flex items-end justify-between">
-            <div className="flex items-end gap-6">
+          <div className="absolute -bottom-16 left-3 right-3 md:left-8 md:right-8 flex flex-col md:flex-row md:items-end md:justify-between">
+            <div className="flex items-end gap-3 md:gap-6">
               <div className="relative">
-                <Avatar className="w-32 h-32 border-4 border-background shadow-xl">
+                <Avatar className="w-20 h-20 md:w-32 md:h-32 border-4 border-background shadow-xl">
                   <AvatarImage src={profileUser.avatar || undefined} />
                   <AvatarFallback>{profileUser.name?.[0] || 'U'}</AvatarFallback>
                 </Avatar>
               </div>
               <div className="pb-2 mb-2">
-                <div className="flex items-center gap-2 mb-1">
-                  <h1 className="text-3xl font-display font-bold" data-testid="text-username">{profileUser.name}</h1>
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <h1 className="text-xl md:text-3xl font-display font-bold" data-testid="text-username">{profileUser.name}</h1>
                   {badges.length > 0 && (
-                    <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                    <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary text-xs">
                       {badges[0]?.name || 'Member'}
                     </Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs md:text-sm text-muted-foreground">
                   <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {profileUser.location || 'Location not set'}</span>
                   <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> Joined {new Date(profileUser.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
                 </div>
@@ -162,26 +162,26 @@ export default function UserProfile() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-24">
-          <div className="lg:col-span-4 space-y-6">
-            <div className="grid grid-cols-3 gap-2 p-4 rounded-2xl bg-card border border-white/5 text-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-8 mt-20 md:mt-24">
+          <div className="lg:col-span-4 space-y-4 md:space-y-6">
+            <div className="grid grid-cols-3 gap-2 p-3 md:p-4 rounded-2xl bg-card border border-white/5 text-center">
               <div>
-                <div className="text-2xl font-bold font-display">{poolsCreated}</div>
-                <div className="text-xs text-muted-foreground uppercase tracking-wider">Pools</div>
+                <div className="text-xl md:text-2xl font-bold font-display">{poolsCreated}</div>
+                <div className="text-[10px] md:text-xs text-muted-foreground uppercase tracking-wider">Pools</div>
               </div>
               <div className="border-x border-white/5">
-                <div className="text-2xl font-bold font-display flex items-center justify-center gap-1">
-                  {rating.toFixed(1)} <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                <div className="text-xl md:text-2xl font-bold font-display flex items-center justify-center gap-1">
+                  {rating.toFixed(1)} <Star className="w-3.5 h-3.5 md:w-4 md:h-4 text-yellow-500 fill-yellow-500" />
                 </div>
-                <div className="text-xs text-muted-foreground uppercase tracking-wider">Rating</div>
+                <div className="text-[10px] md:text-xs text-muted-foreground uppercase tracking-wider">Rating</div>
               </div>
               <div>
-                <div className="text-2xl font-bold font-display">{followerCount}</div>
-                <div className="text-xs text-muted-foreground uppercase tracking-wider">Followers</div>
+                <div className="text-xl md:text-2xl font-bold font-display">{followerCount}</div>
+                <div className="text-[10px] md:text-xs text-muted-foreground uppercase tracking-wider">Followers</div>
               </div>
             </div>
 
-            <div className="p-6 rounded-2xl bg-card border border-white/5">
+            <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold flex items-center gap-2">
                   <Users className="w-4 h-4 text-primary" /> Network
@@ -200,13 +200,13 @@ export default function UserProfile() {
             </div>
 
             {profileUser.bio && (
-              <div className="p-6 rounded-2xl bg-card border border-white/5">
+              <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5">
                 <h3 className="font-bold mb-3">About</h3>
                 <p className="text-sm text-muted-foreground">{profileUser.bio}</p>
               </div>
             )}
 
-            <div className="p-6 rounded-2xl bg-card border border-white/5">
+            <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold flex items-center gap-2">
                   <Trophy className="w-4 h-4 text-yellow-500" /> Achievements
@@ -252,9 +252,9 @@ export default function UserProfile() {
             </div>
           </div>
 
-          <div className="lg:col-span-8 space-y-8">
+          <div className="lg:col-span-8 space-y-4 md:space-y-8">
             <div className="flex items-center gap-6 border-b border-white/10 pb-4">
-              <button className="text-lg font-bold border-b-2 border-primary pb-4 -mb-4.5 px-2">{profileUser.name}'s Pools</button>
+              <button className="text-base md:text-lg font-bold border-b-2 border-primary pb-4 -mb-4.5 px-2">{profileUser.name}'s Pools</button>
             </div>
 
             {pools.length > 0 ? (

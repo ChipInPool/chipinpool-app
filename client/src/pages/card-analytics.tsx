@@ -52,60 +52,60 @@ export default function CardAnalyticsPage() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">Virtual Card Analytics</h1>
-          <p className="text-muted-foreground">Track your spending and card usage</p>
+      <div className="max-w-4xl mx-auto px-1 sm:px-0">
+        <div className="mb-4 md:mb-6">
+          <h1 className="text-xl md:text-2xl font-bold">Virtual Card Analytics</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Track your spending and card usage</p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <DollarSign className="w-8 h-8 text-green-500" />
-                <div>
-                  <p className="text-2xl font-bold">${totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                  <p className="text-sm text-muted-foreground">Total Spent</p>
+            <CardContent className="pt-4 md:pt-6 px-3 md:px-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                <DollarSign className="w-6 h-6 md:w-8 md:h-8 text-green-500" />
+                <div className="min-w-0">
+                  <p className="text-lg md:text-2xl font-bold truncate">${totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">Total Spent</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <BarChart3 className="w-8 h-8 text-blue-500" />
+            <CardContent className="pt-4 md:pt-6 px-3 md:px-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                <BarChart3 className="w-6 h-6 md:w-8 md:h-8 text-blue-500" />
                 <div>
-                  <p className="text-2xl font-bold">{transactionCount}</p>
-                  <p className="text-sm text-muted-foreground">Transactions</p>
+                  <p className="text-lg md:text-2xl font-bold">{transactionCount}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">Transactions</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <TrendingUp className="w-8 h-8 text-purple-500" />
-                <div>
-                  <p className="text-2xl font-bold">${avgTransaction.toFixed(2)}</p>
-                  <p className="text-sm text-muted-foreground">Avg Transaction</p>
+            <CardContent className="pt-4 md:pt-6 px-3 md:px-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-purple-500" />
+                <div className="min-w-0">
+                  <p className="text-lg md:text-2xl font-bold truncate">${avgTransaction.toFixed(2)}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">Avg Transaction</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <CreditCard className="w-8 h-8 text-cyan-500" />
+            <CardContent className="pt-4 md:pt-6 px-3 md:px-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                <CreditCard className="w-6 h-6 md:w-8 md:h-8 text-cyan-500" />
                 <div>
-                  <p className="text-2xl font-bold">{cardCount}</p>
-                  <p className="text-sm text-muted-foreground">Active Cards</p>
+                  <p className="text-lg md:text-2xl font-bold">{cardCount}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">Active Cards</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-4 md:mb-6">
           <Card>
             <CardHeader>
               <CardTitle>Spending by Category</CardTitle>
@@ -183,10 +183,10 @@ export default function CardAnalyticsPage() {
             ) : (
               <div className="space-y-3">
                 {recentTransactions.map((tx: Transaction) => (
-                  <div key={tx.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                    <div>
-                      <p className="font-medium">{tx.merchant}</p>
-                      <p className="text-sm text-muted-foreground">
+                  <div key={tx.id} className="flex items-center justify-between p-2.5 md:p-3 bg-muted/50 rounded-lg gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm md:text-base truncate">{tx.merchant}</p>
+                      <p className="text-xs md:text-sm text-muted-foreground">
                         {format(new Date(tx.createdAt), "MMM d, yyyy 'at' h:mm a")}
                       </p>
                     </div>

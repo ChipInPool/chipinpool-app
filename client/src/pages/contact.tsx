@@ -56,15 +56,15 @@ export default function Contact() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto py-12">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-display font-bold mb-4">Contact Us</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+      <div className="max-w-4xl mx-auto py-6 md:py-12 px-1 sm:px-0">
+        <div className="text-center mb-8 md:mb-12">
+          <h1 className="text-2xl md:text-4xl font-display font-bold mb-3 md:mb-4">Contact Us</h1>
+          <p className="text-base md:text-xl text-muted-foreground max-w-2xl mx-auto">
             Have a question or feedback? We'd love to hear from you.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-8 md:mb-12">
           {contactOptions.map((option, index) => (
             <Card key={index} className="bg-card/50 border-white/10 hover:border-primary/30 transition-colors">
               <CardContent className="pt-6">

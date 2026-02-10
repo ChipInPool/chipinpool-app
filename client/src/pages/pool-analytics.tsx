@@ -141,54 +141,54 @@ export default function PoolAnalytics() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
+      <div className="max-w-4xl mx-auto px-1 sm:px-0">
+        <div className="flex items-center justify-between mb-4 md:mb-8">
+          <div className="flex items-center gap-3 md:gap-4">
             <Button variant="ghost" size="icon" asChild data-testid="button-back">
               <Link href={`/pool/${pool.id}`}>
                 <ArrowLeft className="w-5 h-5" />
               </Link>
             </Button>
             <div>
-              <h1 className="text-2xl font-display font-bold">{pool.title}</h1>
-              <p className="text-sm text-muted-foreground">Pool Analytics & Insights</p>
+              <h1 className="text-xl md:text-2xl font-display font-bold">{pool.title}</h1>
+              <p className="text-xs md:text-sm text-muted-foreground">Pool Analytics & Insights</p>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="p-4 rounded-xl bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20">
-            <div className="flex items-center gap-2 mb-2">
-              <Target className="w-4 h-4 text-green-400" />
-              <span className="text-xs text-muted-foreground">Progress</span>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-8">
+          <div className="p-3 md:p-4 rounded-xl bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20">
+            <div className="flex items-center gap-1.5 md:gap-2 mb-1 md:mb-2">
+              <Target className="w-3.5 h-3.5 md:w-4 md:h-4 text-green-400" />
+              <span className="text-[10px] md:text-xs text-muted-foreground">Progress</span>
             </div>
-            <div className="text-2xl font-display font-bold text-green-400">{progressPercentage.toFixed(1)}%</div>
+            <div className="text-lg md:text-2xl font-display font-bold text-green-400">{progressPercentage.toFixed(1)}%</div>
           </div>
-          <div className="p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20">
-            <div className="flex items-center gap-2 mb-2">
-              <Users className="w-4 h-4 text-blue-400" />
-              <span className="text-xs text-muted-foreground">Contributors</span>
+          <div className="p-3 md:p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20">
+            <div className="flex items-center gap-1.5 md:gap-2 mb-1 md:mb-2">
+              <Users className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-400" />
+              <span className="text-[10px] md:text-xs text-muted-foreground">Contributors</span>
             </div>
-            <div className="text-2xl font-display font-bold text-blue-400">{uniqueContributors}</div>
+            <div className="text-lg md:text-2xl font-display font-bold text-blue-400">{uniqueContributors}</div>
           </div>
-          <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="w-4 h-4 text-primary" />
-              <span className="text-xs text-muted-foreground">Avg. Contribution</span>
+          <div className="p-3 md:p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+            <div className="flex items-center gap-1.5 md:gap-2 mb-1 md:mb-2">
+              <DollarSign className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
+              <span className="text-[10px] md:text-xs text-muted-foreground">Avg. Contribution</span>
             </div>
-            <div className="text-2xl font-display font-bold text-primary">${avgContribution.toFixed(2)}</div>
+            <div className="text-lg md:text-2xl font-display font-bold text-primary">${avgContribution.toFixed(2)}</div>
           </div>
-          <div className="p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="w-4 h-4 text-purple-400" />
-              <span className="text-xs text-muted-foreground">Days Left</span>
+          <div className="p-3 md:p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20">
+            <div className="flex items-center gap-1.5 md:gap-2 mb-1 md:mb-2">
+              <Clock className="w-3.5 h-3.5 md:w-4 md:h-4 text-purple-400" />
+              <span className="text-[10px] md:text-xs text-muted-foreground">Days Left</span>
             </div>
-            <div className="text-2xl font-display font-bold text-purple-400">{Math.max(0, daysRemaining)}</div>
+            <div className="text-lg md:text-2xl font-display font-bold text-purple-400">{Math.max(0, daysRemaining)}</div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <div className="p-6 rounded-2xl bg-card border border-white/5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-4 md:mb-8">
+          <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5">
             <h3 className="font-bold flex items-center gap-2 mb-4">
               <BarChart3 className="w-4 h-4 text-primary" /> Weekly Contributions
             </h3>
@@ -214,7 +214,7 @@ export default function PoolAnalytics() {
             )}
           </div>
 
-          <div className="p-6 rounded-2xl bg-card border border-white/5">
+          <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5">
             <h3 className="font-bold flex items-center gap-2 mb-4">
               <TrendingUp className="w-4 h-4 text-green-400" /> Top Contributors
             </h3>
@@ -248,26 +248,26 @@ export default function PoolAnalytics() {
           </div>
         </div>
 
-        <div className="p-6 rounded-2xl bg-card border border-white/5">
+        <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5">
           <h3 className="font-bold flex items-center gap-2 mb-4">
             <Activity className="w-4 h-4 text-accent" /> Pool Summary
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 rounded-xl bg-white/5">
-              <div className="text-xs text-muted-foreground mb-1">Total Raised</div>
-              <div className="text-xl font-display font-bold">${parseFloat(pool.currentAmount).toLocaleString()}</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            <div className="p-3 md:p-4 rounded-xl bg-white/5">
+              <div className="text-[10px] md:text-xs text-muted-foreground mb-1">Total Raised</div>
+              <div className="text-base md:text-xl font-display font-bold">${parseFloat(pool.currentAmount).toLocaleString()}</div>
             </div>
-            <div className="p-4 rounded-xl bg-white/5">
-              <div className="text-xs text-muted-foreground mb-1">Goal Amount</div>
-              <div className="text-xl font-display font-bold">${parseFloat(pool.targetAmount).toLocaleString()}</div>
+            <div className="p-3 md:p-4 rounded-xl bg-white/5">
+              <div className="text-[10px] md:text-xs text-muted-foreground mb-1">Goal Amount</div>
+              <div className="text-base md:text-xl font-display font-bold">${parseFloat(pool.targetAmount).toLocaleString()}</div>
             </div>
-            <div className="p-4 rounded-xl bg-white/5">
-              <div className="text-xs text-muted-foreground mb-1">Total Contributions</div>
-              <div className="text-xl font-display font-bold">{contributions.length}</div>
+            <div className="p-3 md:p-4 rounded-xl bg-white/5">
+              <div className="text-[10px] md:text-xs text-muted-foreground mb-1">Total Contributions</div>
+              <div className="text-base md:text-xl font-display font-bold">{contributions.length}</div>
             </div>
-            <div className="p-4 rounded-xl bg-white/5">
-              <div className="text-xs text-muted-foreground mb-1">Created</div>
-              <div className="text-xl font-display font-bold">
+            <div className="p-3 md:p-4 rounded-xl bg-white/5">
+              <div className="text-[10px] md:text-xs text-muted-foreground mb-1">Created</div>
+              <div className="text-base md:text-xl font-display font-bold">
                 {pool.createdAt ? formatDistanceToNow(new Date(pool.createdAt), { addSuffix: true }) : 'N/A'}
               </div>
             </div>

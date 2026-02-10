@@ -257,30 +257,30 @@ export default function MerchantDashboard() {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <div className="flex items-center justify-between mb-6">
+      <div className="container mx-auto px-2 md:px-4 py-4 md:py-8 max-w-6xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 md:mb-6">
           <div>
             <Link href="/api-docs">
               <Button variant="ghost" size="sm" className="mb-2" data-testid="button-back">
                 <ArrowLeft className="w-4 h-4 mr-2" /> Back to API Docs
               </Button>
             </Link>
-            <h1 className="text-3xl font-display font-bold">Merchant Dashboard</h1>
-            <p className="text-muted-foreground">{merchant.companyName}</p>
+            <h1 className="text-2xl md:text-3xl font-display font-bold">Merchant Dashboard</h1>
+            <p className="text-sm md:text-base text-muted-foreground">{merchant.companyName}</p>
           </div>
           {getStatusBadge(merchant.status)}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-primary/10 rounded-lg">
                   <DollarSign className="w-5 h-5 text-primary" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Volume</p>
-                  <p className="text-xl font-bold">${parseFloat(merchant.totalVolume).toLocaleString()}</p>
+                <div className="min-w-0">
+                  <p className="text-xs md:text-sm text-muted-foreground">Total Volume</p>
+                  <p className="text-lg md:text-xl font-bold truncate">${parseFloat(merchant.totalVolume).toLocaleString()}</p>
                 </div>
               </div>
             </CardContent>
@@ -291,23 +291,23 @@ export default function MerchantDashboard() {
                 <div className="p-3 bg-yellow-500/10 rounded-lg">
                   <TrendingUp className="w-5 h-5 text-yellow-600" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Fees Paid</p>
-                  <p className="text-xl font-bold">${parseFloat(merchant.totalFees).toLocaleString()}</p>
+                <div className="min-w-0">
+                  <p className="text-xs md:text-sm text-muted-foreground">Fees Paid</p>
+                  <p className="text-lg md:text-xl font-bold truncate">${parseFloat(merchant.totalFees).toLocaleString()}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-green-500/10 rounded-lg">
                     <CreditCard className="w-5 h-5 text-green-600" />
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Pending Balance</p>
-                    <p className="text-xl font-bold">${parseFloat(merchant.pendingBalance).toLocaleString()}</p>
+                  <div className="min-w-0">
+                    <p className="text-xs md:text-sm text-muted-foreground">Pending Balance</p>
+                    <p className="text-lg md:text-xl font-bold truncate">${parseFloat(merchant.pendingBalance).toLocaleString()}</p>
                   </div>
                 </div>
                 {parseFloat(merchant.pendingBalance) >= 10 && merchant.status === 'approved' && (
@@ -395,7 +395,7 @@ export default function MerchantDashboard() {
                     <p className="text-muted-foreground text-center py-8">No API keys yet</p>
                   ) : (
                     apiKeys.map((key) => (
-                      <div key={key.id} className="flex items-center justify-between p-4 border rounded-lg" data-testid={`api-key-${key.id}`}>
+                      <div key={key.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 md:p-4 border rounded-lg gap-2" data-testid={`api-key-${key.id}`}>
                         <div>
                           <p className="font-medium">{key.name}</p>
                           <p className="text-sm text-muted-foreground font-mono">{key.prefix}_••••••••</p>
@@ -440,7 +440,7 @@ export default function MerchantDashboard() {
                 ) : (
                   <div className="space-y-3">
                     {sessions.map((session) => (
-                      <div key={session.id} className="flex items-center justify-between p-4 border rounded-lg" data-testid={`session-${session.id}`}>
+                      <div key={session.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 md:p-4 border rounded-lg gap-2" data-testid={`session-${session.id}`}>
                         <div>
                           <p className="font-medium">{session.productTitle}</p>
                           <p className="text-sm text-muted-foreground">Order: {session.externalOrderId}</p>

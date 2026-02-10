@@ -202,61 +202,61 @@ export default function Recurring() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" asChild data-testid="button-back">
+      <div className="max-w-4xl mx-auto px-1 sm:px-0">
+        <div className="flex items-center justify-between mb-6 md:mb-8">
+          <div className="flex items-center gap-3 md:gap-4">
+            <Button variant="ghost" size="icon" asChild data-testid="button-back" className="shrink-0">
               <Link href="/profile">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
             </Button>
             <div>
-              <h1 className="text-2xl font-display font-bold">Recurring Contributions</h1>
-              <p className="text-sm text-muted-foreground">Manage your automatic payments</p>
+              <h1 className="text-xl md:text-2xl font-display font-bold">Recurring Contributions</h1>
+              <p className="text-xs md:text-sm text-muted-foreground">Manage your automatic payments</p>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="p-5 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 rounded-lg bg-blue-500/20">
-                <Wallet className="w-5 h-5 text-blue-400" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
+          <div className="p-3 md:p-5 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20">
+            <div className="flex items-center gap-2 md:gap-3 mb-2">
+              <div className="p-1.5 md:p-2 rounded-lg bg-blue-500/20">
+                <Wallet className="w-4 h-4 md:w-5 md:h-5 text-blue-400" />
               </div>
-              <span className="text-sm text-muted-foreground">Wallet Balance</span>
+              <span className="text-xs md:text-sm text-muted-foreground">Wallet Balance</span>
             </div>
-            <div className="text-3xl font-display font-bold">
+            <div className="text-xl md:text-3xl font-display font-bold truncate">
               ${user ? parseFloat(user.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
             </div>
           </div>
-          <div className="p-5 rounded-xl bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 rounded-lg bg-green-500/20">
-                <Play className="w-5 h-5 text-green-400" />
+          <div className="p-3 md:p-5 rounded-xl bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20">
+            <div className="flex items-center gap-2 md:gap-3 mb-2">
+              <div className="p-1.5 md:p-2 rounded-lg bg-green-500/20">
+                <Play className="w-4 h-4 md:w-5 md:h-5 text-green-400" />
               </div>
-              <span className="text-sm text-muted-foreground">Active</span>
+              <span className="text-xs md:text-sm text-muted-foreground">Active</span>
             </div>
-            <div className="text-3xl font-display font-bold">{activeContributions.length}</div>
+            <div className="text-xl md:text-3xl font-display font-bold">{activeContributions.length}</div>
           </div>
-          <div className="p-5 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 rounded-lg bg-primary/20">
-                <TrendingUp className="w-5 h-5 text-primary" />
+          <div className="p-3 md:p-5 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+            <div className="flex items-center gap-2 md:gap-3 mb-2">
+              <div className="p-1.5 md:p-2 rounded-lg bg-primary/20">
+                <TrendingUp className="w-4 h-4 md:w-5 md:h-5 text-primary" />
               </div>
-              <span className="text-sm text-muted-foreground">Monthly Total</span>
+              <span className="text-xs md:text-sm text-muted-foreground">Monthly Total</span>
             </div>
-            <div className="text-3xl font-display font-bold">
+            <div className="text-xl md:text-3xl font-display font-bold truncate">
               ${totalMonthlyAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
-          <div className="p-5 rounded-xl bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/20">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 rounded-lg bg-accent/20">
-                <RefreshCw className="w-5 h-5 text-accent" />
+          <div className="p-3 md:p-5 rounded-xl bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/20">
+            <div className="flex items-center gap-2 md:gap-3 mb-2">
+              <div className="p-1.5 md:p-2 rounded-lg bg-accent/20">
+                <RefreshCw className="w-4 h-4 md:w-5 md:h-5 text-accent" />
               </div>
-              <span className="text-sm text-muted-foreground">Total Setups</span>
+              <span className="text-xs md:text-sm text-muted-foreground">Total Setups</span>
             </div>
-            <div className="text-3xl font-display font-bold">{contributions.length}</div>
+            <div className="text-xl md:text-3xl font-display font-bold">{contributions.length}</div>
           </div>
         </div>
 
@@ -283,23 +283,23 @@ export default function Recurring() {
               {contributions.map((contribution) => (
                 <div
                   key={contribution.id}
-                  className="p-4 hover:bg-white/[0.02] transition-colors"
+                  className="p-3 md:p-4 hover:bg-white/[0.02] transition-colors"
                   data-testid={`recurring-${contribution.id}`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                        <RefreshCw className="w-5 h-5 text-primary" />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shrink-0">
+                        <RefreshCw className="w-4 h-4 md:w-5 md:h-5 text-primary" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <Link
                           href={`/pool/${contribution.poolId}`}
-                          className="font-semibold hover:text-primary transition-colors"
+                          className="font-semibold hover:text-primary transition-colors text-sm md:text-base truncate block"
                           data-testid={`link-pool-${contribution.id}`}
                         >
                           {contribution.pool?.title || 'Pool'}
                         </Link>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                        <div className="flex flex-wrap items-center gap-1.5 md:gap-2 text-sm text-muted-foreground mt-1">
                           <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${getFrequencyColor(contribution.frequency)}`}>
                             {getFrequencyLabel(contribution.frequency)}
                           </span>
@@ -309,19 +309,19 @@ export default function Recurring() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <div className="font-display font-bold text-lg">
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pl-13 sm:pl-0">
+                      <div className="text-left sm:text-right">
+                        <div className="font-display font-bold text-base md:text-lg">
                           ${parseFloat(contribution.amount).toFixed(2)}
                         </div>
                         {contribution.status === 'active' && contribution.nextPaymentDate && (
-                          <div className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
+                          <div className="text-xs text-muted-foreground flex items-center gap-1 sm:justify-end">
                             <Clock className="w-3 h-3" />
                             Next: {format(new Date(contribution.nextPaymentDate), 'MMM d')}
                           </div>
                         )}
                         {contribution.status === 'paused' && (
-                          <div className="text-xs text-yellow-400 flex items-center gap-1 justify-end">
+                          <div className="text-xs text-yellow-400 flex items-center gap-1 sm:justify-end">
                             <Pause className="w-3 h-3" />
                             Paused
                           </div>
@@ -332,7 +332,7 @@ export default function Recurring() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-muted-foreground hover:text-primary hover:bg-primary/10"
+                            className="text-muted-foreground hover:text-primary hover:bg-primary/10 h-9 w-9 md:h-10 md:w-10"
                             onClick={() => handleToggleStatus(contribution)}
                             disabled={toggleStatusMutation.isPending}
                             data-testid={`button-toggle-${contribution.id}`}
@@ -347,7 +347,7 @@ export default function Recurring() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-muted-foreground hover:text-blue-400 hover:bg-blue-500/10"
+                            className="text-muted-foreground hover:text-blue-400 hover:bg-blue-500/10 h-9 w-9 md:h-10 md:w-10"
                             onClick={() => handleEditClick(contribution)}
                             data-testid={`button-edit-${contribution.id}`}
                             title="Edit"
@@ -357,7 +357,7 @@ export default function Recurring() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
+                            className="text-muted-foreground hover:text-red-400 hover:bg-red-500/10 h-9 w-9 md:h-10 md:w-10"
                             onClick={() => handleCancelClick(contribution.id)}
                             data-testid={`button-cancel-${contribution.id}`}
                             title="Cancel"

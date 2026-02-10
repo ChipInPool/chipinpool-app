@@ -44,7 +44,7 @@ export default function Landing() {
         </div>
       </nav>
 
-      <section className="relative overflow-hidden py-20 md:py-32">
+      <section className="relative overflow-hidden py-12 sm:py-20 md:py-32">
         <div className="absolute inset-0 z-0">
           <img 
             src={heroImage} 
@@ -56,23 +56,23 @@ export default function Landing() {
         
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-semibold mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-              <Sparkles className="w-4 h-4" />
+            <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs sm:text-sm font-semibold mb-6 sm:mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span>The Future of Group Payments</span>
             </div>
-            <h1 className="text-5xl md:text-7xl font-display font-extrabold tracking-tight leading-tight mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
+            <h1 className="text-3xl sm:text-5xl md:text-7xl font-display font-extrabold tracking-tight leading-tight mb-4 sm:mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
               Pool funds.<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-primary to-accent">Split costs.</span><br />
               Shop together.
             </h1>
-            <p className="text-xl text-muted-foreground mb-10 max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
+            <p className="text-base sm:text-xl text-muted-foreground mb-6 sm:mb-10 max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
               Create pools for trips, gifts, or shared expenses. Invite friends, track contributions in real-time, and spend instantly with virtual cards.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
-              <Button size="lg" className="font-semibold text-lg px-10 h-14 shadow-xl shadow-primary/30 hover:scale-105 transition-transform" asChild data-testid="button-start-pooling">
+              <Button size="lg" className="font-semibold text-base sm:text-lg px-6 sm:px-10 h-12 sm:h-14 shadow-xl shadow-primary/30 hover:scale-105 transition-transform w-full sm:w-auto" asChild data-testid="button-start-pooling">
                 <Link href="/login">Start Pooling Free <ArrowRight className="w-5 h-5 ml-2" /></Link>
               </Button>
-              <Button variant="outline" size="lg" className="h-14 px-10 border-white/10 bg-white/5 hover:bg-white/10 text-lg" asChild data-testid="button-how-it-works">
+              <Button variant="outline" size="lg" className="h-12 sm:h-14 px-6 sm:px-10 border-white/10 bg-white/5 hover:bg-white/10 text-base sm:text-lg w-full sm:w-auto" asChild data-testid="button-how-it-works">
                 <Link href="/how-it-works">See How It Works</Link>
               </Button>
             </div>
@@ -80,17 +80,17 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="py-8 border-y border-white/5 bg-white/[0.01] overflow-hidden">
+      <section className="py-4 sm:py-8 border-y border-white/5 bg-white/[0.01] overflow-hidden">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-center gap-8 md:gap-16 text-muted-foreground opacity-60">
-            <div className="flex items-center gap-2 text-sm font-medium whitespace-nowrap">
-              <ShieldCheck className="w-5 h-5" /> Bank-Level Security
+          <div className="flex items-center justify-center gap-4 sm:gap-8 md:gap-16 text-muted-foreground opacity-60 flex-wrap">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium whitespace-nowrap">
+              <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" /> Bank-Level Security
             </div>
-            <div className="flex items-center gap-2 text-sm font-medium whitespace-nowrap">
-              <CreditCard className="w-5 h-5" /> Visa Cards
+            <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium whitespace-nowrap">
+              <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" /> Visa Cards
             </div>
-            <div className="flex items-center gap-2 text-sm font-medium whitespace-nowrap">
-              <Globe className="w-5 h-5" /> Works Worldwide
+            <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium whitespace-nowrap">
+              <Globe className="w-4 h-4 sm:w-5 sm:h-5" /> Works Worldwide
             </div>
             <div className="hidden md:flex items-center gap-2 text-sm font-medium whitespace-nowrap">
               <RefreshCw className="w-5 h-5" /> Instant Transfers
@@ -99,60 +99,60 @@ export default function Landing() {
         </div>
       </section>
 
-      <section id="features" className="py-20 bg-white/[0.01]">
+      <section id="features" className="py-12 sm:py-20 bg-white/[0.01]">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
+          <div className="text-center mb-8 sm:mb-16">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 text-accent text-sm font-semibold mb-4">
               <Zap className="w-4 h-4" /> Features
             </div>
-            <h2 className="text-3xl md:text-5xl font-display font-bold mb-4">Everything you need for group payments</h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">From splitting dinner to funding a group vacation, ChipInPool makes it easy.</p>
+            <h2 className="text-2xl sm:text-3xl md:text-5xl font-display font-bold mb-3 sm:mb-4">Everything you need for group payments</h2>
+            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">From splitting dinner to funding a group vacation, ChipInPool makes it easy.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="group p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300">
-              <div className="p-4 rounded-xl bg-primary/10 text-primary w-fit mb-6 group-hover:scale-110 transition-transform">
-                <Zap className="w-8 h-8" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="group p-5 sm:p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300">
+              <div className="p-3 sm:p-4 rounded-xl bg-primary/10 text-primary w-fit mb-4 sm:mb-6 group-hover:scale-110 transition-transform">
+                <Zap className="w-6 h-6 sm:w-8 sm:h-8" />
               </div>
-              <h3 className="font-display font-bold text-xl mb-3">Instant Pooling</h3>
+              <h3 className="font-display font-bold text-lg sm:text-xl mb-2 sm:mb-3">Instant Pooling</h3>
               <p className="text-muted-foreground">Create a pool in seconds. Funds are available immediately once contributions are made.</p>
             </div>
 
-            <div className="group p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5 transition-all duration-300">
-              <div className="p-4 rounded-xl bg-accent/10 text-accent w-fit mb-6 group-hover:scale-110 transition-transform">
-                <CreditCard className="w-8 h-8" />
+            <div className="group p-5 sm:p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5 transition-all duration-300">
+              <div className="p-3 sm:p-4 rounded-xl bg-accent/10 text-accent w-fit mb-4 sm:mb-6 group-hover:scale-110 transition-transform">
+                <CreditCard className="w-6 h-6 sm:w-8 sm:h-8" />
               </div>
-              <h3 className="font-display font-bold text-xl mb-3">Virtual Cards</h3>
+              <h3 className="font-display font-bold text-lg sm:text-xl mb-2 sm:mb-3">Virtual Cards</h3>
               <p className="text-muted-foreground">Auto-generate virtual Visa cards tied to your pools. Spend anywhere, online or in-store.</p>
             </div>
 
-            <div className="group p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 hover:border-purple-500/30 hover:shadow-lg hover:shadow-purple-500/5 transition-all duration-300">
-              <div className="p-4 rounded-xl bg-purple-500/10 text-purple-400 w-fit mb-6 group-hover:scale-110 transition-transform">
-                <Users className="w-8 h-8" />
+            <div className="group p-5 sm:p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 hover:border-purple-500/30 hover:shadow-lg hover:shadow-purple-500/5 transition-all duration-300">
+              <div className="p-3 sm:p-4 rounded-xl bg-purple-500/10 text-purple-400 w-fit mb-4 sm:mb-6 group-hover:scale-110 transition-transform">
+                <Users className="w-6 h-6 sm:w-8 sm:h-8" />
               </div>
               <h3 className="font-display font-bold text-xl mb-3">Social Splitting</h3>
               <p className="text-muted-foreground">Invite friends via link, email, or SMS. See who's contributed and who hasn't.</p>
             </div>
 
-            <div className="group p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 hover:border-green-500/30 hover:shadow-lg hover:shadow-green-500/5 transition-all duration-300">
-              <div className="p-4 rounded-xl bg-green-500/10 text-green-400 w-fit mb-6 group-hover:scale-110 transition-transform">
-                <ShieldCheck className="w-8 h-8" />
+            <div className="group p-5 sm:p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 hover:border-green-500/30 hover:shadow-lg hover:shadow-green-500/5 transition-all duration-300">
+              <div className="p-3 sm:p-4 rounded-xl bg-green-500/10 text-green-400 w-fit mb-4 sm:mb-6 group-hover:scale-110 transition-transform">
+                <ShieldCheck className="w-6 h-6 sm:w-8 sm:h-8" />
               </div>
               <h3 className="font-display font-bold text-xl mb-3">Bank-Level Security</h3>
               <p className="text-muted-foreground">256-bit encryption, KYC verification, and real-time fraud monitoring.</p>
             </div>
 
-            <div className="group p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 hover:border-orange-500/30 hover:shadow-lg hover:shadow-orange-500/5 transition-all duration-300">
-              <div className="p-4 rounded-xl bg-orange-500/10 text-orange-400 w-fit mb-6 group-hover:scale-110 transition-transform">
-                <Bell className="w-8 h-8" />
+            <div className="group p-5 sm:p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 hover:border-orange-500/30 hover:shadow-lg hover:shadow-orange-500/5 transition-all duration-300">
+              <div className="p-3 sm:p-4 rounded-xl bg-orange-500/10 text-orange-400 w-fit mb-4 sm:mb-6 group-hover:scale-110 transition-transform">
+                <Bell className="w-6 h-6 sm:w-8 sm:h-8" />
               </div>
               <h3 className="font-display font-bold text-xl mb-3">Smart Notifications</h3>
               <p className="text-muted-foreground">Get notified via email or SMS when friends contribute, pools hit goals, or cards are used.</p>
             </div>
 
-            <div className="group p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5 transition-all duration-300">
-              <div className="p-4 rounded-xl bg-blue-500/10 text-blue-400 w-fit mb-6 group-hover:scale-110 transition-transform">
-                <RefreshCw className="w-8 h-8" />
+            <div className="group p-5 sm:p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5 transition-all duration-300">
+              <div className="p-3 sm:p-4 rounded-xl bg-blue-500/10 text-blue-400 w-fit mb-4 sm:mb-6 group-hover:scale-110 transition-transform">
+                <RefreshCw className="w-6 h-6 sm:w-8 sm:h-8" />
               </div>
               <h3 className="font-display font-bold text-xl mb-3">Recurring Contributions</h3>
               <p className="text-muted-foreground">Set up weekly, monthly, or quarterly auto-contributions for ongoing pools.</p>
@@ -161,17 +161,17 @@ export default function Landing() {
         </div>
       </section>
 
-      <section id="how-it-works" className="py-20">
+      <section id="how-it-works" className="py-12 sm:py-20">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
+          <div className="text-center mb-8 sm:mb-16">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 text-sm font-semibold mb-4">
               <Sparkles className="w-4 h-4" /> Simple Process
             </div>
-            <h2 className="text-3xl md:text-5xl font-display font-bold mb-4">How ChipInPool Works</h2>
-            <p className="text-muted-foreground text-lg">Three simple steps to start pooling funds</p>
+            <h2 className="text-2xl sm:text-3xl md:text-5xl font-display font-bold mb-3 sm:mb-4">How ChipInPool Works</h2>
+            <p className="text-muted-foreground text-base sm:text-lg">Three simple steps to start pooling funds</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 max-w-5xl mx-auto">
             <div className="text-center relative">
               <div className="hidden md:block absolute top-8 left-1/2 w-full h-0.5 bg-gradient-to-r from-primary/50 to-accent/50" />
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/70 text-background flex items-center justify-center text-2xl font-bold mx-auto mb-6 relative z-10 shadow-lg shadow-primary/30">1</div>
@@ -193,20 +193,20 @@ export default function Landing() {
         </div>
       </section>
 
-      <section id="developers" className="py-20">
+      <section id="developers" className="py-12 sm:py-20">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto rounded-3xl bg-gradient-to-br from-primary/10 via-accent/5 to-purple-500/10 border border-white/10 p-12 text-center relative overflow-hidden">
+          <div className="max-w-4xl mx-auto rounded-2xl sm:rounded-3xl bg-gradient-to-br from-primary/10 via-accent/5 to-purple-500/10 border border-white/10 p-6 sm:p-12 text-center relative overflow-hidden">
             <div className="absolute inset-0 bg-grid-white/5 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))]" />
             <div className="relative z-10">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/20 text-primary text-sm font-semibold mb-6">
                 <Code className="w-4 h-4" />
                 <span>ChipInPay API</span>
               </div>
-              <h2 className="text-3xl md:text-5xl font-display font-bold mb-4">Build with ChipInPay</h2>
-              <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
+              <h2 className="text-2xl sm:text-3xl md:text-5xl font-display font-bold mb-3 sm:mb-4">Build with ChipInPay</h2>
+              <p className="text-muted-foreground text-base sm:text-lg mb-6 sm:mb-8 max-w-2xl mx-auto">
                 Integrate group payments into your app or platform. Our REST API gives you full control over pools, contributions, and virtual cards.
               </p>
-              <div className="flex flex-col sm:flex-row gap-6 justify-center mb-8">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 justify-center mb-6 sm:mb-8">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <CheckCircle className="w-4 h-4 text-green-400" />
                   RESTful JSON API
@@ -220,13 +220,13 @@ export default function Landing() {
                   Production Ready
                 </div>
               </div>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button size="lg" className="font-semibold px-8 h-12" asChild data-testid="button-request-api">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+                <Button size="lg" className="font-semibold px-6 sm:px-8 h-11 sm:h-12 w-full sm:w-auto" asChild data-testid="button-request-api">
                   <Link href="/api-docs">
                     View Documentation <ArrowRight className="w-4 h-4 ml-2" />
                   </Link>
                 </Button>
-                <Button variant="outline" size="lg" className="px-8 h-12 border-white/10 bg-white/5" asChild>
+                <Button variant="outline" size="lg" className="px-6 sm:px-8 h-11 sm:h-12 border-white/10 bg-white/5 w-full sm:w-auto" asChild>
                   <a href="mailto:mail@chipinpool.com?subject=ChipInPay%20API%20Access%20Request">
                     Contact Sales
                   </a>
@@ -237,21 +237,21 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="py-20 bg-gradient-to-b from-transparent to-primary/5">
+      <section className="py-12 sm:py-20 bg-gradient-to-b from-transparent to-primary/5">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-5xl font-display font-bold mb-4">Ready to start pooling?</h2>
-          <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl md:text-5xl font-display font-bold mb-3 sm:mb-4">Ready to start pooling?</h2>
+          <p className="text-muted-foreground text-base sm:text-lg mb-6 sm:mb-8 max-w-xl mx-auto">
             Join thousands of users who are already splitting costs and pooling funds with ChipInPool.
           </p>
-          <Button size="lg" className="font-semibold text-lg px-12 h-14 shadow-xl shadow-primary/30" asChild data-testid="button-cta-start">
+          <Button size="lg" className="font-semibold text-base sm:text-lg px-8 sm:px-12 h-12 sm:h-14 shadow-xl shadow-primary/30 w-full sm:w-auto" asChild data-testid="button-cta-start">
             <Link href="/login">Get Started Free <ArrowRight className="w-5 h-5 ml-2" /></Link>
           </Button>
         </div>
       </section>
 
-      <footer className="border-t border-white/5 py-12 bg-background">
+      <footer className="border-t border-white/5 py-8 sm:py-12 bg-background">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-6 sm:mb-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-background font-bold text-lg shadow-lg shadow-primary/20">

@@ -64,21 +64,21 @@ export default function SplitCalculator() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center gap-4 mb-8">
+      <div className="max-w-2xl mx-auto px-1 sm:px-0">
+        <div className="flex items-center gap-2 sm:gap-4 mb-4 sm:mb-8">
           <Button variant="ghost" size="icon" asChild data-testid="button-back">
             <Link href="/">
               <ArrowLeft className="w-5 h-5" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-display font-bold">Split Calculator</h1>
-            <p className="text-sm text-muted-foreground">Easily split bills with friends</p>
+            <h1 className="text-xl sm:text-2xl font-display font-bold">Split Calculator</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">Easily split bills with friends</p>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="p-6 rounded-2xl bg-card border border-white/5">
+        <div className="space-y-4 sm:space-y-6">
+          <div className="p-4 sm:p-6 rounded-2xl bg-card border border-white/5">
             <h3 className="font-bold flex items-center gap-2 mb-4">
               <DollarSign className="w-4 h-4 text-green-400" /> Bill Amount
             </h3>
@@ -95,8 +95,8 @@ export default function SplitCalculator() {
             </div>
           </div>
 
-          <div className="p-6 rounded-2xl bg-card border border-white/5">
-            <h3 className="font-bold flex items-center gap-2 mb-4">
+          <div className="p-4 sm:p-6 rounded-2xl bg-card border border-white/5">
+            <h3 className="font-bold flex items-center gap-2 mb-3 sm:mb-4 text-sm sm:text-base">
               <Percent className="w-4 h-4 text-blue-400" /> Add Tip
             </h3>
             <div className="flex gap-2 flex-wrap">
@@ -131,9 +131,9 @@ export default function SplitCalculator() {
             )}
           </div>
 
-          <div className="p-6 rounded-2xl bg-card border border-white/5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold flex items-center gap-2">
+          <div className="p-4 sm:p-6 rounded-2xl bg-card border border-white/5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0 mb-3 sm:mb-4">
+              <h3 className="font-bold flex items-center gap-2 text-sm sm:text-base">
                 <Users className="w-4 h-4 text-purple-400" /> Split Between
               </h3>
               <div className="flex gap-2">
@@ -160,23 +160,23 @@ export default function SplitCalculator() {
 
             <div className="space-y-3">
               {people.map((person, i) => (
-                <div key={person.id} className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-sm font-bold">
+                <div key={person.id} className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-xs sm:text-sm font-bold shrink-0">
                     {i + 1}
                   </div>
                   <Input
                     placeholder={`Person ${i + 1}`}
                     value={person.name}
                     onChange={(e) => updatePersonName(person.id, e.target.value)}
-                    className="flex-1 bg-white/5 border-white/10"
+                    className="flex-1 min-w-0 bg-white/5 border-white/10"
                     data-testid={`input-person-${i}`}
                   />
                   {splitType === 'equal' ? (
-                    <div className="w-24 text-right font-display font-bold text-primary">
+                    <div className="w-20 sm:w-24 text-right font-display font-bold text-primary text-sm sm:text-base shrink-0">
                       ${equalSplit.toFixed(2)}
                     </div>
                   ) : (
-                    <div className="relative w-24">
+                    <div className="relative w-20 sm:w-24 shrink-0">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                       <Input
                         type="number"
@@ -193,7 +193,7 @@ export default function SplitCalculator() {
                     size="icon"
                     onClick={() => removePerson(person.id)}
                     disabled={people.length <= 2}
-                    className="text-muted-foreground hover:text-red-400"
+                    className="text-muted-foreground hover:text-red-400 min-w-[44px] min-h-[44px] shrink-0"
                     data-testid={`remove-person-${i}`}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -223,9 +223,9 @@ export default function SplitCalculator() {
             )}
           </div>
 
-          <div className="p-6 rounded-2xl bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold flex items-center gap-2">
+          <div className="p-4 sm:p-6 rounded-2xl bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="font-bold flex items-center gap-2 text-sm sm:text-base">
                 <Calculator className="w-4 h-4 text-primary" /> Summary
               </h3>
               <Button

@@ -128,16 +128,16 @@ export default function ActivityFeed() {
   return (
     <Layout>
       <div className="max-w-2xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between mb-4 sm:mb-8">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Button variant="ghost" size="icon" asChild data-testid="button-back">
               <Link href="/">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
             </Button>
             <div>
-              <h1 className="text-2xl font-display font-bold">Activity Feed</h1>
-              <p className="text-sm text-muted-foreground">See what people you follow are doing</p>
+              <h1 className="text-xl sm:text-2xl font-display font-bold">Activity Feed</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">See what people you follow are doing</p>
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={() => refetch()} data-testid="button-refresh">
@@ -145,7 +145,7 @@ export default function ActivityFeed() {
           </Button>
         </div>
 
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-4 sm:mb-6">
           {(['all', 'contributions', 'pools'] as const).map(f => (
             <Button
               key={f}
@@ -162,8 +162,8 @@ export default function ActivityFeed() {
 
         <div className="rounded-2xl bg-card border border-white/5 overflow-hidden">
           {filteredActivities.length === 0 ? (
-            <div className="p-12 text-center">
-              <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
+            <div className="p-8 sm:p-12 text-center">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
                 <Activity className="w-8 h-8 text-muted-foreground" />
               </div>
               <h3 className="font-semibold text-lg mb-2">No Activity Yet</h3>
@@ -181,18 +181,18 @@ export default function ActivityFeed() {
               {filteredActivities.map((activity) => (
                 <div
                   key={activity.id}
-                  className="p-4 hover:bg-white/[0.02] transition-colors"
+                  className="p-3 sm:p-4 hover:bg-white/[0.02] transition-colors"
                   data-testid={`activity-${activity.id}`}
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex items-start gap-2.5 sm:gap-4">
                     <Link href={`/user/${activity.userId}`}>
-                      <Avatar className="w-10 h-10 cursor-pointer hover:ring-2 hover:ring-primary transition-all">
+                      <Avatar className="w-8 h-8 sm:w-10 sm:h-10 cursor-pointer hover:ring-2 hover:ring-primary transition-all shrink-0">
                         <AvatarImage src={activity.userAvatar} />
                         <AvatarFallback>{activity.userName?.[0] || '?'}</AvatarFallback>
                       </Avatar>
                     </Link>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap text-sm sm:text-base">
                         <Link href={`/user/${activity.userId}`} className="font-semibold hover:text-primary transition-colors">
                           {activity.userName}
                         </Link>

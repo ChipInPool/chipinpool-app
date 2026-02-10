@@ -460,12 +460,12 @@ export default function Login() {
               <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
                 <Shield className="w-8 h-8 text-primary" />
               </div>
-              <CardTitle className="text-2xl font-display">Verify Your Identity</CardTitle>
+              <CardTitle className="text-xl md:text-2xl font-display">Verify Your Identity</CardTitle>
               <CardDescription>
                 Complete KYC verification to unlock all features including creating pools and withdrawing funds.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 px-4 md:px-6">
               <Button 
                 className="w-full" 
                 onClick={handleStartKyc}
@@ -512,7 +512,7 @@ export default function Login() {
           </div>
 
           <Card className="border-white/10 bg-card/50 backdrop-blur">
-            <CardHeader>
+            <CardHeader className="px-4 md:px-6">
               <Button 
                 variant="ghost" 
                 size="sm" 
@@ -521,7 +521,7 @@ export default function Login() {
               >
                 <ArrowLeft className="w-4 h-4 mr-2" /> Back to Sign In
               </Button>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg md:text-2xl">
                 <KeyRound className="w-5 h-5" /> Reset Password
               </CardTitle>
               <CardDescription>
@@ -530,7 +530,7 @@ export default function Login() {
                   : "Choose how you'd like to receive your reset link"}
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 md:px-6">
               {forgotSent ? (
                 <div className="text-center space-y-4">
                   <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto">
@@ -620,19 +620,19 @@ export default function Login() {
             </div>
             <span className="font-display font-bold text-2xl tracking-tight">ChipIn</span>
           </div>
-          <p className="text-muted-foreground">Pool funds together. Pay smarter.</p>
+          <p className="text-sm md:text-base text-muted-foreground">Pool funds together. Pay smarter.</p>
         </div>
 
         <Card className="border-white/10 bg-card/50 backdrop-blur">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <CardHeader>
+            <CardHeader className="px-4 md:px-6">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="login" data-testid="tab-login">Sign In</TabsTrigger>
                 <TabsTrigger value="register" data-testid="tab-register">Sign Up</TabsTrigger>
               </TabsList>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="px-4 md:px-6">
               <TabsContent value="login">
                 {mfaRequired ? (
                   <div className="space-y-6">
@@ -699,7 +699,7 @@ export default function Login() {
                   </div>
                 ) : (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-1.5 md:gap-2">
                     <Button
                       type="button"
                       variant={loginMethod === 'email' ? 'default' : 'outline'}
@@ -708,7 +708,7 @@ export default function Login() {
                       className="w-full"
                       data-testid="button-method-email"
                     >
-                      <Mail className="w-4 h-4 mr-1" /> Email
+                      <Mail className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Email</span>
                     </Button>
                     <Button
                       type="button"
@@ -718,7 +718,7 @@ export default function Login() {
                       className="w-full"
                       data-testid="button-method-username"
                     >
-                      <User className="w-4 h-4 mr-1" /> Username
+                      <User className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Username</span>
                     </Button>
                     <Button
                       type="button"
@@ -728,7 +728,7 @@ export default function Login() {
                       className="w-full"
                       data-testid="button-method-phone"
                     >
-                      <Phone className="w-4 h-4 mr-1" /> Phone
+                      <Phone className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Phone</span>
                     </Button>
                   </div>
 
@@ -874,7 +874,7 @@ export default function Login() {
               <TabsContent value="register">
                 {step === 'form' ? (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <Label htmlFor="register-firstName">First Name</Label>
                         <Input
@@ -1056,7 +1056,7 @@ export default function Login() {
                         value={verificationCode}
                         onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         maxLength={6}
-                        className="text-center text-2xl tracking-widest"
+                        className="text-center text-xl md:text-2xl tracking-widest"
                         data-testid="input-verification-code"
                       />
                     </div>

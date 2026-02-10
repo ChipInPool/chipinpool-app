@@ -519,34 +519,34 @@ export default function Security() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-display font-bold flex items-center gap-3">
-            <Shield className="w-8 h-8 text-primary" />
+      <div className="max-w-2xl mx-auto px-1 sm:px-0">
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-2xl md:text-3xl font-display font-bold flex items-center gap-2 md:gap-3">
+            <Shield className="w-6 h-6 md:w-8 md:h-8 text-primary" />
             Security Settings
           </h1>
-          <p className="text-muted-foreground mt-2">Protect your account and enable security features</p>
+          <p className="text-sm md:text-base text-muted-foreground mt-1 md:mt-2">Protect your account and enable security features</p>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           <Card className="bg-white/[0.02] border-white/5">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Mail className="w-5 h-5 text-blue-400" />
-                  <CardTitle>Email Verification</CardTitle>
+            <CardHeader className="px-4 md:px-6">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                  <Mail className="w-5 h-5 text-blue-400 shrink-0" />
+                  <CardTitle className="text-base md:text-lg truncate">Email Verification</CardTitle>
                 </div>
                 {status.emailVerified ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30 shrink-0 text-xs">
                     <CheckCircle className="w-3 h-3 mr-1" /> Verified
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="border-orange-500/30 text-orange-400">
+                  <Badge variant="outline" className="border-orange-500/30 text-orange-400 shrink-0 text-xs">
                     <XCircle className="w-3 h-3 mr-1" /> Not Verified
                   </Badge>
                 )}
               </div>
-              <CardDescription>Verify your email address for account recovery</CardDescription>
+              <CardDescription className="text-xs md:text-sm">Verify your email address for account recovery</CardDescription>
             </CardHeader>
             {!status.emailVerified && (
               <CardContent className="space-y-4">
@@ -583,23 +583,23 @@ export default function Security() {
           </Card>
 
           <Card className="bg-white/[0.02] border-white/5">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Phone className="w-5 h-5 text-green-400" />
-                  <CardTitle>Phone Verification</CardTitle>
+            <CardHeader className="px-4 md:px-6">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                  <Phone className="w-5 h-5 text-green-400 shrink-0" />
+                  <CardTitle className="text-base md:text-lg truncate">Phone Verification</CardTitle>
                 </div>
                 {status.phoneVerified ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30 shrink-0 text-xs">
                     <CheckCircle className="w-3 h-3 mr-1" /> Verified
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="border-orange-500/30 text-orange-400">
+                  <Badge variant="outline" className="border-orange-500/30 text-orange-400 shrink-0 text-xs">
                     <XCircle className="w-3 h-3 mr-1" /> Not Verified
                   </Badge>
                 )}
               </div>
-              <CardDescription>Add your phone number for SMS notifications and 2FA</CardDescription>
+              <CardDescription className="text-xs md:text-sm">Add your phone number for SMS notifications and 2FA</CardDescription>
             </CardHeader>
             {!status.phoneVerified && (
               <CardContent className="space-y-4">
@@ -644,23 +644,23 @@ export default function Security() {
           </Card>
 
           <Card className="bg-white/[0.02] border-white/5">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Key className="w-5 h-5 text-yellow-400" />
-                  <CardTitle>Transaction PIN</CardTitle>
+            <CardHeader className="px-4 md:px-6">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                  <Key className="w-5 h-5 text-yellow-400 shrink-0" />
+                  <CardTitle className="text-base md:text-lg truncate">Transaction PIN</CardTitle>
                 </div>
                 {status.hasTransactionPin ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30 shrink-0 text-xs">
                     <CheckCircle className="w-3 h-3 mr-1" /> Set
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="border-orange-500/30 text-orange-400">
+                  <Badge variant="outline" className="border-orange-500/30 text-orange-400 shrink-0 text-xs">
                     <XCircle className="w-3 h-3 mr-1" /> Not Set
                   </Badge>
                 )}
               </div>
-              <CardDescription>Set a 4-digit PIN to authorize spending from your pools</CardDescription>
+              <CardDescription className="text-xs md:text-sm">Set a 4-digit PIN to authorize spending from your pools</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-2">
@@ -685,23 +685,23 @@ export default function Security() {
           </Card>
 
           <Card className="bg-white/[0.02] border-white/5">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Smartphone className="w-5 h-5 text-purple-400" />
-                  <CardTitle>Two-Factor Authentication</CardTitle>
+            <CardHeader className="px-4 md:px-6">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                  <Smartphone className="w-5 h-5 text-purple-400 shrink-0" />
+                  <CardTitle className="text-base md:text-lg truncate">Two-Factor Authentication</CardTitle>
                 </div>
                 {status.twoFactorEnabled ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30 shrink-0 text-xs">
                     <CheckCircle className="w-3 h-3 mr-1" /> Enabled
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="border-orange-500/30 text-orange-400">
+                  <Badge variant="outline" className="border-orange-500/30 text-orange-400 shrink-0 text-xs">
                     <XCircle className="w-3 h-3 mr-1" /> Disabled
                   </Badge>
                 )}
               </div>
-              <CardDescription>Use an authenticator app for extra security when logging in</CardDescription>
+              <CardDescription className="text-xs md:text-sm">Use an authenticator app for extra security when logging in</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {status.twoFactorEnabled ? (
@@ -746,11 +746,11 @@ export default function Security() {
           </Card>
 
           <Card className="bg-white/[0.02] border-white/5">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <UserCheck className="w-5 h-5 text-accent" />
-                  <CardTitle>Identity Verification (KYC)</CardTitle>
+            <CardHeader className="px-4 md:px-6">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                  <UserCheck className="w-5 h-5 text-accent shrink-0" />
+                  <CardTitle className="text-base md:text-lg truncate">Identity Verification (KYC)</CardTitle>
                 </div>
                 {status.kycStatus === 'verified' ? (
                   <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
@@ -837,33 +837,33 @@ export default function Security() {
           </Card>
 
           <Card className="bg-white/[0.02] border-white/5">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Building className="w-5 h-5 text-cyan-400" />
-                  <CardTitle>Bank Accounts</CardTitle>
+            <CardHeader className="px-4 md:px-6">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                  <Building className="w-5 h-5 text-cyan-400 shrink-0" />
+                  <CardTitle className="text-base md:text-lg truncate">Bank Accounts</CardTitle>
                 </div>
                 {bankAccountsList.length > 0 ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30 shrink-0 text-xs">
                     <CheckCircle className="w-3 h-3 mr-1" /> {bankAccountsList.length} Linked
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="border-orange-500/30 text-orange-400">
+                  <Badge variant="outline" className="border-orange-500/30 text-orange-400 shrink-0 text-xs">
                     <XCircle className="w-3 h-3 mr-1" /> Not Linked
                   </Badge>
                 )}
               </div>
-              <CardDescription>Securely link your bank for verified withdrawals (1-3 business days, free)</CardDescription>
+              <CardDescription className="text-xs md:text-sm">Securely link your bank for verified withdrawals (1-3 business days, free)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {bankAccountsList.length > 0 && (
                 <div className="space-y-2">
                   {bankAccountsList.map((account: any) => (
-                    <div key={account.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Building className="w-4 h-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-medium">{account.institutionName}</p>
+                    <div key={account.id} className="flex items-center justify-between p-2.5 md:p-3 bg-white/5 rounded-lg gap-2">
+                      <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                        <Building className="w-4 h-4 text-muted-foreground shrink-0 hidden sm:block" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{account.institutionName}</p>
                           <p className="text-xs text-muted-foreground">
                             {account.accountType} ••••{account.accountMask}
                             {account.isDefault && <span className="ml-2 text-cyan-400">(Default)</span>}
@@ -913,36 +913,36 @@ export default function Security() {
           </Card>
 
           <Card className="bg-white/[0.02] border-white/5">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CreditCard className="w-5 h-5 text-lime-400" />
-                  <CardTitle>Debit Cards</CardTitle>
-                  <Badge className="bg-lime-500/20 text-lime-400 border-lime-500/30">
+            <CardHeader className="px-4 md:px-6">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                  <CreditCard className="w-5 h-5 text-lime-400 shrink-0" />
+                  <CardTitle className="text-base md:text-lg truncate">Debit Cards</CardTitle>
+                  <Badge className="bg-lime-500/20 text-lime-400 border-lime-500/30 hidden sm:inline-flex text-xs">
                     <Zap className="w-3 h-3 mr-1" /> Instant
                   </Badge>
                 </div>
                 {debitCardsList.length > 0 ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30 shrink-0 text-xs">
                     <CheckCircle className="w-3 h-3 mr-1" /> {debitCardsList.length} Linked
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="border-orange-500/30 text-orange-400">
+                  <Badge variant="outline" className="border-orange-500/30 text-orange-400 shrink-0 text-xs">
                     <XCircle className="w-3 h-3 mr-1" /> Not Linked
                   </Badge>
                 )}
               </div>
-              <CardDescription>Link a debit card for instant withdrawals (30 minutes, 1.5% fee)</CardDescription>
+              <CardDescription className="text-xs md:text-sm">Link a debit card for instant withdrawals (30 minutes, 1.5% fee)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {debitCardsList.length > 0 && (
                 <div className="space-y-2">
                   {debitCardsList.map((account: any) => (
-                    <div key={account.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <CreditCard className="w-4 h-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-medium">{account.institutionName}</p>
+                    <div key={account.id} className="flex items-center justify-between p-2.5 md:p-3 bg-white/5 rounded-lg gap-2">
+                      <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                        <CreditCard className="w-4 h-4 text-muted-foreground shrink-0 hidden sm:block" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{account.institutionName}</p>
                           <p className="text-xs text-muted-foreground">
                             ••••{account.accountMask}
                             {account.isDefault && <span className="ml-2 text-cyan-400">(Default)</span>}

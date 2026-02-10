@@ -76,15 +76,15 @@ export default function ApiDocs() {
   return (
     <Layout>
       {/* Hero */}
-      <div className="relative rounded-3xl overflow-hidden border border-white/5 bg-card/30 mb-12">
+      <div className="relative rounded-2xl md:rounded-3xl overflow-hidden border border-white/5 bg-card/30 mb-6 md:mb-12">
         <div className="absolute inset-0 z-0">
            <img src={heroImage} className="w-full h-full object-cover opacity-40 mix-blend-screen" alt="API Docs Hero" />
            <div className="absolute inset-0 bg-linear-to-r from-background via-background/95 to-transparent" />
         </div>
-        <div className="relative z-10 p-8 md:p-16 max-w-3xl">
-           <Badge variant="outline" className="mb-6 bg-primary/10 text-primary border-primary/20 backdrop-blur-md">Developer Preview</Badge>
-           <h1 className="text-4xl md:text-6xl font-display font-bold mb-6">Build with ChipInPay</h1>
-           <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
+        <div className="relative z-10 p-5 md:p-16 max-w-3xl">
+           <Badge variant="outline" className="mb-4 md:mb-6 bg-primary/10 text-primary border-primary/20 backdrop-blur-md">Developer Preview</Badge>
+           <h1 className="text-2xl sm:text-4xl md:text-6xl font-display font-bold mb-4 md:mb-6">Build with ChipInPay</h1>
+           <p className="text-sm md:text-lg text-muted-foreground mb-6 md:mb-8 leading-relaxed">
              Integrate social group payments directly into your checkout flow. 
              Allow your customers to split costs instantly without leaving your site.
            </p>
@@ -222,10 +222,10 @@ export default function ApiDocs() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-12">
         {/* Sidebar Navigation */}
         <div className="lg:col-span-3 space-y-8">
-           <div className="sticky top-24">
+           <div className="sticky top-24 hidden lg:block">
               <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mb-4">Documentation</h3>
               <nav className="space-y-1">
                  <a href="#introduction" className="block px-3 py-2 rounded-md bg-primary/10 text-primary font-medium border-l-2 border-primary">Introduction</a>
@@ -245,26 +245,26 @@ export default function ApiDocs() {
         </div>
 
         {/* Main Content */}
-        <div className="lg:col-span-9 space-y-16">
+        <div className="lg:col-span-9 space-y-10 md:space-y-16">
            {/* Introduction */}
-           <section id="introduction" className="space-y-6">
-              <h2 className="text-3xl font-display font-bold">Introduction</h2>
-              <p className="text-muted-foreground text-lg">
+           <section id="introduction" className="space-y-4 md:space-y-6">
+              <h2 className="text-2xl md:text-3xl font-display font-bold">Introduction</h2>
+              <p className="text-muted-foreground text-sm md:text-lg">
                 ChipInPay allows e-commerce merchants to offer "Split Payment" as a native checkout option. 
                 Instead of one person paying $500, they can start a pool directly at checkout and invite friends to contribute.
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-                 <div className="p-6 rounded-xl bg-card border border-white/5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 pt-4">
+                 <div className="p-4 md:p-6 rounded-xl bg-card border border-white/5">
                     <Globe className="w-8 h-8 text-primary mb-4" />
                     <h3 className="font-bold mb-2">Universal Checkout</h3>
                     <p className="text-sm text-muted-foreground">Works with any payment gateway via our unified API layer.</p>
                  </div>
-                 <div className="p-6 rounded-xl bg-card border border-white/5">
+                 <div className="p-4 md:p-6 rounded-xl bg-card border border-white/5">
                     <Shield className="w-8 h-8 text-accent mb-4" />
                     <h3 className="font-bold mb-2">Fraud Protection</h3>
                     <p className="text-sm text-muted-foreground">Built-in risk analysis for all pooled transactions.</p>
                  </div>
-                 <div className="p-6 rounded-xl bg-card border border-white/5">
+                 <div className="p-4 md:p-6 rounded-xl bg-card border border-white/5">
                     <Zap className="w-8 h-8 text-yellow-400 mb-4" />
                     <h3 className="font-bold mb-2">Instant Settlement</h3>
                     <p className="text-sm text-muted-foreground">We collect the pool and settle the full amount to you instantly.</p>
@@ -273,8 +273,8 @@ export default function ApiDocs() {
            </section>
 
            {/* Quick Start */}
-           <section id="quickstart" className="space-y-6">
-              <h2 className="text-3xl font-display font-bold">Quick Start</h2>
+           <section id="quickstart" className="space-y-4 md:space-y-6">
+              <h2 className="text-2xl md:text-3xl font-display font-bold">Quick Start</h2>
               <p className="text-muted-foreground">Install the React SDK to get started.</p>
               
               <div className="relative group">
@@ -283,7 +283,7 @@ export default function ApiDocs() {
                        {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                     </Button>
                  </div>
-                 <div className="bg-[#0D1117] rounded-xl border border-white/10 p-6 overflow-x-auto font-mono text-sm">
+                 <div className="bg-[#0D1117] rounded-xl border border-white/10 p-4 md:p-6 overflow-x-auto font-mono text-xs md:text-sm">
                     <div className="flex gap-2 mb-4 border-b border-white/5 pb-2">
                        <span className="text-green-400">npm</span>
                        <span className="text-muted-foreground">yarn</span>
@@ -295,16 +295,16 @@ export default function ApiDocs() {
            </section>
 
            {/* Authentication */}
-           <section id="authentication" className="space-y-6">
-              <h2 className="text-3xl font-display font-bold">Authentication</h2>
+           <section id="authentication" className="space-y-4 md:space-y-6">
+              <h2 className="text-2xl md:text-3xl font-display font-bold">Authentication</h2>
               <p className="text-muted-foreground">All API requests require authentication via your API key.</p>
               
-              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
-                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-xs md:text-sm">
+                 <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-white/5 border-b border-white/5">
                     <span className="text-xs text-muted-foreground">HTTP Request</span>
                     <Terminal className="w-4 h-4 text-muted-foreground" />
                  </div>
-                 <div className="p-6 overflow-x-auto">
+                 <div className="p-3 md:p-6 overflow-x-auto">
 <pre className="text-gray-300">
 <span className="text-purple-400">Authorization:</span> Bearer <span className="text-green-400">pk_live_your_api_key_here</span>
 
@@ -319,16 +319,16 @@ export default function ApiDocs() {
            </section>
 
            {/* Integration Example */}
-           <section id="checkout" className="space-y-6">
-              <h2 className="text-3xl font-display font-bold">Create a Checkout Session</h2>
+           <section id="checkout" className="space-y-4 md:space-y-6">
+              <h2 className="text-2xl md:text-3xl font-display font-bold">Create a Checkout Session</h2>
               <p className="text-muted-foreground">Initialize the ChipIn button in your checkout component.</p>
               
-              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
-                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-xs md:text-sm">
+                 <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-white/5 border-b border-white/5">
                     <span className="text-xs text-muted-foreground">CheckoutForm.tsx</span>
                     <Code2 className="w-4 h-4 text-muted-foreground" />
                  </div>
-                 <div className="p-6 overflow-x-auto">
+                 <div className="p-3 md:p-6 overflow-x-auto">
 <pre className="text-gray-300">
 <span className="text-purple-400">import</span> {"{ ChipInProvider, PayButton }"} <span className="text-purple-400">from</span> <span className="text-green-400">'@chipin/sdk'</span>;
 
@@ -357,16 +357,16 @@ export default function ApiDocs() {
            </section>
 
            {/* Webhooks */}
-           <section id="webhooks" className="space-y-6">
-              <h2 className="text-3xl font-display font-bold">Webhooks</h2>
+           <section id="webhooks" className="space-y-4 md:space-y-6">
+              <h2 className="text-2xl md:text-3xl font-display font-bold">Webhooks</h2>
               <p className="text-muted-foreground">Receive real-time updates when pools are funded or contributions are made.</p>
               
-              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
-                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-xs md:text-sm">
+                 <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-white/5 border-b border-white/5">
                     <span className="text-xs text-muted-foreground">Webhook Payload</span>
                     <Code2 className="w-4 h-4 text-muted-foreground" />
                  </div>
-                 <div className="p-6 overflow-x-auto">
+                 <div className="p-3 md:p-6 overflow-x-auto">
 <pre className="text-gray-300">
 {"{"}
   <span className="text-blue-300">"event"</span>: <span className="text-green-400">"pool.funded"</span>,
@@ -387,28 +387,28 @@ export default function ApiDocs() {
            </section>
 
            {/* Node.js SDK */}
-           <section id="nodejs-sdk" className="space-y-6 pt-8 border-t border-white/5">
-              <h2 className="text-3xl font-display font-bold">Node.js SDK</h2>
+           <section id="nodejs-sdk" className="space-y-4 md:space-y-6 pt-8 border-t border-white/5">
+              <h2 className="text-2xl md:text-3xl font-display font-bold">Node.js SDK</h2>
               <p className="text-muted-foreground">Server-side integration for Node.js applications.</p>
               
-              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
-                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-xs md:text-sm">
+                 <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-white/5 border-b border-white/5">
                     <span className="text-xs text-muted-foreground">Installation</span>
                     <Terminal className="w-4 h-4 text-muted-foreground" />
                  </div>
-                 <div className="p-6 overflow-x-auto">
+                 <div className="p-3 md:p-6 overflow-x-auto">
 <pre className="text-gray-300">
 <span className="text-purple-400">npm</span> install <span className="text-blue-400">@chipin/node-sdk</span>
 </pre>
                  </div>
               </div>
 
-              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
-                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-xs md:text-sm">
+                 <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-white/5 border-b border-white/5">
                     <span className="text-xs text-muted-foreground">server.js</span>
                     <Code2 className="w-4 h-4 text-muted-foreground" />
                  </div>
-                 <div className="p-6 overflow-x-auto">
+                 <div className="p-3 md:p-6 overflow-x-auto">
 <pre className="text-gray-300">
 <span className="text-purple-400">const</span> ChipIn = <span className="text-purple-400">require</span>(<span className="text-green-400">'@chipin/node-sdk'</span>);
 
@@ -431,28 +431,28 @@ console.<span className="text-blue-400">log</span>(session.url); <span className
            </section>
 
            {/* Python SDK */}
-           <section id="python-sdk" className="space-y-6 pt-8 border-t border-white/5">
-              <h2 className="text-3xl font-display font-bold">Python SDK</h2>
+           <section id="python-sdk" className="space-y-4 md:space-y-6 pt-8 border-t border-white/5">
+              <h2 className="text-2xl md:text-3xl font-display font-bold">Python SDK</h2>
               <p className="text-muted-foreground">Server-side integration for Python applications.</p>
               
-              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
-                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-xs md:text-sm">
+                 <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-white/5 border-b border-white/5">
                     <span className="text-xs text-muted-foreground">Installation</span>
                     <Terminal className="w-4 h-4 text-muted-foreground" />
                  </div>
-                 <div className="p-6 overflow-x-auto">
+                 <div className="p-3 md:p-6 overflow-x-auto">
 <pre className="text-gray-300">
 <span className="text-purple-400">pip</span> install <span className="text-blue-400">chipinpay</span>
 </pre>
                  </div>
               </div>
 
-              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
-                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-xs md:text-sm">
+                 <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-white/5 border-b border-white/5">
                     <span className="text-xs text-muted-foreground">app.py</span>
                     <Code2 className="w-4 h-4 text-muted-foreground" />
                  </div>
-                 <div className="p-6 overflow-x-auto">
+                 <div className="p-3 md:p-6 overflow-x-auto">
 <pre className="text-gray-300">
 <span className="text-purple-400">import</span> chipinpay
 
@@ -477,28 +477,28 @@ session = chipinpay.CheckoutSession.<span className="text-blue-400">create</span
            </section>
 
            {/* React SDK */}
-           <section id="react-sdk" className="space-y-6 pt-8 border-t border-white/5">
-              <h2 className="text-3xl font-display font-bold">React SDK</h2>
+           <section id="react-sdk" className="space-y-4 md:space-y-6 pt-8 border-t border-white/5">
+              <h2 className="text-2xl md:text-3xl font-display font-bold">React SDK</h2>
               <p className="text-muted-foreground">Client-side components for React applications.</p>
               
-              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
-                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-xs md:text-sm">
+                 <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-white/5 border-b border-white/5">
                     <span className="text-xs text-muted-foreground">Installation</span>
                     <Terminal className="w-4 h-4 text-muted-foreground" />
                  </div>
-                 <div className="p-6 overflow-x-auto">
+                 <div className="p-3 md:p-6 overflow-x-auto">
 <pre className="text-gray-300">
 <span className="text-purple-400">npm</span> install <span className="text-blue-400">@chipin/react</span>
 </pre>
                  </div>
               </div>
 
-              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-sm">
-                 <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+              <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-xs md:text-sm">
+                 <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-white/5 border-b border-white/5">
                     <span className="text-xs text-muted-foreground">Checkout.tsx</span>
                     <Code2 className="w-4 h-4 text-muted-foreground" />
                  </div>
-                 <div className="p-6 overflow-x-auto">
+                 <div className="p-3 md:p-6 overflow-x-auto">
 <pre className="text-gray-300">
 <span className="text-purple-400">import</span> {"{ ChipInProvider, SplitPayButton, useChipIn }"} <span className="text-purple-400">from</span> <span className="text-green-400">'@chipin/react'</span>;
 
@@ -544,9 +544,9 @@ session = chipinpay.CheckoutSession.<span className="text-blue-400">create</span
                  </div>
               </div>
 
-              <div className="p-6 rounded-xl bg-card border border-white/5">
+              <div className="p-4 md:p-6 rounded-xl bg-card border border-white/5">
                 <h3 className="font-bold mb-3">Component Props</h3>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-white/5">

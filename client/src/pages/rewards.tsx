@@ -160,18 +160,18 @@ function BadgeCard({ badge }: { badge: Badge }) {
 function PointsCard({ points }: { points: PointsData }) {
   return (
     <Card className="bg-gradient-to-br from-amber-500 to-orange-600 text-white border-0">
-      <CardContent className="pt-6">
-        <div className="flex items-center justify-between mb-6">
+      <CardContent className="pt-4 sm:pt-6 px-4 sm:px-6">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
           <div>
-            <p className="text-amber-100 text-sm mb-1">Your Level</p>
-            <div className="flex items-center gap-2">
-              <Crown className="w-8 h-8" />
-              <span className="text-4xl font-bold">{points.level}</span>
+            <p className="text-amber-100 text-xs sm:text-sm mb-1">Your Level</p>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <Crown className="w-6 h-6 sm:w-8 sm:h-8" />
+              <span className="text-2xl sm:text-4xl font-bold">{points.level}</span>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-amber-100 text-sm mb-1">Total Points</p>
-            <p className="text-3xl font-bold">{points.lifetimePoints.toLocaleString()}</p>
+            <p className="text-amber-100 text-xs sm:text-sm mb-1">Total Points</p>
+            <p className="text-xl sm:text-3xl font-bold">{points.lifetimePoints.toLocaleString()}</p>
           </div>
         </div>
         
@@ -186,27 +186,27 @@ function PointsCard({ points }: { points: PointsData }) {
           </p>
         </div>
         
-        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-amber-400/30">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-3 sm:pt-4 border-t border-amber-400/30">
           <div className="text-center">
-            <div className="flex items-center justify-center gap-1 mb-1">
-              <Flame className="w-4 h-4 text-red-300" />
-              <span className="text-xl font-bold">{points.currentStreak}</span>
+            <div className="flex items-center justify-center gap-1 mb-0.5 sm:mb-1">
+              <Flame className="w-3 h-3 sm:w-4 sm:h-4 text-red-300" />
+              <span className="text-base sm:text-xl font-bold">{points.currentStreak}</span>
             </div>
-            <p className="text-xs text-amber-200">Day Streak</p>
+            <p className="text-[10px] sm:text-xs text-amber-200">Day Streak</p>
           </div>
           <div className="text-center">
-            <div className="flex items-center justify-center gap-1 mb-1">
-              <Zap className="w-4 h-4 text-yellow-300" />
-              <span className="text-xl font-bold">{points.longestStreak}</span>
+            <div className="flex items-center justify-center gap-1 mb-0.5 sm:mb-1">
+              <Zap className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-300" />
+              <span className="text-base sm:text-xl font-bold">{points.longestStreak}</span>
             </div>
-            <p className="text-xs text-amber-200">Best Streak</p>
+            <p className="text-[10px] sm:text-xs text-amber-200">Best Streak</p>
           </div>
           <div className="text-center">
-            <div className="flex items-center justify-center gap-1 mb-1">
-              <Star className="w-4 h-4 text-white" />
-              <span className="text-xl font-bold">{points.points}</span>
+            <div className="flex items-center justify-center gap-1 mb-0.5 sm:mb-1">
+              <Star className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
+              <span className="text-base sm:text-xl font-bold">{points.points}</span>
             </div>
-            <p className="text-xs text-amber-200">Available</p>
+            <p className="text-[10px] sm:text-xs text-amber-200">Available</p>
           </div>
         </div>
       </CardContent>
@@ -229,7 +229,7 @@ function LeaderboardCard({ leaderboard, userRank }: { leaderboard: LeaderboardEn
             key={entry.userId}
             data-testid={`leaderboard-entry-${entry.userId}`}
             className={cn(
-              "flex items-center gap-3 p-3 rounded-lg",
+              "flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg",
               index === 0 && "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800",
               index === 1 && "bg-zinc-100 dark:bg-zinc-800/50",
               index === 2 && "bg-orange-50 dark:bg-orange-950/30",
@@ -237,7 +237,7 @@ function LeaderboardCard({ leaderboard, userRank }: { leaderboard: LeaderboardEn
             )}
           >
             <div className={cn(
-              "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm",
+              "w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm shrink-0",
               index === 0 && "bg-amber-500 text-white",
               index === 1 && "bg-zinc-400 text-white",
               index === 2 && "bg-orange-400 text-white",
@@ -329,16 +329,16 @@ export default function Rewards() {
     <Layout>
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
         <header className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center gap-4">
+          <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               <Link href="/dashboard">
                 <Button variant="ghost" size="icon" data-testid="back-button">
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
               </Link>
               <div>
-                <h1 className="text-xl font-bold">Rewards & Achievements</h1>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                <h1 className="text-lg sm:text-xl font-bold">Rewards & Achievements</h1>
+                <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
                   Earn points and unlock badges
                 </p>
               </div>
@@ -346,7 +346,7 @@ export default function Rewards() {
           </div>
         </header>
         
-        <main className="container mx-auto px-4 py-6 max-w-4xl">
+        <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-4xl">
           {pointsLoading ? (
             <Skeleton className="h-48 rounded-xl mb-6" />
           ) : points ? (
@@ -357,17 +357,18 @@ export default function Rewards() {
           
           <Tabs defaultValue="badges" className="space-y-6">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="badges" data-testid="tab-badges">
-                <Medal className="w-4 h-4 mr-2" />
+              <TabsTrigger value="badges" data-testid="tab-badges" className="text-xs sm:text-sm px-1 sm:px-3">
+                <Medal className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 Badges
               </TabsTrigger>
-              <TabsTrigger value="history" data-testid="tab-history">
-                <Star className="w-4 h-4 mr-2" />
+              <TabsTrigger value="history" data-testid="tab-history" className="text-xs sm:text-sm px-1 sm:px-3">
+                <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 History
               </TabsTrigger>
-              <TabsTrigger value="leaderboard" data-testid="tab-leaderboard">
-                <Trophy className="w-4 h-4 mr-2" />
-                Leaderboard
+              <TabsTrigger value="leaderboard" data-testid="tab-leaderboard" className="text-xs sm:text-sm px-1 sm:px-3">
+                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Leaderboard</span>
+                <span className="sm:hidden">Board</span>
               </TabsTrigger>
             </TabsList>
             
@@ -398,18 +399,18 @@ export default function Rewards() {
               </div>
               
               {badgesLoading ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
                   {[...Array(6)].map((_, i) => (
                     <Skeleton key={i} className="h-36 rounded-xl" />
                   ))}
                 </div>
               ) : filteredBadges.length === 0 ? (
-                <Card className="p-8 text-center">
+                <Card className="p-6 sm:p-8 text-center">
                   <Medal className="w-12 h-12 mx-auto text-zinc-300 mb-4" />
                   <p className="text-zinc-500">No badges in this category yet</p>
                 </Card>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
                   {filteredBadges
                     .sort((a, b) => (b.earned ? 1 : 0) - (a.earned ? 1 : 0))
                     .map(badge => (

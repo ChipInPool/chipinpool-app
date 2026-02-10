@@ -433,12 +433,12 @@ export default function PoolDetails() {
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto">
-        <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
+      <div className="max-w-5xl mx-auto px-1 sm:px-0">
+        <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4 md:mb-6 transition-colors">
           <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
         </Link>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
           <div className="lg:col-span-2 space-y-6">
             <div className={`relative rounded-3xl overflow-hidden border border-white/5 bg-card/50 ${pool.image ? 'aspect-video' : ''}`}>
               {pool.image && (
@@ -447,8 +447,8 @@ export default function PoolDetails() {
                   <div className="absolute inset-0 bg-linear-to-t from-background/90 via-transparent to-transparent" />
                 </>
               )}
-              <div className={`${pool.image ? 'absolute bottom-0 left-0 right-0' : 'relative'} p-6 md:p-8`}>
-                <div className="flex flex-wrap items-center gap-3 mb-3">
+              <div className={`${pool.image ? 'absolute bottom-0 left-0 right-0' : 'relative'} p-4 md:p-8`}>
+                <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2 md:mb-3">
                   <span className="px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider backdrop-blur-md">
                     {pool.category}
                   </span>
@@ -457,7 +457,7 @@ export default function PoolDetails() {
                     {pool.status === 'active' ? `Ends ${formatDistanceToNow(new Date(pool.deadline), { addSuffix: true })}` : 'Completed'}
                   </div>
                 </div>
-                <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground dark:text-white mb-3 break-words">{pool.title}</h1>
+                <h1 className="text-2xl md:text-4xl font-display font-bold text-foreground dark:text-white mb-2 md:mb-3 break-words">{pool.title}</h1>
                 <Link 
                   href={isCreator ? '/profile' : `/user/${pool.creatorId}`}
                   className="flex items-center gap-3 text-muted-foreground dark:text-white/80 hover:text-foreground dark:hover:text-white transition-colors w-fit"
@@ -472,15 +472,15 @@ export default function PoolDetails() {
               </div>
             </div>
 
-            <div className="p-6 rounded-2xl bg-card border border-white/5">
-              <h3 className="font-display font-bold text-xl mb-4">About this Pool</h3>
+            <div className="p-3 md:p-6 rounded-2xl bg-card border border-white/5">
+              <h3 className="font-display font-bold text-lg md:text-xl mb-3 md:mb-4">About this Pool</h3>
               <p className="text-muted-foreground leading-relaxed">
                 {pool.description || "No description provided."}
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-card border border-white/5">
-              <h3 className="font-display font-bold text-xl mb-6">
+            <div className="p-3 md:p-6 rounded-2xl bg-card border border-white/5">
+              <h3 className="font-display font-bold text-lg md:text-xl mb-4 md:mb-6">
                 Contributors ({isPublicView ? (pool.contributorCount || 0) : contributors.length})
               </h3>
               <div className="space-y-4">
@@ -526,9 +526,9 @@ export default function PoolDetails() {
           </div>
 
           <div className="lg:col-span-1">
-            <div className="sticky top-24 p-6 rounded-3xl bg-card border border-white/10 shadow-2xl shadow-black/50">
-              <div className="flex flex-col items-center mb-8 relative">
-                <div className="w-48 h-48">
+            <div className="sticky top-24 p-4 md:p-6 rounded-3xl bg-card border border-white/10 shadow-2xl shadow-black/50">
+              <div className="flex flex-col items-center mb-6 md:mb-8 relative">
+                <div className="w-36 h-36 md:w-48 md:h-48">
                   <CircularProgressbarWithChildren 
                     value={percentage} 
                     styles={buildStyles({
@@ -538,8 +538,8 @@ export default function PoolDetails() {
                     })}
                   >
                     <div className="text-center flex flex-col items-center">
-                      <span className="text-4xl font-display font-bold text-white tracking-tighter">${currentAmount.toLocaleString()}</span>
-                      <span className="text-sm text-muted-foreground uppercase tracking-wider font-medium mt-1">of ${targetAmount.toLocaleString()}</span>
+                      <span className="text-2xl md:text-4xl font-display font-bold text-white tracking-tighter">${currentAmount.toLocaleString()}</span>
+                      <span className="text-xs md:text-sm text-muted-foreground uppercase tracking-wider font-medium mt-1">of ${targetAmount.toLocaleString()}</span>
                     </div>
                   </CircularProgressbarWithChildren>
                 </div>
@@ -588,7 +588,7 @@ export default function PoolDetails() {
                     
                     {paymentStep === 'amount' ? (
                       <div className="grid gap-6 py-4 animate-in fade-in slide-in-from-left-4">
-                        <div className="grid grid-cols-4 gap-4">
+                        <div className="grid grid-cols-4 gap-2 md:gap-4">
                           {[25, 50, 100].map((amt) => (
                             <Button 
                               key={amt} 
@@ -727,7 +727,7 @@ export default function PoolDetails() {
                       </div>
                     )}
 
-                    <DialogFooter className="sm:justify-between gap-4">
+                    <DialogFooter className="flex-col sm:flex-row sm:justify-between gap-3 sm:gap-4">
                       <div className="flex items-center text-sm text-muted-foreground">
                         {paymentStep === 'amount' && (
                           <>
@@ -865,7 +865,7 @@ export default function PoolDetails() {
 
                 {/* Authenticated user actions - hide for guests */}
                 {isAuthenticated && (
-                <div className={`grid gap-3 ${isCreator ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                <div className={`grid gap-2 md:gap-3 ${isCreator ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
                   <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
                     <DialogTrigger asChild>
                       <Button variant="outline" className="h-12 border-white/10 hover:bg-white/5" data-testid="button-invite">
@@ -878,7 +878,7 @@ export default function PoolDetails() {
                         <DialogDescription>Invite friends to chip in!</DialogDescription>
                       </DialogHeader>
                       <Tabs defaultValue="share" className="w-full">
-                        <TabsList className="w-full grid grid-cols-3 bg-white/5">
+                        <TabsList className="w-full grid grid-cols-3 bg-white/5 text-xs sm:text-sm">
                           <TabsTrigger value="share" className="data-[state=active]:bg-primary/20" data-testid="tab-share-link">
                             <LinkIcon className="w-4 h-4 mr-2" /> Share Link
                           </TabsTrigger>
@@ -891,7 +891,7 @@ export default function PoolDetails() {
                         </TabsList>
                         
                         <TabsContent value="share" className="space-y-4 pt-4">
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                             <Button 
                               variant="outline" 
                               className="h-12 border-white/10 hover:bg-white/5 justify-start"
@@ -1216,7 +1216,7 @@ export default function PoolDetails() {
                               data-testid="input-edit-description"
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label htmlFor="edit-target">Target Amount ($)</Label>
                               <Input 

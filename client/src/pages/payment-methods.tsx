@@ -385,23 +385,23 @@ export default function PaymentMethods() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto p-4 space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold">Payment Methods</h1>
-          <p className="text-muted-foreground">Manage your payment methods for deposits and withdrawals</p>
+      <div className="max-w-4xl mx-auto px-2 sm:px-4 space-y-4 md:space-y-6">
+        <div className="space-y-1 md:space-y-2">
+          <h1 className="text-2xl md:text-3xl font-bold">Payment Methods</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Manage your payment methods for deposits and withdrawals</p>
         </div>
 
         <Card className="bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-2 px-4 md:px-6">
             <div className="flex items-center gap-3">
-              <Shield className="w-6 h-6 text-primary" />
+              <Shield className="w-5 h-5 md:w-6 md:h-6 text-primary" />
               <div>
                 <CardTitle>Withdrawal Status</CardTitle>
                 <CardDescription>Link a bank account to receive funds</CardDescription>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 md:px-6">
             {canReceivePayouts ? (
               <div className="flex items-center gap-3 p-3 bg-green-500/10 rounded-lg border border-green-500/20">
                 <CheckCircle className="w-5 h-5 text-green-400" />
@@ -475,18 +475,18 @@ export default function PaymentMethods() {
                   <div className="space-y-2">
                     {bankAccountsList.map((account: any) => (
                       <div key={account.id} className="p-3 bg-white/5 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Building className="w-4 h-4 text-muted-foreground" />
-                            <div>
-                              <p className="text-sm font-medium">{account.institutionName}</p>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Building className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{account.institutionName}</p>
                               <p className="text-xs text-muted-foreground">
                                 {account.accountType} ••••{account.accountMask}
                                 {account.isDefault && <span className="ml-2 text-cyan-400">(Default)</span>}
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
                             {!account.isDefault && (
                               <Button
                                 variant="ghost"
@@ -539,7 +539,7 @@ export default function PaymentMethods() {
                 <Button 
                   onClick={handleLinkBank}
                   variant={bankAccountsList.length > 0 ? "outline" : "default"}
-                  className={bankAccountsList.length > 0 ? "" : "bg-gradient-to-r from-cyan-500 to-blue-500 w-full"}
+                  className={bankAccountsList.length > 0 ? "w-full md:w-auto" : "bg-gradient-to-r from-cyan-500 to-blue-500 w-full"}
                   data-testid="button-link-bank"
                   disabled={bankLinkLoading || completeBankLinkMutation.isPending}
                 >
@@ -648,18 +648,18 @@ export default function PaymentMethods() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="space-y-2 p-4 bg-white/5 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+              <div className="space-y-2 p-3 md:p-4 bg-white/5 rounded-lg">
                 <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold">1</div>
                 <h3 className="font-medium">Link a Payment Method</h3>
                 <p className="text-sm text-muted-foreground">Connect your bank account securely through Stripe</p>
               </div>
-              <div className="space-y-2 p-4 bg-white/5 rounded-lg">
+              <div className="space-y-2 p-3 md:p-4 bg-white/5 rounded-lg">
                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">2</div>
                 <h3 className="font-medium">Complete Verification</h3>
                 <p className="text-sm text-muted-foreground">Verify your identity once to enable withdrawals to all linked accounts</p>
               </div>
-              <div className="space-y-2 p-4 bg-white/5 rounded-lg">
+              <div className="space-y-2 p-3 md:p-4 bg-white/5 rounded-lg">
                 <div className="w-8 h-8 rounded-full bg-lime-500/20 flex items-center justify-center text-lime-400 font-bold">3</div>
                 <h3 className="font-medium">Deposit & Withdraw</h3>
                 <p className="text-sm text-muted-foreground">Add funds or withdraw from pool contributions anytime</p>

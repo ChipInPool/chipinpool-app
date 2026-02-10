@@ -87,12 +87,12 @@ export default function Home() {
 
   return (
     <Layout>
-      <div className="mb-8">
-        <h1 className="text-3xl font-display font-bold mb-2">
+      <div className="mb-4 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-display font-bold mb-2">
           Welcome back, {user?.firstName}!
         </h1>
-        <div className="flex items-center gap-3">
-          <p className="text-muted-foreground">Here's what's happening with your pools and wallet.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+          <p className="text-sm md:text-base text-muted-foreground">Here's what's happening with your pools and wallet.</p>
           <Button
             variant="ghost"
             size="sm"
@@ -105,16 +105,16 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
         <Card className="bg-white/[0.02] border-white/5">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-6 md:pb-2">
             <FeatureTooltip id="stat-wallet" title="Wallet Balance" description="Your ChipIn wallet holds your funds. Deposit money via Stripe to start contributing to pools.">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Wallet Balance</CardTitle>
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Wallet Balance</CardTitle>
             </FeatureTooltip>
             <Wallet className="h-4 w-4 text-primary" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono">${parseFloat(user?.balance || '0').toLocaleString()}</div>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+            <div className="text-xl md:text-2xl font-bold font-mono">${parseFloat(user?.balance || '0').toLocaleString()}</div>
             <Link href="/profile?action=deposit">
               <p className="text-xs text-primary hover:underline cursor-pointer mt-1">+ Add funds</p>
             </Link>
@@ -122,79 +122,79 @@ export default function Home() {
         </Card>
 
         <Card className="bg-white/[0.02] border-white/5">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-6 md:pb-2">
             <FeatureTooltip id="stat-active-pools" title="Active Pools" description="Pools you've created that are currently accepting contributions.">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Active Pools</CardTitle>
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Active Pools</CardTitle>
             </FeatureTooltip>
             <TrendingUp className="h-4 w-4 text-green-400" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{activePools.length}</div>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+            <div className="text-xl md:text-2xl font-bold">{activePools.length}</div>
             <p className="text-xs text-muted-foreground mt-1">{myPools.length} total created</p>
           </CardContent>
         </Card>
 
         <Card className="bg-white/[0.02] border-white/5">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-6 md:pb-2">
             <FeatureTooltip id="stat-total-contributed" title="Total Contributed" description="The total amount you've contributed across all pools you've joined.">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Contributed</CardTitle>
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Total Contributed</CardTitle>
             </FeatureTooltip>
             <DollarSign className="h-4 w-4 text-accent" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono">${totalContributed.toLocaleString()}</div>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+            <div className="text-xl md:text-2xl font-bold font-mono">${totalContributed.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground mt-1">Across {contributedPools.length} pools</p>
           </CardContent>
         </Card>
 
         <Card className="bg-white/[0.02] border-white/5">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-6 md:pb-2">
             <FeatureTooltip id="stat-pools-created" title="Pools Created" description="The number of pools you've started. Create pools for trips, gifts, events, and more.">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Pools Created</CardTitle>
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Pools Created</CardTitle>
             </FeatureTooltip>
             <Users className="h-4 w-4 text-purple-400" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{poolsCreatedCount}</div>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+            <div className="text-xl md:text-2xl font-bold">{poolsCreatedCount}</div>
             <p className="text-xs text-muted-foreground mt-1">{activePools.length} currently active</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 mb-8 md:mb-12">
         <div className="lg:col-span-2">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-display font-bold">Quick Actions</h2>
+          <div className="flex items-center justify-between mb-4 md:mb-6">
+            <h2 className="text-lg md:text-xl font-display font-bold">Quick Actions</h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
             <Link href="/create">
-              <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-colors cursor-pointer text-center" data-testid="quick-action-create-pool">
-                <Plus className="w-6 h-6 mx-auto mb-2 text-primary" />
-                <span className="text-sm font-medium">New Pool</span>
+              <div className="p-3 md:p-4 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-colors cursor-pointer text-center" data-testid="quick-action-create-pool">
+                <Plus className="w-5 h-5 md:w-6 md:h-6 mx-auto mb-1.5 md:mb-2 text-primary" />
+                <span className="text-xs md:text-sm font-medium">New Pool</span>
               </div>
             </Link>
             <Link href="/profile?action=deposit">
-              <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 hover:bg-green-500/20 transition-colors cursor-pointer text-center" data-testid="quick-action-deposit">
-                <Wallet className="w-6 h-6 mx-auto mb-2 text-green-400" />
-                <span className="text-sm font-medium">Deposit</span>
+              <div className="p-3 md:p-4 rounded-xl bg-green-500/10 border border-green-500/20 hover:bg-green-500/20 transition-colors cursor-pointer text-center" data-testid="quick-action-deposit">
+                <Wallet className="w-5 h-5 md:w-6 md:h-6 mx-auto mb-1.5 md:mb-2 text-green-400" />
+                <span className="text-xs md:text-sm font-medium">Deposit</span>
               </div>
             </Link>
             <Link href="/explore">
-              <div className="p-4 rounded-xl bg-accent/10 border border-accent/20 hover:bg-accent/20 transition-colors cursor-pointer text-center" data-testid="quick-action-explore">
-                <Users className="w-6 h-6 mx-auto mb-2 text-accent" />
-                <span className="text-sm font-medium">Explore</span>
+              <div className="p-3 md:p-4 rounded-xl bg-accent/10 border border-accent/20 hover:bg-accent/20 transition-colors cursor-pointer text-center" data-testid="quick-action-explore">
+                <Users className="w-5 h-5 md:w-6 md:h-6 mx-auto mb-1.5 md:mb-2 text-accent" />
+                <span className="text-xs md:text-sm font-medium">Explore</span>
               </div>
             </Link>
             <Link href="/profile">
-              <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 transition-colors cursor-pointer text-center" data-testid="quick-action-profile">
-                <CreditCard className="w-6 h-6 mx-auto mb-2 text-purple-400" />
-                <span className="text-sm font-medium">My Cards</span>
+              <div className="p-3 md:p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 transition-colors cursor-pointer text-center" data-testid="quick-action-profile">
+                <CreditCard className="w-5 h-5 md:w-6 md:h-6 mx-auto mb-1.5 md:mb-2 text-purple-400" />
+                <span className="text-xs md:text-sm font-medium">My Cards</span>
               </div>
             </Link>
           </div>
 
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-display font-bold">Your Pools</h2>
+            <h2 className="text-lg md:text-xl font-display font-bold">Your Pools</h2>
             <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary" asChild>
               <Link href="/explore">View All <ArrowRight className="w-4 h-4 ml-1" /></Link>
             </Button>
@@ -207,7 +207,7 @@ export default function Home() {
               ))}
             </div>
           ) : myPools.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
+            <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 md:p-8 text-center">
               <p className="text-muted-foreground mb-4">You haven't created any pools yet</p>
               <Button asChild>
                 <Link href="/create"><Plus className="w-4 h-4 mr-2" /> Create Your First Pool</Link>
@@ -224,7 +224,7 @@ export default function Home() {
           {contributedPools.length > 0 && (
             <>
               <div className="flex items-center justify-between mb-4 mt-8">
-                <h2 className="text-xl font-display font-bold">Pools You've Joined</h2>
+                <h2 className="text-lg md:text-xl font-display font-bold">Pools You've Joined</h2>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {contributedPools.slice(0, 4).map((pool: any) => (
@@ -238,7 +238,7 @@ export default function Home() {
         <div className="space-y-6">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-display font-bold flex items-center gap-2">
+              <h2 className="text-lg md:text-xl font-display font-bold flex items-center gap-2">
                 <Activity className="w-5 h-5 text-primary" /> Friend Activity
               </h2>
               <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary" asChild>
@@ -286,7 +286,7 @@ export default function Home() {
 
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-display font-bold flex items-center gap-2">
+              <h2 className="text-lg md:text-xl font-display font-bold flex items-center gap-2">
                 <Bell className="w-5 h-5" /> Notifications
               </h2>
             </div>

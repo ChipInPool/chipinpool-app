@@ -223,14 +223,14 @@ export default function CreatePool() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto">
-        <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
+      <div className="max-w-2xl mx-auto px-1 sm:px-0">
+        <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4 md:mb-6 transition-colors">
           <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
         </Link>
         
-        <div className="mb-8">
-          <h1 className="text-3xl font-display font-bold mb-2">Create a New Pool</h1>
-          <p className="text-muted-foreground">Set up a pool to split costs for a gift, trip, or purchase.</p>
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-2xl md:text-3xl font-display font-bold mb-2">Create a New Pool</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Set up a pool to split costs for a gift, trip, or purchase.</p>
         </div>
 
         <div className="mb-8">
@@ -258,7 +258,7 @@ export default function CreatePool() {
                   setDescription(template.desc);
                   setIsRecurring(template.category === "recurring");
                 }}
-                className="p-4 rounded-xl border border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all text-left group"
+                className="p-3 md:p-4 rounded-xl border border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all text-left group"
                 data-testid={`template-${template.label.toLowerCase().replace(' ', '-')}`}
               >
                 <template.icon className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors mb-2" />
@@ -269,7 +269,7 @@ export default function CreatePool() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8">
           <div className="space-y-6">
             <div className="space-y-4">
               <Label htmlFor="title" className="text-base">What are you pooling for?</Label>
@@ -319,7 +319,7 @@ export default function CreatePool() {
                 <h3 className="font-semibold text-sm mb-3 text-primary flex items-center gap-2">
                   <RefreshCw className="w-4 h-4" /> Recurring Settings
                 </h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Frequency</Label>
                     <Select defaultValue="monthly" onValueChange={setFrequency}>
@@ -478,12 +478,12 @@ export default function CreatePool() {
             </div>
           </div>
 
-          <div className="flex justify-end gap-4 pt-4">
-            <Button type="button" variant="ghost" onClick={() => setLocation("/")}>Cancel</Button>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 sm:gap-4 pt-4">
+            <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => setLocation("/")}>Cancel</Button>
             <Button 
               type="submit" 
               size="lg" 
-              className="w-full md:w-auto font-semibold shadow-lg shadow-primary/20" 
+              className="w-full sm:w-auto font-semibold shadow-lg shadow-primary/20" 
               disabled={createPoolMutation.isPending}
               data-testid="button-create-pool"
             >

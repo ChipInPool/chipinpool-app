@@ -99,7 +99,7 @@ function PushNotificationsSection() {
 
   if (!pushSupported) {
     return (
-      <div className="p-6 rounded-2xl bg-card border border-white/5">
+      <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5">
         <h3 className="font-bold flex items-center gap-2 mb-4">
           <Smartphone className="w-4 h-4 text-orange-400" /> Push Notifications
         </h3>
@@ -111,7 +111,7 @@ function PushNotificationsSection() {
   }
 
   return (
-    <div className="p-6 rounded-2xl bg-card border border-white/5">
+    <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5">
       <h3 className="font-bold flex items-center gap-2 mb-4">
         <Smartphone className="w-4 h-4 text-orange-400" /> Push Notifications
       </h3>
@@ -350,29 +350,29 @@ export default function Settings() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" asChild data-testid="button-back">
+      <div className="max-w-2xl mx-auto px-1 sm:px-0">
+        <div className="flex items-center justify-between mb-6 md:mb-8 gap-2">
+          <div className="flex items-center gap-3 md:gap-4 min-w-0">
+            <Button variant="ghost" size="icon" asChild data-testid="button-back" className="shrink-0">
               <Link href="/profile">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
             </Button>
-            <div>
-              <h1 className="text-2xl font-display font-bold">Settings</h1>
-              <p className="text-sm text-muted-foreground">Manage your preferences</p>
+            <div className="min-w-0">
+              <h1 className="text-xl md:text-2xl font-display font-bold">Settings</h1>
+              <p className="text-xs md:text-sm text-muted-foreground">Manage your preferences</p>
             </div>
           </div>
           {hasChanges && (
-            <Button onClick={() => saveMutation.mutate(prefs)} disabled={saveMutation.isPending} data-testid="button-save">
+            <Button onClick={() => saveMutation.mutate(prefs)} disabled={saveMutation.isPending} data-testid="button-save" className="shrink-0">
               <Save className="w-4 h-4 mr-2" />
-              {saveMutation.isPending ? "Saving..." : "Save Changes"}
+              {saveMutation.isPending ? "Saving..." : "Save"}
             </Button>
           )}
         </div>
 
-        <div className="space-y-6">
-          <div className="p-6 rounded-2xl bg-card border border-white/5">
+        <div className="space-y-4 md:space-y-6">
+          <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5">
             <h3 className="font-bold flex items-center gap-2 mb-4">
               <Sun className="w-4 h-4 text-yellow-400" /> Appearance
             </h3>
@@ -404,8 +404,8 @@ export default function Settings() {
             </div>
           </div>
 
-          <div className="p-6 rounded-2xl bg-card border border-white/5">
-            <div className="flex items-center justify-between mb-4">
+          <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
               <h3 className="font-bold flex items-center gap-2">
                 <User className="w-4 h-4 text-purple-400" /> Profile Information
               </h3>
@@ -415,6 +415,7 @@ export default function Settings() {
                   onClick={() => profileMutation.mutate(profile)} 
                   disabled={profileMutation.isPending}
                   data-testid="button-save-profile"
+                  className="w-full sm:w-auto"
                 >
                   {profileMutation.isPending ? (
                     <>
@@ -431,8 +432,7 @@ export default function Settings() {
               )}
             </div>
             <div className="space-y-4">
-              {/* Profile Picture */}
-              <div className="flex items-center gap-6">
+              <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
                 <div className="relative group">
                   <Avatar className="w-24 h-24 border-2 border-white/10">
                     <AvatarImage src={user?.avatar || undefined} alt={user?.firstName || 'User'} />
@@ -461,13 +461,13 @@ export default function Settings() {
                     data-testid="input-avatar"
                   />
                 </div>
-                <div>
+                <div className="text-center sm:text-left">
                   <p className="font-medium">Profile Picture</p>
                   <p className="text-sm text-muted-foreground">Click the photo to change it</p>
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="mt-2 border-white/10"
+                    className="mt-2 border-white/10 w-full sm:w-auto"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploadingAvatar}
                     data-testid="button-upload-photo"
@@ -577,7 +577,7 @@ export default function Settings() {
             </div>
           </div>
 
-          <div className="p-6 rounded-2xl bg-card border border-white/5">
+          <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5">
             <h3 className="font-bold flex items-center gap-2 mb-4">
               <Mail className="w-4 h-4 text-blue-400" /> Email Notifications
             </h3>
@@ -639,7 +639,7 @@ export default function Settings() {
             </div>
           </div>
 
-          <div className="p-6 rounded-2xl bg-card border border-white/5">
+          <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5">
             <h3 className="font-bold flex items-center gap-2 mb-4">
               <Phone className="w-4 h-4 text-green-400" /> SMS Notifications
             </h3>
@@ -702,7 +702,7 @@ export default function Settings() {
 
           <PushNotificationsSection />
 
-          <div className="p-6 rounded-2xl bg-card border border-white/5">
+          <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5">
             <h3 className="font-bold flex items-center gap-2 mb-4">
               <Shield className="w-4 h-4 text-red-400" /> Security & Privacy
             </h3>
