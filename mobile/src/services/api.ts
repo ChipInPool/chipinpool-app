@@ -88,16 +88,11 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
 export const api = {
   auth: {
     me: () => fetchApi<any>('/api/auth/me'),
-    login: async (email: string, password: string) => {
-      const result = await fetchApi<any>('/api/auth/login', {
+    login: (email: string, password: string) =>
+      fetchApi<any>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
-      });
-      if (result.sessionId) {
-        await saveSessionCookie(`connect.sid=${result.sessionId}`);
-      }
-      return result;
-    },
+      }),
     register: (data: {
       firstName: string;
       lastName: string;

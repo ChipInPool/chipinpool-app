@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import rateLimit from "express-rate-limit";
+import cors from "cors";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { fileStorageService, isAzureStorage } from "./fileStorage";
 import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, walletDeposits, bankAccounts, merchantPayouts, payMeTransactions, apiAccessRequests, poolActivities } from "@shared/schema";
@@ -130,6 +131,27 @@ export async function registerRoutes(
 
   // Apply general rate limiting to all API routes
   app.use('/api/', generalRateLimiter);
+
+  const allowedOrigins = [
+    'https://chipinpool.com',
+    'https://www.chipinpool.com',
+    'https://chipinpool-csekdvghcqepcthm.centralus-01.azurewebsites.net',
+  ];
+  if (process.env.NODE_ENV !== 'production') {
+    allowedOrigins.push('http://localhost:5000', 'http://localhost:3000', 'http://0.0.0.0:5000');
+  }
+  app.use(cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  }));
 
   // Session middleware
   app.use(
@@ -395,7 +417,7 @@ export async function registerRoutes(
       req.session.save((err) => {
         if (err) return next(err);
         const { password, ...userWithoutPassword } = user;
-        res.json({ user: userWithoutPassword, sessionId: req.sessionID });
+        res.json({ user: userWithoutPassword });
       });
     } catch (error) {
       next(error);
@@ -432,7 +454,7 @@ export async function registerRoutes(
       req.session.save((err) => {
         if (err) return next(err);
         const { password, ...userWithoutPassword } = user;
-        res.json({ user: userWithoutPassword, sessionId: req.sessionID });
+        res.json({ user: userWithoutPassword });
       });
     } catch (error) {
       next(error);
