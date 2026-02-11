@@ -65,7 +65,7 @@
       "policy": "appVersion"
     },
     "extra": {
-      "apiUrl": "https://chipinpool.replit.app",
+      "apiUrl": "https://chipinpool.azurewebsites.net",
       "eas": {
         "projectId": "36899060-b8b7-49a1-90d0-fc1b0062c7a7"
       }
