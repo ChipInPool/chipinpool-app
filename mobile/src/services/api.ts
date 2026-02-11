@@ -44,7 +44,10 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
     (headers as Record<string, string>)['Cookie'] = sessionCookie;
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  const url = `${API_URL}${endpoint}`;
+  console.log('[API] Request:', options.method || 'GET', endpoint);
+
+  const response = await fetch(url, {
     ...options,
     headers,
     credentials: 'include',
@@ -52,25 +55,49 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
 
   const setCookie = response.headers.get('set-cookie');
   if (setCookie) {
-    await saveSessionCookie(setCookie);
+    const sidMatch = setCookie.match(/connect\.sid=([^;]+)/);
+    if (sidMatch) {
+      await saveSessionCookie(`connect.sid=${sidMatch[1]}`);
+    } else {
+      await saveSessionCookie(setCookie.split(';')[0]);
+    }
   }
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(error.message || error.error || 'Request failed');
+    const errorText = await response.text();
+    console.error('[API] Error:', response.status, endpoint, errorText.substring(0, 200));
+    let error: any;
+    try {
+      error = JSON.parse(errorText);
+    } catch {
+      error = { message: `Request failed (${response.status})` };
+    }
+    throw new Error(error.message || error.error || `Request failed (${response.status})`);
   }
 
-  return response.json();
+  const text = await response.text();
+  if (!text) return {} as T;
+  try {
+    return JSON.parse(text);
+  } catch {
+    console.error('[API] Invalid JSON response:', endpoint, text.substring(0, 200));
+    return {} as T;
+  }
 }
 
 export const api = {
   auth: {
     me: () => fetchApi<any>('/api/auth/me'),
-    login: (email: string, password: string) =>
-      fetchApi<any>('/api/auth/login', {
+    login: async (email: string, password: string) => {
+      const result = await fetchApi<any>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
-      }),
+      });
+      if (result.sessionId) {
+        await saveSessionCookie(`connect.sid=${result.sessionId}`);
+      }
+      return result;
+    },
     register: (data: {
       firstName: string;
       lastName: string;
@@ -223,4 +250,4 @@ export const api = {
   },
 };
 
-export { clearSessionCookie, API_URL };
+export default api;

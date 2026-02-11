@@ -141,7 +141,7 @@ export async function registerRoutes(
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        sameSite: "none",
       },
       proxy: true, // Trust the reverse proxy
     })
@@ -392,8 +392,11 @@ export async function registerRoutes(
       }
 
       req.session.userId = user.id;
-      const { password, ...userWithoutPassword } = user;
-      res.json({ user: userWithoutPassword });
+      req.session.save((err) => {
+        if (err) return next(err);
+        const { password, ...userWithoutPassword } = user;
+        res.json({ user: userWithoutPassword, sessionId: req.sessionID });
+      });
     } catch (error) {
       next(error);
     }
@@ -426,8 +429,11 @@ export async function registerRoutes(
       }
 
       req.session.userId = user.id;
-      const { password, ...userWithoutPassword } = user;
-      res.json({ user: userWithoutPassword });
+      req.session.save((err) => {
+        if (err) return next(err);
+        const { password, ...userWithoutPassword } = user;
+        res.json({ user: userWithoutPassword, sessionId: req.sessionID });
+      });
     } catch (error) {
       next(error);
     }
