@@ -2,7 +2,7 @@
   "expo": {
     "name": "ChipIn",
     "slug": "chipinpool",
-    "version": "1.1.0",
+    "version": "2.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
