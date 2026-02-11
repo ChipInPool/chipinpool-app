@@ -79,6 +79,7 @@ export default function RegisterScreen() {
           </TouchableOpacity>
 
           <View style={styles.header}>
+            <Text style={styles.appName}>ChipInPool</Text>
             <Text style={styles.title}>{step === 'info' ? 'Create account' : 'Verify phone'}</Text>
             <Text style={styles.subtitle}>
               {step === 'info' ? 'Enter your details to get started' : `Enter the code sent to ${phone}`}
@@ -156,6 +157,7 @@ const styles = StyleSheet.create({
   backButton: { marginBottom: 20 },
   backButtonText: { color: '#7FFFD4', fontSize: 16 },
   header: { marginBottom: 32 },
+  appName: { fontSize: 22, fontWeight: 'bold', color: '#7FFFD4', marginBottom: 12 },
   title: { fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 8 },
   subtitle: { fontSize: 16, color: '#708090' },
   errorContainer: { backgroundColor: 'rgba(239, 68, 68, 0.2)', padding: 12, borderRadius: 8, marginBottom: 16 },

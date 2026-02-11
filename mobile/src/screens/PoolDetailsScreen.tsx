@@ -59,8 +59,8 @@ export default function PoolDetailsScreen() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Check out this pool on ChipIn: https://chipinpool.azurewebsites.net/pool/${poolId}`,
-        url: `https://chipinpool.azurewebsites.net/pool/${poolId}`,
+        message: `Check out this pool on ChipInPool: https://chipinpool.com/pool/${poolId}`,
+        url: `https://chipinpool.com/pool/${poolId}`,
       });
     } catch (error) {}
   };

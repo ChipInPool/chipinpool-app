@@ -46,6 +46,7 @@ export default function HomeScreen() {
       >
         <View style={styles.headerRow}>
           <View>
+            <Text style={styles.appBrand}>ChipInPool</Text>
             <Text style={styles.greeting}>Hello, {user?.firstName}!</Text>
             <Text style={styles.subGreeting}>Here's your overview</Text>
           </View>
@@ -169,6 +170,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#001F3F' },
   scrollContent: { padding: 20 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
+  appBrand: { fontSize: 14, fontWeight: '600', color: '#7FFFD4', marginBottom: 4, letterSpacing: 1 },
   greeting: { fontSize: 28, fontWeight: 'bold', color: '#fff' },
   subGreeting: { fontSize: 16, color: '#708090', marginTop: 4 },
   bellContainer: { position: 'relative', padding: 4 },

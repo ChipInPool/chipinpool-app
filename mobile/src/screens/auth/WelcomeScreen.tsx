@@ -14,6 +14,11 @@ export default function WelcomeScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.logoContainer}>
+          <Image
+            source={require('../../../assets/icon.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
           <Text style={styles.logo}>ChipInPool</Text>
           <Text style={styles.tagline}>Pool funds. Share expenses. Pay together.</Text>
         </View>
@@ -25,11 +30,11 @@ export default function WelcomeScreen() {
         </View>
 
         <View style={styles.buttons}>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('Register')}>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('Register')} data-testid="button-get-started">
             <Text style={styles.primaryButtonText}>Get Started</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('Login')}>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('Login')} data-testid="button-login">
             <Text style={styles.secondaryButtonText}>I already have an account</Text>
           </TouchableOpacity>
         </View>
@@ -62,7 +67,13 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 60,
+    marginTop: 40,
+  },
+  logoImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    marginBottom: 16,
   },
   logo: {
     fontSize: 36,

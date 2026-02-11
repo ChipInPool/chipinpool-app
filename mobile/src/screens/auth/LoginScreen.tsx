@@ -46,6 +46,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           <View style={styles.header}>
+            <Text style={styles.appName}>ChipInPool</Text>
             <Text style={styles.title}>Welcome back</Text>
             <Text style={styles.subtitle}>Sign in to your account</Text>
           </View>
@@ -119,6 +120,12 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 32,
+  },
+  appName: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#7FFFD4',
+    marginBottom: 12,
   },
   title: {
     fontSize: 28,
