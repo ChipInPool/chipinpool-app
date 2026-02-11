@@ -1,0 +1,52 @@
+App Name: ChipIn
+
+Subtitle (30 chars): Pool Funds. Spend Together.
+
+Description:
+
+ChipIn makes group money simple. Whether you're splitting a trip, collecting for a gift, or pooling funds with friends for a big purchase — ChipIn handles it all in one app.
+
+Create a pool, invite your crew, and watch contributions roll in. When you're ready to spend, use your virtual Visa card linked directly to your pool — online or in-store.
+
+KEY FEATURES
+
+Pool Funds Together
+Set up pools for trips, events, gifts, or anything else. Share a link, and anyone can chip in. Track progress with real-time updates and hit your goal faster.
+
+Virtual Visa Cards
+Get a virtual debit card tied to your pool. Use it anywhere Visa is accepted — online shopping, subscriptions, or tap-to-pay in stores.
+
+Pay Me Back Links
+Send a simple link to collect money from anyone — no sign-up required for them.
+
+Spend Now Marketplace
+Browse curated partner stores and shop directly with your pool funds. Exclusive discounts from partnered businesses.
+
+Wallet & Bank Transfers
+Deposit funds, track your balance, and withdraw to your bank account whenever you want.
+
+Smart Auto-Contributions
+Set up recurring contributions so you never forget to chip in. Weekly, biweekly, or monthly — you choose.
+
+Secure by Design
+Identity verification (KYC), two-factor authentication, and encrypted transactions keep your money safe.
+
+Real-Time Notifications
+Get instant alerts when someone contributes, when your pool hits a milestone, or when your card is used.
+
+Rewards & Badges
+Earn points and unlock badges as you contribute and create pools. Climb the leaderboard and show off your ChipIn status.
+
+Download ChipIn today and take the hassle out of group money.
+
+Keywords: pool money, split bills, group payments, virtual card, send money, chip in, fund pool, group wallet, shared spending, social payments
+
+Promotional Text (170 chars): Pool money with friends, spend together with virtual Visa cards, and shop exclusive partner deals. Group payments made simple.
+
+What's New (v2.0.1):
+
+New app branding and logo
+Improved connection to backend services
+Spend Now marketplace with partner discounts
+Enhanced push notifications
+Bug fixes and performance improvements
