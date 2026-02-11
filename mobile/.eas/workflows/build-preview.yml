@@ -1,0 +1,19 @@
+name: Build Preview for Testing
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build_ios_preview:
+    name: Build iOS Preview
+    type: build
+    params:
+      platform: ios
+      profile: preview
+
+  build_android_preview:
+    name: Build Android Preview
+    type: build
+    params:
+      platform: android
+      profile: preview
