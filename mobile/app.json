@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.chipinpool.mobile",
-      "buildNumber": "7",
+      "buildNumber": "8",
       "infoPlist": {
         "NSCameraUsageDescription": "ChipIn needs camera access for identity verification and profile photos.",
         "NSPhotoLibraryUsageDescription": "ChipIn needs photo library access to upload profile photos.",
@@ -35,7 +35,7 @@
         "backgroundColor": "#001F3F"
       },
       "package": "com.chipinpool.app",
-      "versionCode": 7,
+      "versionCode": 8,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",

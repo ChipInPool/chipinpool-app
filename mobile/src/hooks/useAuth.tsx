@@ -30,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [needs2FA, setNeeds2FA] = useState(false);
+  const [pendingMfaUserId, setPendingMfaUserId] = useState<string | null>(null);
 
   const refreshUser = async () => {
     try {
@@ -57,8 +58,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const result = await api.auth.login(email, password);
-    if (result.requires2FA) {
+    if (result.mfaRequired) {
       setNeeds2FA(true);
+      setPendingMfaUserId(result.userId);
       return;
     }
     setUser(result);
@@ -66,9 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const verify2FA = async (code: string) => {
-    const result = await api.auth.verify2FA(code);
-    setUser(result);
+    const userData = await api.auth.verify2FA(code, pendingMfaUserId || '');
+    setUser(userData);
     setNeeds2FA(false);
+    setPendingMfaUserId(null);
   };
 
   const logout = async () => {

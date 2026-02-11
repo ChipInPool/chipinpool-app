@@ -23,7 +23,7 @@ async function saveSessionCookie(cookie: string) {
   }
 }
 
-async function clearSessionCookie() {
+export async function clearSessionCookie() {
   try {
     sessionCookie = null;
     await SecureStore.deleteItemAsync('session_cookie');
@@ -87,12 +87,20 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
 
 export const api = {
   auth: {
-    me: () => fetchApi<any>('/api/auth/me'),
-    login: (email: string, password: string) =>
-      fetchApi<any>('/api/auth/login', {
+    me: async () => {
+      const result = await fetchApi<any>('/api/auth/me');
+      return result.user;
+    },
+    login: async (email: string, password: string) => {
+      const result = await fetchApi<any>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
-      }),
+      });
+      if (result.mfaRequired) {
+        return result;
+      }
+      return result.user;
+    },
     register: (data: {
       firstName: string;
       lastName: string;
@@ -123,11 +131,13 @@ export const api = {
       await clearSessionCookie();
       return result;
     },
-    verify2FA: (code: string) =>
-      fetchApi<any>('/api/auth/verify-2fa', {
+    verify2FA: async (code: string, userId: string) => {
+      const result = await fetchApi<any>('/api/auth/verify-mfa', {
         method: 'POST',
-        body: JSON.stringify({ code }),
-      }),
+        body: JSON.stringify({ code, userId }),
+      });
+      return result.user;
+    },
   },
   user: {
     getProfile: () => fetchApi<any>('/api/users/me'),
@@ -138,7 +148,10 @@ export const api = {
       }),
   },
   pools: {
-    list: () => fetchApi<any>('/api/pools'),
+    list: async () => {
+      const result = await fetchApi<any>('/api/pools');
+      return result.pools || [];
+    },
     get: (id: string) => fetchApi<any>(`/api/pools/${id}`),
     create: (data: any) =>
       fetchApi<any>('/api/pools', {
@@ -170,7 +183,10 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ amount }),
       }),
-    getTransactions: () => fetchApi<any>('/api/wallet/transactions'),
+    getTransactions: async () => {
+      const result = await fetchApi<any>('/api/wallet/transactions');
+      return result.transactions || [];
+    },
   },
   bankAccounts: {
     list: () => fetchApi<any>('/api/bank-accounts'),
@@ -217,12 +233,18 @@ export const api = {
     get: (id: string) => fetchApi<any>(`/api/partners/${id}`),
   },
   notifications: {
-    list: () => fetchApi<any>('/api/notifications'),
+    list: async () => {
+      const result = await fetchApi<any>('/api/notifications');
+      return result.notifications || [];
+    },
     markAllRead: () =>
       fetchApi<any>('/api/notifications/mark-all-read', { method: 'POST' }),
   },
   activity: {
-    feed: () => fetchApi<any>('/api/activity-feed'),
+    feed: async () => {
+      const result = await fetchApi<any>('/api/activity-feed');
+      return result.activities || [];
+    },
   },
   rewards: {
     badges: () => fetchApi<any>('/api/rewards/badges'),
