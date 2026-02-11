@@ -11,5 +11,15 @@
         "whatsNew": "New app branding and logo\nImproved connection to backend services\nSpend Now marketplace with partner discounts\nEnhanced push notifications\nBug fixes and performance improvements"
       }
     }
+  },
+  "android": {
+    "info": {
+      "en-US": {
+        "title": "ChipIn",
+        "shortDescription": "Pool money with friends, spend together with virtual Visa cards. Group payments made simple.",
+        "fullDescription": "ChipIn makes group money simple. Whether you're splitting a trip, collecting for a gift, or pooling funds with friends for a big purchase — ChipIn handles it all in one app.\n\nCreate a pool, invite your crew, and watch contributions roll in. When you're ready to spend, use your virtual Visa card linked directly to your pool — online or in-store.\n\nKEY FEATURES\n\n★ Pool Funds Together\nSet up pools for trips, events, gifts, or anything else. Share a link, and anyone can chip in. Track progress with real-time updates and hit your goal faster.\n\n★ Virtual Visa Cards\nGet a virtual debit card tied to your pool. Use it anywhere Visa is accepted — online shopping, subscriptions, or tap-to-pay in stores.\n\n★ Pay Me Back Links\nSend a simple link to collect money from anyone — no sign-up required for them.\n\n★ Spend Now Marketplace\nBrowse curated partner stores and shop directly with your pool funds. Exclusive discounts from partnered businesses.\n\n★ Wallet & Bank Transfers\nDeposit funds, track your balance, and withdraw to your bank account whenever you want.\n\n★ Smart Auto-Contributions\nSet up recurring contributions so you never forget to chip in. Weekly, biweekly, or monthly — you choose.\n\n★ Secure by Design\nIdentity verification (KYC), two-factor authentication, and encrypted transactions keep your money safe.\n\n★ Real-Time Notifications\nGet instant alerts when someone contributes, when your pool hits a milestone, or when your card is used.\n\n★ Rewards & Badges\nEarn points and unlock badges as you contribute and create pools. Climb the leaderboard and show off your ChipIn status.\n\nDownload ChipIn today and take the hassle out of group money.",
+        "releaseNotes": "New app branding and logo\nImproved connection to backend services\nSpend Now marketplace with partner discounts\nEnhanced push notifications\nBug fixes and performance improvements"
+      }
+    }
   }
 }
