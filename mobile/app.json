@@ -56,7 +56,9 @@
           "color": "#7FFFD4"
         }
       ],
-      "expo-updates"
+      "expo-updates",
+      "expo-font",
+      "expo-asset"
     ],
     "owner": "chipinpool",
     "runtimeVersion": {
