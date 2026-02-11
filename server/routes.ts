@@ -4438,6 +4438,209 @@ export async function registerRoutes(
     }
   });
 
+  // Refund all contributions back to contributors' wallets proportionally (atomic)
+  app.post("/api/pools/:id/refund-all", requireAuth, async (req, res, next) => {
+    try {
+      const poolId = req.params.id;
+      const userId = req.session.userId!;
+
+      const pool = await storage.getPool(poolId);
+      if (!pool) {
+        return res.status(404).json({ message: "Pool not found" });
+      }
+
+      if (pool.creatorId !== userId) {
+        return res.status(403).json({ message: "Only the pool creator can refund contributions" });
+      }
+
+      const refunds: { userId: string; name: string; amount: string }[] = [];
+
+      await db.transaction(async (tx) => {
+        const [lockedPool] = await tx.select().from(pools).where(eq(pools.id, poolId)).for('update');
+        const lockedRemainingBalance = parseFloat(lockedPool.currentAmount) - parseFloat(lockedPool.spentAmount);
+        if (lockedRemainingBalance <= 0) {
+          throw new Error("No remaining balance to refund");
+        }
+
+        const allContributions = await tx.select().from(contributions).where(eq(contributions.poolId, poolId));
+        const totalContributed = allContributions.reduce((sum, c) => sum + parseFloat(c.amount), 0);
+        if (totalContributed <= 0) {
+          throw new Error("No contributions to refund");
+        }
+
+        let totalRefunded = 0;
+        const refundEntries: { userId: string; amount: number; name: string }[] = [];
+
+        for (const contribution of allContributions) {
+          if (!contribution.userId) continue;
+
+          const [contributor] = await tx.select().from(users).where(eq(users.id, contribution.userId)).for('update');
+          if (!contributor) continue;
+
+          const proportionalShare = (parseFloat(contribution.amount) / totalContributed) * lockedRemainingBalance;
+          const refundAmount = Math.round(proportionalShare * 100) / 100;
+
+          if (refundAmount <= 0) continue;
+
+          refundEntries.push({
+            userId: contribution.userId,
+            amount: refundAmount,
+            name: `${contributor.firstName} ${contributor.lastName}`,
+          });
+          totalRefunded += refundAmount;
+        }
+
+        // Adjust rounding to ensure exact balance match
+        if (refundEntries.length > 0 && Math.abs(totalRefunded - lockedRemainingBalance) < 0.1) {
+          const diff = Math.round((lockedRemainingBalance - totalRefunded) * 100) / 100;
+          if (diff !== 0) {
+            refundEntries[refundEntries.length - 1].amount = Math.round((refundEntries[refundEntries.length - 1].amount + diff) * 100) / 100;
+          }
+        }
+
+        for (const entry of refundEntries) {
+          if (entry.amount <= 0) continue;
+
+          await tx.update(users).set({
+            balance: sql`(CAST(${users.balance} AS DECIMAL) + ${entry.amount.toFixed(2)})::TEXT`
+          }).where(eq(users.id, entry.userId));
+
+          refunds.push({
+            userId: entry.userId,
+            name: entry.name,
+            amount: entry.amount.toFixed(2),
+          });
+        }
+
+        await tx.update(pools).set({
+          currentAmount: lockedPool.spentAmount,
+          updatedAt: new Date(),
+          ...(req.body.closePool ? { status: 'completed' as const } : {}),
+        }).where(eq(pools.id, poolId));
+      });
+
+      for (const refund of refunds) {
+        await storage.createPoolActivity({
+          poolId,
+          userId: refund.userId,
+          type: 'refund',
+          amount: refund.amount,
+          description: `Pool refund to ${refund.name}`,
+        });
+
+        await storage.createNotification({
+          userId: refund.userId,
+          type: 'contribution',
+          title: 'Pool Refund',
+          message: `You received a refund of $${refund.amount} from the pool "${pool.title}"`,
+          link: `/pools/${poolId}`,
+        });
+      }
+
+      res.json({
+        message: `Successfully refunded ${refunds.length} contributor(s)`,
+        refunds,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Distribute custom amounts from pool balance to specified user wallets (atomic)
+  app.post("/api/pools/:id/distribute", requireAuth, async (req, res, next) => {
+    try {
+      const poolId = req.params.id;
+      const userId = req.session.userId!;
+
+      const distributeSchema = z.object({
+        distributions: z.array(z.object({
+          userId: z.string(),
+          amount: z.string(),
+        })),
+        closePool: z.boolean().optional(),
+      });
+
+      const data = distributeSchema.parse(req.body);
+
+      const pool = await storage.getPool(poolId);
+      if (!pool) {
+        return res.status(404).json({ message: "Pool not found" });
+      }
+
+      if (pool.creatorId !== userId) {
+        return res.status(403).json({ message: "Only the pool creator can distribute funds" });
+      }
+
+      const distributions: { userId: string; name: string; amount: string }[] = [];
+
+      await db.transaction(async (tx) => {
+        const [lockedPool] = await tx.select().from(pools).where(eq(pools.id, poolId)).for('update');
+        const lockedRemainingBalance = parseFloat(lockedPool.currentAmount) - parseFloat(lockedPool.spentAmount);
+        const totalDistribution = data.distributions.reduce((sum, d) => sum + parseFloat(d.amount), 0);
+
+        if (totalDistribution > lockedRemainingBalance) {
+          throw new Error("Distribution total exceeds available balance");
+        }
+
+        let actualDistributed = 0;
+
+        for (const dist of data.distributions) {
+          const [targetUser] = await tx.select().from(users).where(eq(users.id, dist.userId)).for('update');
+          if (!targetUser) continue;
+
+          const distAmount = parseFloat(dist.amount);
+          if (distAmount <= 0) continue;
+
+          await tx.update(users).set({
+            balance: sql`(CAST(${users.balance} AS DECIMAL) + ${distAmount.toFixed(2)})::TEXT`
+          }).where(eq(users.id, targetUser.id));
+
+          actualDistributed += distAmount;
+
+          distributions.push({
+            userId: dist.userId,
+            name: `${targetUser.firstName} ${targetUser.lastName}`,
+            amount: dist.amount,
+          });
+        }
+
+        await tx.update(pools).set({
+          currentAmount: sql`(CAST(${pools.currentAmount} AS DECIMAL) - ${actualDistributed.toFixed(2)})::TEXT`,
+          updatedAt: new Date(),
+        }).where(eq(pools.id, poolId));
+
+        if (data.closePool) {
+          await tx.update(pools).set({ status: 'completed' }).where(eq(pools.id, poolId));
+        }
+      });
+
+      for (const dist of distributions) {
+        await storage.createPoolActivity({
+          poolId,
+          userId: dist.userId,
+          type: 'distribution',
+          amount: dist.amount,
+          description: `Distributed to ${dist.name}`,
+        });
+
+        await storage.createNotification({
+          userId: dist.userId,
+          type: 'contribution',
+          title: 'Pool Distribution',
+          message: `You received $${parseFloat(dist.amount).toFixed(2)} from the pool "${pool.title}"`,
+          link: `/pools/${poolId}`,
+        });
+      }
+
+      res.json({
+        message: `Successfully distributed to ${distributions.length} user(s)`,
+        distributions,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Get pending transfer requests for current user
   app.get("/api/transfer-requests/pending", requireAuth, async (req, res, next) => {
     try {

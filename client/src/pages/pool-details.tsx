@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3, RefreshCw, Building2, ImagePlus, Upload, X, Activity, ArrowUpRight, ArrowDownLeft, ShoppingBag } from "lucide-react";
+import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3, RefreshCw, Building2, ImagePlus, Upload, X, Activity, ArrowUpRight, ArrowDownLeft, ShoppingBag, Undo2, ArrowDownToLine, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useRoute, useLocation } from "wouter";
@@ -81,6 +81,13 @@ export default function PoolDetails() {
   const [editImage, setEditImage] = useState("");
   const [isUploadingPoolImage, setIsUploadingPoolImage] = useState(false);
   const poolImageInputRef = useRef<HTMLInputElement>(null);
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [distributeDialogOpen, setDistributeDialogOpen] = useState(false);
+  const [distributions, setDistributions] = useState<{userId: string, name: string, amount: string}[]>([]);
+  const [closePoolAfterAction, setClosePoolAfterAction] = useState(false);
+  const [isRefunding, setIsRefunding] = useState(false);
+  const [isDistributing, setIsDistributing] = useState(false);
+  const [refundResults, setRefundResults] = useState<{userId: string, name: string, amount: string}[] | null>(null);
 
   // Fetch pool data - use public endpoint if not authenticated
   const { data: poolData, isLoading: poolLoading } = useQuery({
@@ -299,6 +306,7 @@ export default function PoolDetails() {
   const comments = pool.comments || [];
   const creator = pool.creator || { name: 'Unknown', avatar: null };
   const isCreator = pool.creatorId === user?.id;
+  const remainingBalance = parseFloat(pool?.currentAmount || '0') - parseFloat(pool?.spentAmount || '0');
 
   const handleChipIn = async () => {
     setIsChippingIn(true);
@@ -396,6 +404,78 @@ export default function PoolDetails() {
     setEditDeadline(pool.deadline ? format(new Date(pool.deadline), 'yyyy-MM-dd') : "");
     setEditImage(pool.image || "");
     setEditDialogOpen(true);
+  };
+
+  const handleRefundAll = async () => {
+    setIsRefunding(true);
+    try {
+      const res = await fetch(`/api/pools/${params?.id}/refund-all`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ closePool: closePoolAfterAction }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error || 'Refund failed');
+      setRefundResults(data.refunds);
+      toast({ title: "Refunds Processed", description: data.message });
+      queryClient.invalidateQueries({ queryKey: queryKeys.pool(params?.id || '') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.pools });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user });
+    } catch (error: any) {
+      toast({ title: "Refund Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsRefunding(false);
+    }
+  };
+
+  const handleDistribute = async () => {
+    const validDistributions = distributions.filter(d => d.userId && parseFloat(d.amount) > 0);
+    if (validDistributions.length === 0) {
+      toast({ title: "No Distributions", description: "Please add at least one distribution", variant: "destructive" });
+      return;
+    }
+    setIsDistributing(true);
+    try {
+      const res = await fetch(`/api/pools/${params?.id}/distribute`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          distributions: validDistributions.map(d => ({ userId: d.userId, amount: d.amount })),
+          closePool: closePoolAfterAction,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error || 'Distribution failed');
+      toast({ title: "Funds Distributed", description: data.message });
+      setDistributeDialogOpen(false);
+      setDistributions([]);
+      setClosePoolAfterAction(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.pool(params?.id || '') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.pools });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user });
+    } catch (error: any) {
+      toast({ title: "Distribution Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsDistributing(false);
+    }
+  };
+
+  const addDistribution = () => {
+    setDistributions(prev => [...prev, { userId: '', name: '', amount: '' }]);
+  };
+
+  const removeDistribution = (index: number) => {
+    setDistributions(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateDistribution = (index: number, field: string, value: string) => {
+    setDistributions(prev => prev.map((d, i) => i === index ? { ...d, [field]: value } : d));
+  };
+
+  const setDistributionFromContributor = (index: number, contributor: any) => {
+    setDistributions(prev => prev.map((d, i) => i === index ? { ...d, userId: contributor.id, name: `${contributor.name}` } : d));
   };
 
   const confettiConfig = {
@@ -667,6 +747,173 @@ export default function PoolDetails() {
                         <ShoppingBag className="w-5 h-5 mr-2" /> Spend Now Marketplace
                       </Link>
                     </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Dialog open={refundDialogOpen} onOpenChange={(open) => { setRefundDialogOpen(open); if (!open) { setRefundResults(null); setClosePoolAfterAction(false); } }}>
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="border-white/10 hover:border-orange-500/30 hover:text-orange-400"
+                            disabled={remainingBalance <= 0}
+                            data-testid="button-refund-contributors"
+                          >
+                            <Undo2 className="w-4 h-4 mr-2" /> Refund
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md bg-card border-white/10">
+                          <DialogHeader>
+                            <DialogTitle>Refund Contributors</DialogTitle>
+                            <DialogDescription>
+                              Refund the remaining pool balance back to contributors proportionally.
+                            </DialogDescription>
+                          </DialogHeader>
+                          {refundResults ? (
+                            <div className="space-y-4">
+                              <div className="text-sm text-green-400 font-medium">Refunds processed successfully!</div>
+                              <div className="space-y-2 max-h-48 overflow-y-auto">
+                                {refundResults.map((r: any, i: number) => (
+                                  <div key={i} className="flex items-center justify-between p-2 rounded bg-white/5">
+                                    <span className="text-sm">{r.name}</span>
+                                    <span className="text-sm font-mono text-green-400">${parseFloat(r.amount).toFixed(2)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              <Button className="w-full" onClick={() => { setRefundDialogOpen(false); setRefundResults(null); }}>
+                                Done
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                                <div className="text-sm text-muted-foreground">Available to refund</div>
+                                <div className="text-2xl font-bold font-mono">${remainingBalance.toFixed(2)}</div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Checkbox 
+                                  id="close-pool-refund" 
+                                  checked={closePoolAfterAction}
+                                  onCheckedChange={(checked) => setClosePoolAfterAction(!!checked)}
+                                />
+                                <Label htmlFor="close-pool-refund" className="text-sm">Close pool after refund</Label>
+                              </div>
+                              <DialogFooter>
+                                <Button variant="outline" onClick={() => setRefundDialogOpen(false)}>Cancel</Button>
+                                <Button 
+                                  onClick={handleRefundAll} 
+                                  disabled={isRefunding || remainingBalance <= 0}
+                                  className="bg-orange-500 hover:bg-orange-600"
+                                  data-testid="button-confirm-refund"
+                                >
+                                  {isRefunding ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Refunding...</> : 'Refund All'}
+                                </Button>
+                              </DialogFooter>
+                            </div>
+                          )}
+                        </DialogContent>
+                      </Dialog>
+
+                      <Dialog open={distributeDialogOpen} onOpenChange={(open) => { setDistributeDialogOpen(open); if (!open) { setDistributions([]); setClosePoolAfterAction(false); } }}>
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="outline"
+                            className="border-white/10 hover:border-green-500/30 hover:text-green-400"
+                            disabled={remainingBalance <= 0}
+                            data-testid="button-distribute-balance"
+                          >
+                            <ArrowDownToLine className="w-4 h-4 mr-2" /> Distribute
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-lg bg-card border-white/10">
+                          <DialogHeader>
+                            <DialogTitle>Distribute Pool Balance</DialogTitle>
+                            <DialogDescription>
+                              Send custom amounts from the pool to specific wallets.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                              <div className="text-sm text-muted-foreground">Available to distribute</div>
+                              <div className="text-2xl font-bold font-mono">${remainingBalance.toFixed(2)}</div>
+                              {distributions.length > 0 && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Distributing: ${distributions.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0).toFixed(2)}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="space-y-3 max-h-60 overflow-y-auto">
+                              {distributions.map((dist, index) => (
+                                <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
+                                  <Select
+                                    value={dist.userId}
+                                    onValueChange={(value) => {
+                                      const contributor = contributors.find((c: any) => c.id === value);
+                                      if (contributor) setDistributionFromContributor(index, contributor);
+                                    }}
+                                  >
+                                    <SelectTrigger className="flex-1 bg-white/5 border-white/10" data-testid={`select-distribute-user-${index}`}>
+                                      <SelectValue placeholder="Select user" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {contributors.filter((c: any) => c.id).map((c: any) => (
+                                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="$0.00"
+                                    value={dist.amount}
+                                    onChange={(e) => updateDistribution(index, 'amount', e.target.value)}
+                                    className="w-24 bg-white/5 border-white/10 text-right font-mono"
+                                    data-testid={`input-distribute-amount-${index}`}
+                                  />
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => removeDistribution(index)}
+                                    className="shrink-0 text-red-400 hover:text-red-300"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+
+                            <Button 
+                              variant="outline" 
+                              className="w-full border-dashed border-white/10"
+                              onClick={addDistribution}
+                              data-testid="button-add-distribution"
+                            >
+                              <Plus className="w-4 h-4 mr-2" /> Add Recipient
+                            </Button>
+
+                            <div className="flex items-center gap-2">
+                              <Checkbox 
+                                id="close-pool-distribute" 
+                                checked={closePoolAfterAction}
+                                onCheckedChange={(checked) => setClosePoolAfterAction(!!checked)}
+                              />
+                              <Label htmlFor="close-pool-distribute" className="text-sm">Close pool after distribution</Label>
+                            </div>
+
+                            <DialogFooter>
+                              <Button variant="outline" onClick={() => setDistributeDialogOpen(false)}>Cancel</Button>
+                              <Button 
+                                onClick={handleDistribute} 
+                                disabled={isDistributing || distributions.length === 0}
+                                className="bg-green-600 hover:bg-green-700"
+                                data-testid="button-confirm-distribute"
+                              >
+                                {isDistributing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Distributing...</> : 'Distribute Funds'}
+                              </Button>
+                            </DialogFooter>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   </>
                 )}
 

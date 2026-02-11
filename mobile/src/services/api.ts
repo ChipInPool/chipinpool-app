@@ -130,6 +130,16 @@ export const api = {
       }),
     getContributions: (poolId: string) => 
       fetchApi<any>(`/api/pools/${poolId}/contributions`),
+    refundAll: (poolId: string, closePool?: boolean) =>
+      fetchApi<any>(`/api/pools/${poolId}/refund-all`, {
+        method: 'POST',
+        body: JSON.stringify({ closePool }),
+      }),
+    distribute: (poolId: string, distributions: {userId: string, amount: string}[], closePool?: boolean) =>
+      fetchApi<any>(`/api/pools/${poolId}/distribute`, {
+        method: 'POST',
+        body: JSON.stringify({ distributions, closePool }),
+      }),
   },
   wallet: {
     getBalance: () => fetchApi<any>('/api/wallet/balance'),
