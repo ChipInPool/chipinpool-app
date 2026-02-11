@@ -3,7 +3,7 @@ export default ({ config }) => {
     ...config,
     extra: {
       ...config.extra,
-      apiUrl: process.env.API_URL || 'https://chipinpool.com',
+      apiUrl: process.env.API_URL || 'https://chipinpool-csekdvghcqepcthm.centralus-01.azurewebsites.net',
     },
   };
 };
