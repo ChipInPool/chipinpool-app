@@ -144,6 +144,19 @@ export const api = {
       }
       return result.user;
     },
+    loginUsername: async (username: string, password: string) => {
+      const result = await fetchApi<any>('/api/auth/login-username', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      });
+      if (result.sessionToken) {
+        await saveSessionCookie(result.sessionToken);
+      }
+      if (result.mfaRequired) {
+        return result;
+      }
+      return result.user;
+    },
     register: (data: {
       firstName: string;
       lastName: string;

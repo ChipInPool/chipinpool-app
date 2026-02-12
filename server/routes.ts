@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import session from "express-session";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
+const cookieSignature = require("cookie-signature");
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { fileStorageService, isAzureStorage } from "./fileStorage";
 import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, walletDeposits, bankAccounts, merchantPayouts, payMeTransactions, apiAccessRequests, poolActivities } from "@shared/schema";
@@ -108,6 +109,11 @@ export async function registerRoutes(
       throw new Error('SESSION_SECRET environment variable is required in production');
     }
     console.warn('[Security Warning] SESSION_SECRET not set - using insecure default for development only');
+  }
+  
+  const effectiveSecret = sessionSecret || 'dev-only-insecure-secret-do-not-use-in-production';
+  function signedSessionToken(sessionID: string): string {
+    return `connect.sid=s%3A${cookieSignature.sign(sessionID, effectiveSecret)}`;
   }
   
   // Rate limiting for authentication endpoints (prevent brute force attacks)
@@ -417,7 +423,7 @@ export async function registerRoutes(
       req.session.save((err) => {
         if (err) return next(err);
         const { password, ...userWithoutPassword } = user;
-        res.json({ user: userWithoutPassword, sessionToken: `connect.sid=${req.sessionID}` });
+        res.json({ user: userWithoutPassword, sessionToken: signedSessionToken(req.sessionID) });
       });
     } catch (error) {
       next(error);
@@ -454,7 +460,7 @@ export async function registerRoutes(
       req.session.save((err) => {
         if (err) return next(err);
         const { password, ...userWithoutPassword } = user;
-        res.json({ user: userWithoutPassword, sessionToken: `connect.sid=${req.sessionID}` });
+        res.json({ user: userWithoutPassword, sessionToken: signedSessionToken(req.sessionID) });
       });
     } catch (error) {
       next(error);
@@ -500,7 +506,7 @@ export async function registerRoutes(
       req.session.save((err) => {
         if (err) return next(err);
         const { password, ...userWithoutPassword } = user;
-        res.json({ user: userWithoutPassword, sessionToken: `connect.sid=${req.sessionID}` });
+        res.json({ user: userWithoutPassword, sessionToken: signedSessionToken(req.sessionID) });
       });
     } catch (error) {
       next(error);
@@ -714,7 +720,7 @@ export async function registerRoutes(
       req.session.save((err) => {
         if (err) return next(err);
         const { password, ...userWithoutPassword } = user;
-        res.json({ user: userWithoutPassword, sessionToken: `connect.sid=${req.sessionID}` });
+        res.json({ user: userWithoutPassword, sessionToken: signedSessionToken(req.sessionID) });
       });
     } catch (error) {
       next(error);

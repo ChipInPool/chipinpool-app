@@ -13,9 +13,11 @@ type LoginTab = 'email' | 'phone' | 'username';
 
 export default function LoginScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { sendOTP, verifyOTP } = useAuth();
+  const { sendOTP, verifyOTP, loginWithUsername } = useAuth();
   const [activeTab, setActiveTab] = useState<LoginTab>('email');
   const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [step, setStep] = useState<'identifier' | 'otp'>('identifier');
   const [isLoading, setIsLoading] = useState(false);
@@ -23,6 +25,8 @@ export default function LoginScreen() {
   const [maskedTarget, setMaskedTarget] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState<string>('');
   const hiddenInputRef = useRef<TextInput>(null);
+
+  const isUsernameTab = activeTab === 'username';
 
   const getPlaceholder = () => {
     switch (activeTab) {
@@ -70,6 +74,35 @@ export default function LoginScreen() {
       setIsLoading(false);
     }
   };
+
+  const handleUsernameLogin = async () => {
+    if (!identifier.trim()) {
+      setError('Please enter your username');
+      return;
+    }
+    if (!password.trim()) {
+      setError('Please enter your password');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      await loginWithUsername(identifier.trim(), password);
+    } catch (err: any) {
+      setError(err.message || 'Invalid username or password');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const { needs2FA } = useAuth();
+  React.useEffect(() => {
+    if (needs2FA) {
+      navigation.navigate('Verify2FA');
+    }
+  }, [needs2FA]);
 
   const handleOtpChange = (value: string) => {
     const cleaned = value.replace(/[^0-9]/g, '').slice(0, 6);
@@ -132,7 +165,23 @@ export default function LoginScreen() {
   const handleTabChange = (tab: LoginTab) => {
     setActiveTab(tab);
     setIdentifier('');
+    setPassword('');
     setError('');
+  };
+
+  const handleSubmit = () => {
+    if (isUsernameTab) {
+      handleUsernameLogin();
+    } else {
+      handleSendOTP();
+    }
+  };
+
+  const isSubmitDisabled = () => {
+    if (isUsernameTab) {
+      return !identifier.trim() || !password.trim() || isLoading;
+    }
+    return !identifier.trim() || isLoading;
   };
 
   return (
@@ -149,7 +198,9 @@ export default function LoginScreen() {
             <Text style={styles.title}>{step === 'identifier' ? 'Welcome back' : 'Enter your code'}</Text>
             <Text style={styles.subtitle}>
               {step === 'identifier'
-                ? 'Sign in with a one-time code sent to your email or phone'
+                ? isUsernameTab
+                  ? 'Sign in with your username and password'
+                  : 'Sign in with a one-time code sent to your email or phone'
                 : `We sent a 6-digit code to ${maskedTarget}`
               }
             </Text>
@@ -203,19 +254,49 @@ export default function LoginScreen() {
                     autoFocus
                   />
                 </View>
+
+                {isUsernameTab && (
+                  <View style={styles.inputWrapper}>
+                    <Ionicons
+                      name="lock-closed-outline"
+                      size={20}
+                      color="#708090"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Password"
+                      placeholderTextColor="#708090"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry={!showPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                      <Ionicons
+                        name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                        size={20}
+                        color="#708090"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
 
               <TouchableOpacity
-                style={[styles.primaryButton, (!identifier.trim() || isLoading) && styles.disabledButton]}
-                onPress={handleSendOTP}
-                disabled={!identifier.trim() || isLoading}
+                style={[styles.primaryButton, isSubmitDisabled() && styles.disabledButton]}
+                onPress={handleSubmit}
+                disabled={isSubmitDisabled()}
               >
                 {isLoading ? (
                   <ActivityIndicator color="#001F3F" />
                 ) : (
                   <View style={styles.buttonContent}>
-                    <Text style={styles.primaryButtonText}>Send Login Code</Text>
-                    <Ionicons name="arrow-forward" size={18} color="#001F3F" />
+                    <Text style={styles.primaryButtonText}>
+                      {isUsernameTab ? 'Sign In' : 'Send Login Code'}
+                    </Text>
+                    <Ionicons name={isUsernameTab ? 'log-in-outline' : 'arrow-forward'} size={18} color="#001F3F" />
                   </View>
                 )}
               </TouchableOpacity>
@@ -223,7 +304,10 @@ export default function LoginScreen() {
               <View style={styles.infoCard}>
                 <Ionicons name="shield-checkmark-outline" size={18} color="#7FFFD4" />
                 <Text style={styles.infoText}>
-                  No password needed. We'll send a secure one-time code to verify your identity.
+                  {isUsernameTab
+                    ? 'Sign in securely with your username and password.'
+                    : 'No password needed. We\'ll send a secure one-time code to verify your identity.'
+                  }
                 </Text>
               </View>
             </View>
@@ -392,7 +476,7 @@ const styles = StyleSheet.create({
     color: '#7FFFD4',
   },
   inputContainer: {
-    gap: 8,
+    gap: 12,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -405,6 +489,9 @@ const styles = StyleSheet.create({
   },
   inputIcon: {
     marginRight: 12,
+  },
+  eyeIcon: {
+    padding: 4,
   },
   input: {
     flex: 1,
