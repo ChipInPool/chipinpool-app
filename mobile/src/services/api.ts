@@ -158,7 +158,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    contribute: (poolId: string, amount: number) =>
+    contribute: (poolId: string, amount: string) =>
       fetchApi<any>(`/api/pools/${poolId}/contribute`, {
         method: 'POST',
         body: JSON.stringify({ amount }),

@@ -29,10 +29,21 @@ export default function PoolsScreen() {
       >
         <View style={styles.poolHeader}>
           <View style={styles.poolEmoji}>
-            <Text style={styles.poolEmojiText}>{pool.emoji || '💰'}</Text>
+            <Ionicons
+              name={
+                pool.category === 'Gift' ? 'gift' :
+                pool.category === 'Trip' ? 'airplane' :
+                pool.category === 'Purchase' ? 'cart' :
+                pool.category === 'Event' ? 'calendar' :
+                pool.category === 'Recurring' ? 'repeat' :
+                'ellipsis-horizontal'
+              }
+              size={24}
+              color="#7FFFD4"
+            />
           </View>
           <View style={styles.poolInfo}>
-            <Text style={styles.poolName}>{pool.name}</Text>
+            <Text style={styles.poolName}>{pool.title}</Text>
             <Text style={styles.poolDescription} numberOfLines={1}>{pool.description}</Text>
           </View>
         </View>
@@ -90,7 +101,6 @@ const styles = StyleSheet.create({
   poolCard: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   poolHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   poolEmoji: { width: 48, height: 48, borderRadius: 12, backgroundColor: 'rgba(127, 255, 212, 0.1)', alignItems: 'center', justifyContent: 'center' },
-  poolEmojiText: { fontSize: 24 },
   poolInfo: { flex: 1, marginLeft: 12 },
   poolName: { fontSize: 18, fontWeight: '600', color: '#fff' },
   poolDescription: { fontSize: 14, color: '#708090', marginTop: 2 },

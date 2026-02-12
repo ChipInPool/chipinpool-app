@@ -110,7 +110,7 @@ export default function HomeScreen() {
               data-testid={`card-pool-${pool.id}`}
             >
               <View style={styles.poolInfo}>
-                <Text style={styles.poolName}>{pool.name}</Text>
+                <Text style={styles.poolName}>{pool.title}</Text>
                 <Text style={styles.poolDescription} numberOfLines={1}>{pool.description}</Text>
               </View>
               <View style={styles.poolProgress}>

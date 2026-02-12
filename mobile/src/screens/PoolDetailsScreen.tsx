@@ -34,7 +34,7 @@ export default function PoolDetailsScreen() {
   });
 
   const contributeMutation = useMutation({
-    mutationFn: (amount: number) => api.pools.contribute(poolId, amount),
+    mutationFn: (amount: string) => api.pools.contribute(poolId, amount),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pool', poolId] });
       queryClient.invalidateQueries({ queryKey: ['contributions', poolId] });
@@ -53,7 +53,7 @@ export default function PoolDetailsScreen() {
       Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0');
       return;
     }
-    contributeMutation.mutate(amount);
+    contributeMutation.mutate(contributeAmount);
   };
 
   const handleShare = async () => {
@@ -88,8 +88,19 @@ export default function PoolDetailsScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.emoji}>{pool.emoji || '💰'}</Text>
-        <Text style={styles.name}>{pool.name}</Text>
+        <Ionicons
+          name={
+            pool.category === 'Gift' ? 'gift-outline' :
+            pool.category === 'Trip' ? 'airplane-outline' :
+            pool.category === 'Purchase' ? 'cart-outline' :
+            pool.category === 'Event' ? 'calendar-outline' :
+            pool.category === 'Recurring' ? 'repeat-outline' :
+            'ellipsis-horizontal-outline'
+          }
+          size={48}
+          color="#7FFFD4"
+        />
+        <Text style={styles.name}>{pool.title}</Text>
         <Text style={styles.description}>{pool.description}</Text>
       </View>
 
@@ -189,7 +200,7 @@ export default function PoolDetailsScreen() {
                 <Ionicons name="close" size={24} color="#fff" />
               </TouchableOpacity>
             </View>
-            <Text style={styles.modalSubtitle}>{pool.name}</Text>
+            <Text style={styles.modalSubtitle}>{pool.title}</Text>
             <TextInput
               style={styles.amountInput}
               placeholder="Enter amount"
