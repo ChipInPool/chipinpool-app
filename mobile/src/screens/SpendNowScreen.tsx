@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
@@ -87,6 +88,12 @@ export default function SpendNowScreen() {
 
   const selectedPool = availablePools.find(
     (p: any) => String(p.id) === selectedPoolId,
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchPartners();
+    }, [])
   );
 
   const partners = Array.isArray(partnersData)

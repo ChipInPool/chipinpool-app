@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Share, Modal, TextInput, Linking, Switch } from 'react-native';
-import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Share, Modal, TextInput, Linking, Switch, RefreshControl } from 'react-native';
+import { useRoute, RouteProp, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -94,6 +95,8 @@ export default function PoolDetailsScreen() {
   const [showDistribute, setShowDistribute] = useState(false);
   const [distributions, setDistributions] = useState<{ userId: string; amount: string }[]>([]);
   const [closePoolAfterDistribute, setClosePoolAfterDistribute] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const { refreshUser } = useAuth();
 
   const { data: pool, isLoading, isError } = useQuery({
     queryKey: ['pool', poolId],
@@ -139,6 +142,23 @@ export default function PoolDetailsScreen() {
 
   const isCreator = pool?.creatorId === currentUser?.id;
   const distributeTotal = distributions.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshUser();
+      invalidateAllQueries();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      invalidateAllQueries();
+      refreshUser();
+    }, [poolId])
+  );
 
   const invalidateAllQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['pool', poolId] });
@@ -280,7 +300,7 @@ export default function PoolDetailsScreen() {
   const categoryColor = getCategoryColor(pool?.category ?? '');
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7FFFD4" />}>
       <View style={styles.header}>
         <View style={[styles.iconCircle, { backgroundColor: `${categoryColor}20` }]}>
           <Ionicons name={getCategoryIcon(pool.category)} size={36} color={categoryColor} />

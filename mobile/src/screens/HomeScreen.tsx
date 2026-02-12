@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useQuery } from '@tanstack/react-query';
-import { useNavigation } from '@react-navigation/native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,8 +29,9 @@ const getActivityIcon = (type: string): { name: string; color: string; bg: strin
 };
 
 export default function HomeScreen() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigation = useNavigation<any>();
+  const queryClient = useQueryClient();
 
   const { data: pools, refetch, isLoading } = useQuery({
     queryKey: ['pools'],
@@ -51,6 +52,22 @@ export default function HomeScreen() {
   const unreadCount = safeNotifications.filter((n: any) => !n?.read)?.length ?? 0;
   const balance = parseFloat(user?.walletBalance ?? user?.balance ?? '0') || 0;
 
+  const handleRefresh = async () => {
+    await refreshUser();
+    refetch();
+    queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    queryClient.invalidateQueries({ queryKey: ['activityFeed'] });
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshUser();
+      queryClient.invalidateQueries({ queryKey: ['pools'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['activityFeed'] });
+    }, [])
+  );
+
   const quickActions = [
     { icon: 'add-circle-outline', label: 'Create Pool', color: '#7FFFD4', screen: 'PoolsTab', params: { screen: 'CreatePool' } },
     { icon: 'people-outline', label: 'Join Pool', color: '#60A5FA', screen: 'PoolsTab' },
@@ -63,7 +80,7 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor="#7FFFD4" />}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={handleRefresh} tintColor="#7FFFD4" />}
       >
         <View style={styles.headerRow}>
           <View>

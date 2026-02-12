@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { api } from '@/services/api';
 import { PoolsStackParamList } from '@/navigation/AppTabs';
@@ -36,6 +36,12 @@ export default function PoolsScreen() {
     queryKey: ['pools'],
     queryFn: api.pools.list,
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [])
+  );
 
   const renderPool = ({ item: pool }: { item: any }) => {
     const current = parseFloat(pool.currentAmount) || 0;

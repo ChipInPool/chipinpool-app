@@ -954,9 +954,14 @@ export async function registerRoutes(
       const stripe = await getUncachableStripeClient();
       
       // Get the base URL for success/cancel redirects
-      const baseUrl = process.env.NODE_ENV === 'production' 
-        ? 'https://chipinpool.azurewebsites.net'
-        : `http://localhost:5000`;
+      let baseUrl = 'http://localhost:5000';
+      if (process.env.APP_URL) {
+        baseUrl = process.env.APP_URL;
+      } else if (process.env.REPLIT_DOMAINS) {
+        baseUrl = `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
+      } else if (process.env.WEBSITE_HOSTNAME) {
+        baseUrl = `https://${process.env.WEBSITE_HOSTNAME}`;
+      }
 
       // Create a Stripe Checkout session for guest payment
       const session = await stripe.checkout.sessions.create({
@@ -1543,12 +1548,12 @@ export async function registerRoutes(
       
       // Support both Replit and Azure production environments
       let baseUrl = 'http://localhost:5000';
-      if (process.env.REPLIT_DOMAINS) {
+      if (process.env.APP_URL) {
+        baseUrl = process.env.APP_URL;
+      } else if (process.env.REPLIT_DOMAINS) {
         baseUrl = `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
       } else if (process.env.WEBSITE_HOSTNAME) {
         baseUrl = `https://${process.env.WEBSITE_HOSTNAME}`;
-      } else if (process.env.APP_URL) {
-        baseUrl = process.env.APP_URL;
       }
 
       const session = await stripe.checkout.sessions.create({
@@ -2287,12 +2292,12 @@ export async function registerRoutes(
       
       // Support both Replit and Azure production environments
       let baseUrl = 'http://localhost:5000';
-      if (process.env.REPLIT_DOMAINS) {
+      if (process.env.APP_URL) {
+        baseUrl = process.env.APP_URL;
+      } else if (process.env.REPLIT_DOMAINS) {
         baseUrl = `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
       } else if (process.env.WEBSITE_HOSTNAME) {
         baseUrl = `https://${process.env.WEBSITE_HOSTNAME}`;
-      } else if (process.env.APP_URL) {
-        baseUrl = process.env.APP_URL;
       }
 
       const session = await stripe.checkout.sessions.create({
@@ -2358,12 +2363,12 @@ export async function registerRoutes(
       
       // Support both Replit and Azure production environments
       let baseUrl = 'http://localhost:5000';
-      if (process.env.REPLIT_DOMAINS) {
+      if (process.env.APP_URL) {
+        baseUrl = process.env.APP_URL;
+      } else if (process.env.REPLIT_DOMAINS) {
         baseUrl = `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
       } else if (process.env.WEBSITE_HOSTNAME) {
         baseUrl = `https://${process.env.WEBSITE_HOSTNAME}`;
-      } else if (process.env.APP_URL) {
-        baseUrl = process.env.APP_URL;
       }
 
       const session = await stripe.checkout.sessions.create({
@@ -2678,12 +2683,12 @@ export async function registerRoutes(
 
       // Support both Replit and Azure production environments
       let baseUrl = '';
-      if (process.env.REPLIT_DOMAINS) {
+      if (process.env.APP_URL) {
+        baseUrl = process.env.APP_URL;
+      } else if (process.env.REPLIT_DOMAINS) {
         baseUrl = `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
       } else if (process.env.WEBSITE_HOSTNAME) {
         baseUrl = `https://${process.env.WEBSITE_HOSTNAME}`;
-      } else if (process.env.APP_URL) {
-        baseUrl = process.env.APP_URL;
       }
       const redirectUri = baseUrl ? `${baseUrl}/security` : undefined;
       
@@ -3751,12 +3756,12 @@ export async function registerRoutes(
 
       // Support both Replit and Azure production environments
       let baseUrl = 'http://localhost:5000';
-      if (process.env.REPLIT_DOMAINS) {
+      if (process.env.APP_URL) {
+        baseUrl = process.env.APP_URL;
+      } else if (process.env.REPLIT_DOMAINS) {
         baseUrl = `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
       } else if (process.env.WEBSITE_HOSTNAME) {
         baseUrl = `https://${process.env.WEBSITE_HOSTNAME}`;
-      } else if (process.env.APP_URL) {
-        baseUrl = process.env.APP_URL;
       }
 
       const accountLink = await stripe.accountLinks.create({
@@ -6382,12 +6387,12 @@ export async function registerRoutes(
 
       // Support both Replit and Azure production environments
       let baseUrl = 'http://localhost:5000';
-      if (process.env.REPLIT_DOMAINS) {
+      if (process.env.APP_URL) {
+        baseUrl = process.env.APP_URL;
+      } else if (process.env.REPLIT_DOMAINS) {
         baseUrl = `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
       } else if (process.env.WEBSITE_HOSTNAME) {
         baseUrl = `https://${process.env.WEBSITE_HOSTNAME}`;
-      } else if (process.env.APP_URL) {
-        baseUrl = process.env.APP_URL;
       }
 
       res.json({
