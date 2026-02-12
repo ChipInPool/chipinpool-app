@@ -4825,7 +4825,7 @@ export async function registerRoutes(
           if (entry.amount <= 0) continue;
 
           await tx.update(users).set({
-            balance: sql`(CAST(${users.balance} AS DECIMAL) + ${entry.amount.toFixed(2)})::TEXT`
+            balance: sql`CAST(${users.balance} AS DECIMAL) + ${entry.amount.toFixed(2)}`
           }).where(eq(users.id, entry.userId));
 
           refunds.push({
@@ -4924,7 +4924,7 @@ export async function registerRoutes(
           if (distAmount <= 0) continue;
 
           await tx.update(users).set({
-            balance: sql`(CAST(${users.balance} AS DECIMAL) + ${distAmount.toFixed(2)})::TEXT`
+            balance: sql`CAST(${users.balance} AS DECIMAL) + ${distAmount.toFixed(2)}`
           }).where(eq(users.id, targetUser.id));
 
           actualDistributed += distAmount;
@@ -4937,7 +4937,7 @@ export async function registerRoutes(
         }
 
         await tx.update(pools).set({
-          currentAmount: sql`(CAST(${pools.currentAmount} AS DECIMAL) - ${actualDistributed.toFixed(2)})::TEXT`,
+          currentAmount: sql`CAST(${pools.currentAmount} AS DECIMAL) - ${actualDistributed.toFixed(2)}`,
           updatedAt: new Date(),
         }).where(eq(pools.id, poolId));
 
