@@ -1,0 +1,31 @@
+2026-02-12T15:17:54.3950688Z ##[group]Run npm ci
+2026-02-12T15:17:54.3951006Z [36;1mnpm ci[0m
+2026-02-12T15:17:54.3993864Z shell: /usr/bin/bash -e {0}
+2026-02-12T15:17:54.3994127Z env:
+2026-02-12T15:17:54.3994496Z   EXPO_TOKEN: ***
+2026-02-12T15:17:54.3994701Z ##[endgroup]
+2026-02-12T15:17:57.8588110Z npm error code EUSAGE
+2026-02-12T15:17:57.8589127Z npm error
+2026-02-12T15:17:57.8590746Z npm error `npm ci` can only install packages when your package.json and package-lock.json or npm-shrinkwrap.json are in sync. Please update your lock file with `npm install` before continuing.
+2026-02-12T15:17:57.8592262Z npm error
+2026-02-12T15:17:57.8593296Z npm error Missing: expo-local-authentication@15.0.2 from lock file
+2026-02-12T15:17:57.8593905Z npm error
+2026-02-12T15:17:57.8594304Z npm error Clean install a project
+2026-02-12T15:17:57.8594959Z npm error
+2026-02-12T15:17:57.8595394Z npm error Usage:
+2026-02-12T15:17:57.8595732Z npm error npm ci
+2026-02-12T15:17:57.8599645Z npm error
+2026-02-12T15:17:57.8600086Z npm error Options:
+2026-02-12T15:17:57.8601379Z npm error [--install-strategy <hoisted|nested|shallow|linked>] [--legacy-bundling]
+2026-02-12T15:17:57.8602591Z npm error [--global-style] [--omit <dev|optional|peer> [--omit <dev|optional|peer> ...]]
+2026-02-12T15:17:57.8603836Z npm error [--include <prod|dev|optional|peer> [--include <prod|dev|optional|peer> ...]]
+2026-02-12T15:17:57.8605108Z npm error [--strict-peer-deps] [--foreground-scripts] [--ignore-scripts] [--no-audit]
+2026-02-12T15:17:57.8612289Z npm error [--no-bin-links] [--no-fund] [--dry-run]
+2026-02-12T15:17:57.8613319Z npm error [-w|--workspace <workspace-name> [-w|--workspace <workspace-name> ...]]
+2026-02-12T15:17:57.8614991Z npm error [-ws|--workspaces] [--include-workspace-root] [--install-links]
+2026-02-12T15:17:57.8615742Z npm error
+2026-02-12T15:17:57.8616170Z npm error aliases: clean-install, ic, install-clean, isntall-clean
+2026-02-12T15:17:57.8616635Z npm error
+2026-02-12T15:17:57.8616918Z npm error Run "npm help ci" for more info
+2026-02-12T15:17:57.8617571Z npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-02-12T15_17_54_462Z-debug-0.log
+2026-02-12T15:17:57.8693426Z ##[error]Process completed with exit code 1.
