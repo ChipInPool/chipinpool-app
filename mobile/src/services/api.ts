@@ -156,10 +156,10 @@ export const api = {
     },
   },
   user: {
-    getProfile: () => fetchApi<any>('/api/users/me'),
+    getProfile: () => fetchApi<any>('/api/auth/me').then((r: any) => r.user || r),
     updateProfile: (data: any) =>
-      fetchApi<any>('/api/users/me', {
-        method: 'PATCH',
+      fetchApi<any>('/api/user/profile', {
+        method: 'PUT',
         body: JSON.stringify(data),
       }),
   },
@@ -193,15 +193,18 @@ export const api = {
       }),
   },
   wallet: {
-    getBalance: () => fetchApi<any>('/api/wallet/balance'),
+    getBalance: () => fetchApi<any>('/api/auth/me').then((r: any) => {
+      const user = r.user || r;
+      return { balance: user.walletBalance || '0.00' };
+    }),
     deposit: (amount: number) =>
-      fetchApi<any>('/api/wallet/deposit', {
+      fetchApi<any>('/api/user/deposit', {
         method: 'POST',
         body: JSON.stringify({ amount }),
       }),
     getTransactions: async () => {
-      const result = await fetchApi<any>('/api/wallet/transactions');
-      return result.transactions || [];
+      const result = await fetchApi<any>('/api/user/wallet-history');
+      return result.transactions || result.history || [];
     },
   },
   bankAccounts: {
@@ -216,13 +219,13 @@ export const api = {
     delete: (id: string) =>
       fetchApi<any>(`/api/bank-accounts/${id}`, { method: 'DELETE' }),
     setDefault: (id: string) =>
-      fetchApi<any>(`/api/bank-accounts/${id}/set-default`, { method: 'POST' }),
+      fetchApi<any>(`/api/bank-accounts/${id}/default`, { method: 'PUT' }),
   },
   stripe: {
     getConfig: () => fetchApi<{ publishableKey: string }>('/api/stripe/config'),
     getConnectStatus: () => fetchApi<any>('/api/stripe/connect/status'),
     createOnboardingLink: () =>
-      fetchApi<{ url: string }>('/api/stripe/connect/onboard', { method: 'POST' }),
+      fetchApi<{ url: string }>('/api/stripe/connect/onboarding-link', { method: 'POST' }),
   },
   security: {
     getStatus: () => fetchApi<any>('/api/security/status'),

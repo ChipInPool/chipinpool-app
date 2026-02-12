@@ -48,7 +48,7 @@ export default function HomeScreen() {
   });
 
   const unreadCount = notifications?.filter((n: any) => !n.read)?.length || 0;
-  const balance = parseFloat(user?.balance || '0');
+  const balance = parseFloat(user?.walletBalance || user?.balance || '0');
 
   const quickActions = [
     { icon: 'add-circle-outline', label: 'Create Pool', color: '#7FFFD4', screen: 'PoolsTab', params: { screen: 'CreatePool' } },
