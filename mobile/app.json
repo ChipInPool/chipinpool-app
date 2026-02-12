@@ -5,7 +5,7 @@
     "version": "2.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash.png",
@@ -23,7 +23,8 @@
         "NSCameraUsageDescription": "ChipIn needs camera access for identity verification and profile photos.",
         "NSPhotoLibraryUsageDescription": "ChipIn needs photo library access to upload profile photos.",
         "NSFaceIDUsageDescription": "ChipIn uses Face ID for secure authentication.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["remote-notification"]
       },
       "config": {
         "usesNonExemptEncryption": false
@@ -40,7 +41,9 @@
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "VIBRATE",
-        "RECEIVE_BOOT_COMPLETED"
+        "RECEIVE_BOOT_COMPLETED",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT"
       ]
     },
     "web": {
@@ -68,7 +71,8 @@
         }
       ],
       "expo-font",
-      "expo-asset"
+      "expo-asset",
+      "expo-local-authentication"
     ],
     "owner": "chipinpool",
     "runtimeVersion": {

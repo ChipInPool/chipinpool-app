@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 const API_URL = Constants.expoConfig?.extra?.apiUrl || 'https://chipinpool-csekdvghcqepcthm.centralus-01.azurewebsites.net';
 console.log('[API] Connecting to:', API_URL);
@@ -191,6 +192,8 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+    registerPushToken: (token: string) =>
+      fetchApi<any>('/api/user/push-token', { method: 'POST', body: JSON.stringify({ token, platform: Platform.OS }) }),
   },
   pools: {
     list: async () => {

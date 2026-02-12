@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Switch, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
+import { useNavigation } from '@react-navigation/native';
 import { api } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/theme/ThemeContext';
 
 function MenuItem({ icon, label, onPress, rightElement }: { icon: string; label: string; onPress?: () => void; rightElement?: React.ReactNode }) {
   return (
@@ -17,7 +19,9 @@ function MenuItem({ icon, label, onPress, rightElement }: { icon: string; label:
 }
 
 export default function SettingsScreen() {
+  const navigation = useNavigation<any>();
   const { user, refreshUser } = useAuth();
+  const { isDark } = useTheme();
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -104,26 +108,14 @@ export default function SettingsScreen() {
             <Text style={styles.sectionTitle}>Preferences</Text>
             <MenuItem
               icon="notifications-outline"
-              label="Push Notifications"
-              rightElement={
-                <Switch
-                  value={pushNotifications}
-                  onValueChange={setPushNotifications}
-                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(127, 255, 212, 0.4)' }}
-                  thumbColor={pushNotifications ? '#7FFFD4' : '#708090'}
-                />
-              }
+              label="Notification Preferences"
+              onPress={() => navigation.navigate('NotificationSettings')}
             />
             <MenuItem
               icon="moon-outline"
-              label="Dark Mode"
+              label="Appearance"
               rightElement={
-                <Switch
-                  value={true}
-                  disabled
-                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(127, 255, 212, 0.4)' }}
-                  thumbColor="#7FFFD4"
-                />
+                <Text style={{ color: '#708090', fontSize: 14 }}>{isDark ? 'Dark' : 'Light'} (System)</Text>
               }
             />
           </View>

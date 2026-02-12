@@ -69,6 +69,8 @@ export const users = pgTable("users", {
   verifiedPostalCode: text("verified_postal_code"),
   verifiedCountry: text("verified_country"),
   verifiedDob: text("verified_dob"),
+  pushToken: text("push_token"),
+  pushTokenPlatform: text("push_token_platform"),
   plaidAccessToken: text("plaid_access_token"),
   plaidAccountId: text("plaid_account_id"),
   termsAcceptedAt: timestamp("terms_accepted_at"),

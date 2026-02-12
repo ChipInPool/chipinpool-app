@@ -17,6 +17,7 @@ import SecurityScreen from '@/screens/SecurityScreen';
 import NotificationsScreen from '@/screens/NotificationsScreen';
 import ActivityScreen from '@/screens/ActivityScreen';
 import RewardsScreen from '@/screens/RewardsScreen';
+import NotificationSettingsScreen from '@/screens/NotificationSettingsScreen';
 
 export type AppTabParamList = {
   HomeTab: undefined;
@@ -39,6 +40,7 @@ export type ProfileStackParamList = {
   Settings: undefined;
   Security: undefined;
   Notifications: undefined;
+  NotificationSettings: undefined;
   Activity: undefined;
   Rewards: undefined;
 };
@@ -78,6 +80,7 @@ function ProfileStackNavigator() {
       <ProfileStackNav.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
       <ProfileStackNav.Screen name="Security" component={SecurityScreen} options={{ title: 'Security' }} />
       <ProfileStackNav.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
+      <ProfileStackNav.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ title: 'Notification Settings' }} />
       <ProfileStackNav.Screen name="Activity" component={ActivityScreen} options={{ title: 'Activity' }} />
       <ProfileStackNav.Screen name="Rewards" component={RewardsScreen} options={{ title: 'Rewards' }} />
     </ProfileStackNav.Navigator>

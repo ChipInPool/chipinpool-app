@@ -11,6 +11,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from '@/hooks/useAuth';
 import RootNavigator from '@/navigation/RootNavigator';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { ThemeProvider, useTheme } from '@/theme/ThemeContext';
+
+function StatusBarWrapper() {
+  const { colors } = useTheme();
+  return <StatusBar style={colors.statusBar} />;
+}
 
 LogBox.ignoreLogs(['Reanimated']);
 
@@ -39,12 +45,14 @@ export default function App() {
       <ErrorBoundary>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              <NavigationContainer>
-                <RootNavigator />
-                <StatusBar style="light" />
-              </NavigationContainer>
-            </AuthProvider>
+            <ThemeProvider>
+              <AuthProvider>
+                <NavigationContainer>
+                  <RootNavigator />
+                  <StatusBarWrapper />
+                </NavigationContainer>
+              </AuthProvider>
+            </ThemeProvider>
           </QueryClientProvider>
         </SafeAreaProvider>
       </ErrorBoundary>

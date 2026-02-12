@@ -114,7 +114,7 @@ export default function ProfileScreen() {
             iconColor={COLORS.yellow}
             iconBg="rgba(251,191,36,0.15)"
             label="Notifications"
-            onPress={() => navigation.navigate('Notifications')}
+            onPress={() => navigation.navigate('NotificationSettings')}
           />
           <MenuItem
             icon="time-outline"

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { api, clearSessionCookie } from '@/services/api';
+import { registerForPushNotifications } from '@/services/pushNotifications';
 
 interface User {
   id: string;
@@ -12,6 +13,7 @@ interface User {
   kycStatus: string;
   avatar?: string;
   role?: string;
+  notifyPush?: boolean;
 }
 
 interface AuthContextType {
@@ -48,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const userData = await api.auth.me();
         setUser(userData);
+        registerForPushNotifications().catch(err => console.log('[Push] Registration failed:', err));
       } catch (error) {
         setUser(null);
       } finally {
@@ -66,12 +69,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(result);
     setNeeds2FA(false);
+    registerForPushNotifications().catch(err => console.log('[Push] Registration failed:', err));
   };
 
   const verify2FA = async (code: string) => {
     const userData = await api.auth.verify2FA(code, pendingMfaUserId || '');
     setUser(userData);
     setNeeds2FA(false);
+    registerForPushNotifications().catch(err => console.log('[Push] Registration failed:', err));
     setPendingMfaUserId(null);
   };
 

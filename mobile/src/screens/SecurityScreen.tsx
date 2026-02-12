@@ -1,10 +1,12 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Linking } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Linking, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Ionicons } from '@expo/vector-icons';
+import { checkBiometricCapability, authenticateWithBiometrics, getBiometricLabel, getBiometricIcon, BiometricCapability } from '@/services/biometricAuth';
+import * as SecureStore from 'expo-secure-store';
 
 function MenuItem({ icon, label, onPress, rightElement }: { icon: string; label: string; onPress?: () => void; rightElement?: React.ReactNode }) {
   return (
@@ -42,6 +44,28 @@ export default function SecurityScreen() {
   const { user } = useAuth();
   const kycStatus = user?.kycStatus || 'not_started';
   const kycIcon = getKycIcon(kycStatus);
+
+  const [biometricCapability, setBiometricCapability] = useState<BiometricCapability | null>(null);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+
+  useEffect(() => {
+    checkBiometricCapability().then(setBiometricCapability);
+    SecureStore.getItemAsync('biometric_enabled').then(val => setBiometricEnabled(val === 'true'));
+  }, []);
+
+  const toggleBiometric = async (value: boolean) => {
+    if (value) {
+      const success = await authenticateWithBiometrics('Enable biometric authentication');
+      if (success) {
+        await SecureStore.setItemAsync('biometric_enabled', 'true');
+        setBiometricEnabled(true);
+        Alert.alert('Enabled', `${getBiometricLabel(biometricCapability?.biometricType || 'none')} authentication enabled`);
+      }
+    } else {
+      await SecureStore.setItemAsync('biometric_enabled', 'false');
+      setBiometricEnabled(false);
+    }
+  };
 
   const securityQuery = useQuery({
     queryKey: ['security-status'],
@@ -95,6 +119,31 @@ export default function SecurityScreen() {
             )}
           </View>
         </View>
+
+        {biometricCapability?.isAvailable && biometricCapability.isEnrolled && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Biometric Authentication</Text>
+            <View style={styles.card}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name={getBiometricIcon(biometricCapability.biometricType) as any} size={24} color="#7FFFD4" />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
+                    {getBiometricLabel(biometricCapability.biometricType)}
+                  </Text>
+                  <Text style={{ color: '#708090', fontSize: 13, marginTop: 2 }}>
+                    Use {getBiometricLabel(biometricCapability.biometricType).toLowerCase()} to unlock the app
+                  </Text>
+                </View>
+                <Switch
+                  value={biometricEnabled}
+                  onValueChange={toggleBiometric}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(127, 255, 212, 0.4)' }}
+                  thumbColor={biometricEnabled ? '#7FFFD4' : '#708090'}
+                />
+              </View>
+            </View>
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Two-Factor Authentication</Text>

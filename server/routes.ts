@@ -5947,6 +5947,24 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/user/push-token", requireAuth, async (req, res, next) => {
+    try {
+      const { token, platform } = z.object({
+        token: z.string().min(1),
+        platform: z.string().optional(),
+      }).parse(req.body);
+
+      await db.update(users).set({
+        pushToken: token,
+        pushTokenPlatform: platform || 'unknown',
+      }).where(eq(users.id, req.session.userId!));
+
+      res.json({ message: "Push token registered" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // ========== DEVELOPER API ROUTES ==========
 
   // Request developer API access
