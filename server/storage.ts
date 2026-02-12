@@ -34,9 +34,9 @@ export interface IStorage {
   getPoolsByCreator(creatorId: string): Promise<Pool[]>;
   getPoolsByContributor(userId: string): Promise<Pool[]>;
   createPool(pool: InsertPool): Promise<Pool>;
-  updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date; image?: string }): Promise<Pool | undefined>;
+  updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date; image?: string; status?: 'active' | 'completed' | 'expired' | 'closed' | 'paused' }): Promise<Pool | undefined>;
   updatePoolAmount(id: string, amount: string): Promise<void>;
-  updatePoolStatus(id: string, status: 'active' | 'completed' | 'expired'): Promise<void>;
+  updatePoolStatus(id: string, status: 'active' | 'completed' | 'expired' | 'closed' | 'paused'): Promise<void>;
   
   // Contribution operations
   getContributionsByPool(poolId: string): Promise<Contribution[]>;
@@ -228,13 +228,14 @@ export class DatabaseStorage implements IStorage {
     return pool;
   }
 
-  async updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date; image?: string }): Promise<Pool | undefined> {
+  async updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date; image?: string; status?: 'active' | 'completed' | 'expired' | 'closed' | 'paused' }): Promise<Pool | undefined> {
     const updates: any = { updatedAt: new Date() };
     if (data.title !== undefined) updates.title = data.title;
     if (data.description !== undefined) updates.description = data.description;
     if (data.targetAmount !== undefined) updates.targetAmount = data.targetAmount;
     if (data.deadline !== undefined) updates.deadline = data.deadline;
     if (data.image !== undefined) updates.image = data.image;
+    if (data.status !== undefined) updates.status = data.status;
     
     const [pool] = await db.update(pools).set(updates).where(eq(pools.id, id)).returning();
     return pool;
@@ -247,7 +248,7 @@ export class DatabaseStorage implements IStorage {
     }).where(eq(pools.id, id));
   }
 
-  async updatePoolStatus(id: string, status: 'active' | 'completed' | 'expired'): Promise<void> {
+  async updatePoolStatus(id: string, status: 'active' | 'completed' | 'expired' | 'closed' | 'paused'): Promise<void> {
     await db.update(pools).set({ status }).where(eq(pools.id, id));
   }
 

@@ -100,6 +100,7 @@ export default function PoolDetailsScreen() {
   const [editDescription, setEditDescription] = useState('');
   const [editTargetAmount, setEditTargetAmount] = useState('');
   const [editDeadline, setEditDeadline] = useState('');
+  const [editStatus, setEditStatus] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const { refreshUser } = useAuth();
 
@@ -248,6 +249,7 @@ export default function PoolDetailsScreen() {
       if (editDescription.trim()) data.description = editDescription.trim();
       if (editTargetAmount.trim()) data.targetAmount = editTargetAmount.trim();
       if (editDeadline.trim()) data.deadline = editDeadline.trim();
+      data.status = editStatus;
       return api.pools.update(poolId, data);
     },
     onSuccess: () => {
@@ -454,6 +456,7 @@ export default function PoolDetailsScreen() {
                 setEditDescription(pool?.description || '');
                 setEditTargetAmount(pool?.targetAmount || '');
                 setEditDeadline(pool?.deadline ? new Date(pool.deadline).toISOString().split('T')[0] : '');
+                setEditStatus(pool?.status || 'active');
                 setShowEditPool(true);
               }}
               activeOpacity={0.7}
@@ -1059,6 +1062,46 @@ export default function PoolDetailsScreen() {
                 onChangeText={setEditDeadline}
                 data-testid="input-edit-deadline"
               />
+
+              <Text style={{ fontSize: 14, fontWeight: '600', color: '#8E8E93', marginTop: 16, marginBottom: 8 }}>Status</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {[
+                  { value: 'active', label: 'Active', color: '#7FFFD4' },
+                  { value: 'paused', label: 'Paused', color: '#FFD700' },
+                  { value: 'closed', label: 'Closed', color: '#FF6B6B' },
+                  { value: 'completed', label: 'Completed', color: '#4CAF50' },
+                  { value: 'expired', label: 'Expired', color: '#999' },
+                ].map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    onPress={() => setEditStatus(option.value)}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      borderRadius: 8,
+                      borderWidth: 2,
+                      borderColor: editStatus === option.value ? option.color : 'rgba(255,255,255,0.1)',
+                      backgroundColor: editStatus === option.value ? `${option.color}20` : 'rgba(255,255,255,0.05)',
+                    }}
+                    data-testid={`button-status-${option.value}`}
+                  >
+                    <Text style={{
+                      fontSize: 13,
+                      fontWeight: editStatus === option.value ? '700' : '500',
+                      color: editStatus === option.value ? option.color : '#8E8E93',
+                    }}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={{ fontSize: 12, color: '#8E8E93', marginTop: 4 }}>
+                {editStatus === 'paused' ? 'Contributions temporarily suspended' :
+                 editStatus === 'closed' ? 'Pool closed. Can be reopened later.' :
+                 editStatus === 'completed' ? 'Pool goal has been reached' :
+                 editStatus === 'expired' ? 'Pool deadline has passed' :
+                 'Pool is open for contributions'}
+              </Text>
             </ScrollView>
 
             <TouchableOpacity

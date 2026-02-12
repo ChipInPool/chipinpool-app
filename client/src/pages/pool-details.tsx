@@ -66,6 +66,7 @@ export default function PoolDetails() {
   const [editDescription, setEditDescription] = useState("");
   const [editTargetAmount, setEditTargetAmount] = useState("");
   const [editDeadline, setEditDeadline] = useState("");
+  const [editStatus, setEditStatus] = useState("");
   const [selectedFollowers, setSelectedFollowers] = useState<string[]>([]);
   const [inviteEmails, setInviteEmails] = useState("");
   const [invitePhones, setInvitePhones] = useState("");
@@ -136,7 +137,7 @@ export default function PoolDetails() {
   });
 
   const updatePoolMutation = useMutation({
-    mutationFn: (data: { title?: string; description?: string; targetAmount?: string; deadline?: string; image?: string }) => 
+    mutationFn: (data: { title?: string; description?: string; targetAmount?: string; deadline?: string; image?: string; status?: string }) => 
       api.pools.update(params?.id || '', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.pool(params?.id || '') });
@@ -394,6 +395,7 @@ export default function PoolDetails() {
       targetAmount: editTargetAmount,
       deadline: editDeadline ? new Date(editDeadline).toISOString() : undefined,
       image: editImage || undefined,
+      status: editStatus || undefined,
     });
   };
 
@@ -403,6 +405,7 @@ export default function PoolDetails() {
     setEditTargetAmount(pool.targetAmount || "");
     setEditDeadline(pool.deadline ? format(new Date(pool.deadline), 'yyyy-MM-dd') : "");
     setEditImage(pool.image || "");
+    setEditStatus(pool.status || "active");
     setEditDialogOpen(true);
   };
 
@@ -1585,6 +1588,29 @@ export default function PoolDetails() {
                                 <Calendar className="w-4 h-4 absolute left-3 top-4 text-muted-foreground" />
                               </div>
                             </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit-status">Status</Label>
+                            <select
+                              id="edit-status"
+                              value={editStatus}
+                              onChange={(e) => setEditStatus(e.target.value)}
+                              className="flex h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              data-testid="select-edit-status"
+                            >
+                              <option value="active">Active</option>
+                              <option value="paused">Paused</option>
+                              <option value="closed">Closed</option>
+                              <option value="completed">Completed</option>
+                              <option value="expired">Expired</option>
+                            </select>
+                            <p className="text-xs text-muted-foreground">
+                              {editStatus === 'paused' && 'Contributions will be temporarily suspended'}
+                              {editStatus === 'closed' && 'Pool will be closed. Can be reopened later.'}
+                              {editStatus === 'completed' && 'Mark pool as complete when goal is reached'}
+                              {editStatus === 'active' && 'Pool is open for contributions'}
+                              {editStatus === 'expired' && 'Pool deadline has passed'}
+                            </p>
                           </div>
                         </div>
                         <DialogFooter>

@@ -244,7 +244,7 @@ export const api = {
       const result = await fetchApi<any>(`/api/pools/${poolId}/activity`);
       return result;
     },
-    update: (poolId: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: string }) =>
+    update: (poolId: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: string; status?: string }) =>
       fetchApi(`/api/pools/${poolId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   },
   wallet: {

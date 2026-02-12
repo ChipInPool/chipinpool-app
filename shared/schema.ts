@@ -4,7 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const poolCategoryEnum = pgEnum('pool_category', ['Trip', 'Gift', 'Purchase', 'Event', 'Other', 'Recurring']);
-export const poolStatusEnum = pgEnum('pool_status', ['active', 'completed', 'expired']);
+export const poolStatusEnum = pgEnum('pool_status', ['active', 'completed', 'expired', 'closed', 'paused']);
 export const frequencyEnum = pgEnum('frequency', ['weekly', 'monthly', 'quarterly']);
 export const notificationTypeEnum = pgEnum('notification_type', ['contribution', 'comment', 'goal_reached', 'friend_request', 'pool_invite']);
 export const inviteStatusEnum = pgEnum('invite_status', ['pending', 'accepted', 'declined']);

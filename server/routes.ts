@@ -9,7 +9,7 @@ import { fileStorageService, isAzureStorage } from "./fileStorage";
 import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, walletDeposits, bankAccounts, merchantPayouts, payMeTransactions, apiAccessRequests, poolActivities } from "@shared/schema";
 import express from "express";
 import { db } from "./db";
-import { eq, desc, sql, inArray, and } from "drizzle-orm";
+import { eq, desc, sql, inArray, and, lt, isNull, or } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
@@ -854,8 +854,18 @@ export async function registerRoutes(
   // Pool routes
   app.get("/api/pools", requireAuth, async (req, res, next) => {
     try {
-      const pools = await storage.getPools();
-      res.json({ pools });
+      await db.update(pools)
+        .set({ status: 'expired' })
+        .where(
+          and(
+            eq(pools.status, 'active'),
+            lt(pools.deadline, new Date()),
+            or(eq(pools.isRecurring, false), isNull(pools.isRecurring))
+          )
+        );
+
+      const allPools = await storage.getPools();
+      res.json({ pools: allPools });
     } catch (error) {
       next(error);
     }
@@ -1162,15 +1172,27 @@ export async function registerRoutes(
         targetAmount: z.string().optional(),
         deadline: z.string().optional(),
         image: z.string().optional(),
+        status: z.enum(['active', 'completed', 'expired', 'closed', 'paused']).optional(),
       });
 
       const data = updateSchema.parse(req.body);
+
+      if (data.status) {
+        if (data.status === 'paused' && pool.status !== 'active') {
+          return res.status(400).json({ message: "Pool can only be paused when it is active" });
+        }
+        if (data.status === 'closed' && pool.status === 'completed') {
+          return res.status(400).json({ message: "Cannot close a completed pool" });
+        }
+      }
+
       const updatedPool = await storage.updatePool(pool.id, {
         title: data.title,
         description: data.description,
         targetAmount: data.targetAmount,
         deadline: data.deadline ? new Date(data.deadline) : undefined,
         image: data.image,
+        status: data.status,
       });
 
       res.json({ pool: updatedPool });
@@ -1794,6 +1816,15 @@ export async function registerRoutes(
       // Auto-close Purchase pools after spending
       if (pool!.category === 'Purchase') {
         await storage.updatePoolStatus(pool!.id, 'completed');
+      }
+
+      const updatedPoolCheckSpend = await storage.getPool(pool!.id);
+      if (updatedPoolCheckSpend && parseFloat(updatedPoolCheckSpend.currentAmount) <= 0 && updatedPoolCheckSpend.status === 'active') {
+        const recurringContribs = await storage.getRecurringContributionsByPool(pool!.id);
+        const hasActiveRecurring = recurringContribs.some((rc: any) => rc.status === 'active');
+        if (!hasActiveRecurring) {
+          await storage.updatePoolStatus(pool!.id, 'closed');
+        }
       }
 
       // Send card transaction notification to pool creator
@@ -4238,6 +4269,15 @@ export async function registerRoutes(
         const newSpentAmount = (currentSpent + transferAmount).toFixed(2);
         await storage.updatePoolSpentAmount(poolId, newSpentAmount);
 
+        const updatedPoolCheckTransfer = await storage.getPool(poolId);
+        if (updatedPoolCheckTransfer && parseFloat(updatedPoolCheckTransfer.currentAmount) <= 0 && updatedPoolCheckTransfer.status === 'active') {
+          const recurringContribs = await storage.getRecurringContributionsByPool(poolId);
+          const hasActiveRecurring = recurringContribs.some((rc: any) => rc.status === 'active');
+          if (!hasActiveRecurring) {
+            await storage.updatePoolStatus(poolId, 'closed');
+          }
+        }
+
         // Create wallet withdrawal record
         const withdrawal = await storage.createWalletWithdrawal(
           userId,
@@ -4570,6 +4610,15 @@ export async function registerRoutes(
         });
       }
 
+      const updatedPoolCheckRefund = await storage.getPool(poolId);
+      if (updatedPoolCheckRefund && parseFloat(updatedPoolCheckRefund.currentAmount) <= 0 && updatedPoolCheckRefund.status === 'active') {
+        const recurringContribs = await storage.getRecurringContributionsByPool(poolId);
+        const hasActiveRecurring = recurringContribs.some((rc: any) => rc.status === 'active');
+        if (!hasActiveRecurring) {
+          await storage.updatePoolStatus(poolId, 'closed');
+        }
+      }
+
       res.json({
         message: `Successfully refunded ${refunds.length} contributor(s)`,
         refunds,
@@ -4663,6 +4712,15 @@ export async function registerRoutes(
           message: `You received $${parseFloat(dist.amount).toFixed(2)} from the pool "${pool.title}"`,
           link: `/pools/${poolId}`,
         });
+      }
+
+      const updatedPoolCheckDist = await storage.getPool(poolId);
+      if (updatedPoolCheckDist && parseFloat(updatedPoolCheckDist.currentAmount) <= 0 && updatedPoolCheckDist.status === 'active') {
+        const recurringContribs = await storage.getRecurringContributionsByPool(poolId);
+        const hasActiveRecurring = recurringContribs.some((rc: any) => rc.status === 'active');
+        if (!hasActiveRecurring) {
+          await storage.updatePoolStatus(poolId, 'closed');
+        }
       }
 
       res.json({
@@ -4808,6 +4866,15 @@ export async function registerRoutes(
         const currentSpent = parseFloat(poolForSpent.spentAmount);
         const newSpentAmount = (currentSpent + transferAmount).toFixed(2);
         await storage.updatePoolSpentAmount(transferRequest.poolId, newSpentAmount);
+      }
+
+      const updatedPoolCheckAccept = await storage.getPool(transferRequest.poolId);
+      if (updatedPoolCheckAccept && parseFloat(updatedPoolCheckAccept.currentAmount) <= 0 && updatedPoolCheckAccept.status === 'active') {
+        const recurringContribs = await storage.getRecurringContributionsByPool(transferRequest.poolId);
+        const hasActiveRecurring = recurringContribs.some((rc: any) => rc.status === 'active');
+        if (!hasActiveRecurring) {
+          await storage.updatePoolStatus(transferRequest.poolId, 'closed');
+        }
       }
 
       // Create wallet withdrawal record to track the payout
@@ -7773,6 +7840,34 @@ export async function registerRoutes(
       const { userId } = req.params;
       const profile = await fraudDetection.getUserRiskProfile(userId);
       res.json({ profile });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin: Cleanup stale pools (past deadline, not recurring, still active -> expired)
+  app.post("/api/admin/pools/cleanup-stale", requireAdmin, async (req: any, res, next) => {
+    try {
+      const result = await db.update(pools)
+        .set({ status: 'expired' })
+        .where(
+          and(
+            eq(pools.status, 'active'),
+            lt(pools.deadline, new Date()),
+            or(eq(pools.isRecurring, false), isNull(pools.isRecurring))
+          )
+        )
+        .returning();
+
+      await db.insert(adminAuditLogs).values({
+        adminId: req.adminUser.id,
+        action: 'cleanup_stale_pools',
+        targetType: 'pool',
+        details: `Expired ${result.length} stale pool(s)`,
+        ipAddress: getClientIp(req),
+      });
+
+      res.json({ message: `Expired ${result.length} stale pool(s)`, count: result.length });
     } catch (error) {
       next(error);
     }
