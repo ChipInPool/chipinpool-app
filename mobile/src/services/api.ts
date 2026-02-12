@@ -197,7 +197,10 @@ export const api = {
       const result = await fetchApi<any>('/api/pools');
       return result.pools || [];
     },
-    get: (id: string) => fetchApi<any>(`/api/pools/${id}`),
+    get: async (id: string) => {
+      const result = await fetchApi<any>(`/api/pools/${id}`);
+      return result.pool || result;
+    },
     create: (data: any) =>
       fetchApi<any>('/api/pools', {
         method: 'POST',
@@ -208,8 +211,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ amount }),
       }),
-    getContributions: (poolId: string) => 
-      fetchApi<any>(`/api/pools/${poolId}/contributions`),
+    getContributions: async (poolId: string) => {
+      const result = await fetchApi<any>(`/api/pools/${poolId}/contributors`);
+      return result.contributors || result || [];
+    },
+    checkout: (poolId: string, amount: string) =>
+      fetchApi<{ url: string }>(`/api/pools/${poolId}/checkout`, {
+        method: 'POST',
+        body: JSON.stringify({ amount }),
+      }),
     refundAll: (poolId: string, closePool?: boolean) =>
       fetchApi<any>(`/api/pools/${poolId}/refund-all`, {
         method: 'POST',

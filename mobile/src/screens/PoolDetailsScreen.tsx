@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Share, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Share, Modal, TextInput, Linking } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
@@ -44,6 +44,7 @@ export default function PoolDetailsScreen() {
 
   const [showContribute, setShowContribute] = useState(false);
   const [contributeAmount, setContributeAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'balance'>('stripe');
 
   const { data: pool, isLoading, isError } = useQuery({
     queryKey: ['pool', poolId],
@@ -56,14 +57,40 @@ export default function PoolDetailsScreen() {
     enabled: !!pool,
   });
 
+  const { data: walletData } = useQuery({
+    queryKey: ['walletBalance'],
+    queryFn: () => api.wallet.getBalance(),
+  });
+
+  const walletBalance = walletData?.balance || '0.00';
+
+  const contributorsList = Array.isArray(contributions) && contributions.length > 0
+    ? contributions
+    : Array.isArray(pool?.contributors) ? pool.contributors : [];
+
   const contributeMutation = useMutation({
-    mutationFn: (amount: string) => api.pools.contribute(poolId, amount),
+    mutationFn: async (amount: string) => {
+      if (paymentMethod === 'stripe') {
+        const result = await api.pools.checkout(poolId, amount);
+        if (result?.url) {
+          await Linking.openURL(result.url);
+        }
+        return result;
+      } else {
+        return api.pools.contribute(poolId, amount);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pool', poolId] });
       queryClient.invalidateQueries({ queryKey: ['contributions', poolId] });
+      queryClient.invalidateQueries({ queryKey: ['walletBalance'] });
       setShowContribute(false);
       setContributeAmount('');
-      Alert.alert('Success', 'Contribution added successfully!');
+      if (paymentMethod === 'stripe') {
+        Alert.alert('Stripe Checkout', 'Complete your payment in the browser.');
+      } else {
+        Alert.alert('Success', 'Contribution added successfully!');
+      }
     },
     onError: (error: any) => {
       Alert.alert('Error', error.message || 'Failed to contribute');
@@ -208,13 +235,13 @@ export default function PoolDetailsScreen() {
         <View style={styles.sectionHeader}>
           <Ionicons name="people-outline" size={20} color="#7FFFD4" />
           <Text style={styles.sectionTitle}>Contributors</Text>
-          {Array.isArray(contributions) && contributions.length > 0 && (
+          {contributorsList.length > 0 && (
             <View style={styles.contributorCountBadge}>
-              <Text style={styles.contributorCountText}>{contributions.length}</Text>
+              <Text style={styles.contributorCountText}>{contributorsList.length}</Text>
             </View>
           )}
         </View>
-        {(Array.isArray(contributions) ? contributions : []).map((contribution: any, index: number) => (
+        {contributorsList.map((contribution: any, index: number) => (
           <View key={contribution?.id ?? `contrib-${index}`} style={styles.contributorRow} data-testid={`card-contributor-${contribution?.id}`}>
             <View style={styles.contributorAvatar}>
               <Text style={styles.contributorInitials}>
@@ -224,13 +251,13 @@ export default function PoolDetailsScreen() {
             <View style={styles.contributorInfo}>
               <Text style={styles.contributorName}>{contribution?.user?.firstName ?? ''} {contribution?.user?.lastName ?? ''}</Text>
               <Text style={styles.contributorDate}>
-                {new Date(contribution?.createdAt ?? Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                {new Date(contribution?.date ?? contribution?.createdAt ?? Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </Text>
             </View>
             <Text style={styles.contributorAmount}>${parseFloat(contribution?.amount ?? '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
           </View>
         ))}
-        {(!contributions || contributions.length === 0) && (
+        {contributorsList.length === 0 && (
           <View style={styles.emptyContributors}>
             <Ionicons name="people-outline" size={32} color="#708090" />
             <Text style={styles.emptyText}>No contributions yet</Text>
@@ -270,8 +297,49 @@ export default function PoolDetailsScreen() {
                 data-testid="input-contribute-amount"
               />
             </View>
+            <Text style={styles.paymentMethodLabel}>Payment Method</Text>
             <TouchableOpacity
-              style={[styles.confirmButton, contributeMutation.isPending && styles.confirmButtonDisabled]}
+              style={[
+                styles.paymentMethodCard,
+                paymentMethod === 'stripe' && styles.paymentMethodCardSelected,
+              ]}
+              onPress={() => setPaymentMethod('stripe')}
+              activeOpacity={0.7}
+              data-testid="button-payment-stripe"
+            >
+              <View style={styles.paymentMethodIconWrap}>
+                <Ionicons name="card-outline" size={24} color={paymentMethod === 'stripe' ? '#7FFFD4' : '#708090'} />
+              </View>
+              <View style={styles.paymentMethodInfo}>
+                <Text style={[styles.paymentMethodName, paymentMethod === 'stripe' && styles.paymentMethodNameSelected]}>Pay with Card</Text>
+                <Text style={styles.paymentMethodDesc}>Secure payment via Stripe</Text>
+              </View>
+              <View style={[styles.paymentMethodRadio, paymentMethod === 'stripe' && styles.paymentMethodRadioSelected]}>
+                {paymentMethod === 'stripe' && <View style={styles.paymentMethodRadioDot} />}
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.paymentMethodCard,
+                paymentMethod === 'balance' && styles.paymentMethodCardSelected,
+              ]}
+              onPress={() => setPaymentMethod('balance')}
+              activeOpacity={0.7}
+              data-testid="button-payment-balance"
+            >
+              <View style={styles.paymentMethodIconWrap}>
+                <Ionicons name="wallet-outline" size={24} color={paymentMethod === 'balance' ? '#7FFFD4' : '#708090'} />
+              </View>
+              <View style={styles.paymentMethodInfo}>
+                <Text style={[styles.paymentMethodName, paymentMethod === 'balance' && styles.paymentMethodNameSelected]}>Wallet Balance</Text>
+                <Text style={styles.paymentMethodDesc}>${parseFloat(walletBalance).toFixed(2)} available</Text>
+              </View>
+              <View style={[styles.paymentMethodRadio, paymentMethod === 'balance' && styles.paymentMethodRadioSelected]}>
+                {paymentMethod === 'balance' && <View style={styles.paymentMethodRadioDot} />}
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.confirmButton, { marginTop: 16 }, contributeMutation.isPending && styles.confirmButtonDisabled]}
               onPress={handleContribute}
               disabled={contributeMutation.isPending}
               activeOpacity={0.8}
@@ -280,7 +348,7 @@ export default function PoolDetailsScreen() {
               {contributeMutation.isPending ? (
                 <ActivityIndicator color="#001F3F" />
               ) : (
-                <Text style={styles.confirmButtonText}>Confirm Contribution</Text>
+                <Text style={styles.confirmButtonText}>{paymentMethod === 'stripe' ? 'Continue to Stripe' : 'Confirm Contribution'}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -700,5 +768,68 @@ const styles = StyleSheet.create({
     color: '#001F3F',
     fontSize: 17,
     fontWeight: '700',
+  },
+  paymentMethodLabel: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  paymentMethodCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  paymentMethodCardSelected: {
+    borderColor: '#7FFFD4',
+    backgroundColor: 'rgba(127,255,212,0.06)',
+  },
+  paymentMethodIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paymentMethodInfo: {
+    flex: 1,
+    marginLeft: 14,
+  },
+  paymentMethodName: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  paymentMethodNameSelected: {
+    color: '#7FFFD4',
+  },
+  paymentMethodDesc: {
+    color: '#708090',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  paymentMethodRadio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paymentMethodRadioSelected: {
+    borderColor: '#7FFFD4',
+  },
+  paymentMethodRadioDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#7FFFD4',
   },
 });
