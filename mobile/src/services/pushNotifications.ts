@@ -1,5 +1,4 @@
 import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { api } from './api';
@@ -13,8 +12,8 @@ Notifications.setNotificationHandler({
 });
 
 export async function registerForPushNotifications(): Promise<string | null> {
-  if (!Device.isDevice) {
-    console.log('[Push] Must use physical device for Push Notifications');
+  if (Platform.OS === 'web') {
+    console.log('[Push] Push notifications not supported on web');
     return null;
   }
 

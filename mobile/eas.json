@@ -9,23 +9,21 @@
       "distribution": "internal",
       "channel": "development",
       "ios": {
-        "simulator": true,
-        "image": "macos-ventura-13.6-xcode-15.2"
+        "simulator": true
       }
     },
     "preview": {
       "distribution": "internal",
       "channel": "preview",
       "ios": {
-        "simulator": false,
-        "image": "macos-sonoma-14.5-xcode-16.0"
+        "simulator": false
       }
     },
     "production": {
       "autoIncrement": true,
       "channel": "production",
       "ios": {
-        "image": "macos-sonoma-14.5-xcode-16.0"
+        "image": "latest"
       },
       "android": {
         "image": "latest",
