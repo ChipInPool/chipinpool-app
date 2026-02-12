@@ -21,6 +21,8 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  sendOTP: (identifier: string, method?: 'email' | 'phone') => Promise<{ deliveryMethod: string; maskedTarget: string; message: string }>;
+  verifyOTP: (identifier: string, code: string) => Promise<{ mfaRequired?: boolean }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   needs2FA: boolean;
@@ -80,6 +82,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPendingMfaUserId(null);
   };
 
+  const sendOTP = async (identifier: string, method: 'email' | 'phone' = 'email') => {
+    const result = await api.auth.sendOTP(identifier, method);
+    return result;
+  };
+
+  const verifyOTP = async (identifier: string, code: string): Promise<{ mfaRequired?: boolean }> => {
+    const result = await api.auth.verifyOTP(identifier, code);
+    if (result.mfaRequired) {
+      setNeeds2FA(true);
+      setPendingMfaUserId(result.userId);
+      return { mfaRequired: true };
+    }
+    setUser(result);
+    setNeeds2FA(false);
+    registerForPushNotifications().catch(err => console.log('[Push] Registration failed:', err));
+    return {};
+  };
+
   const logout = async () => {
     try {
       await api.auth.logout();
@@ -98,6 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         login,
+        sendOTP,
+        verifyOTP,
         logout,
         refreshUser,
         needs2FA,

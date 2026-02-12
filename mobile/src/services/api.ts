@@ -166,6 +166,21 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ phone, code }),
       }),
+    sendOTP: (identifier: string, method: 'email' | 'phone' = 'email') =>
+      fetchApi<any>('/api/auth/otp-login/send', {
+        method: 'POST',
+        body: JSON.stringify({ identifier, method }),
+      }),
+    verifyOTP: async (identifier: string, code: string) => {
+      const result = await fetchApi<any>('/api/auth/otp-login/verify', {
+        method: 'POST',
+        body: JSON.stringify({ identifier, code }),
+      });
+      if (result.mfaRequired) {
+        return result;
+      }
+      return result.user;
+    },
     logout: async () => {
       const result = await fetchApi<any>('/api/auth/logout', { method: 'POST' });
       await clearSessionCookie();

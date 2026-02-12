@@ -575,6 +575,150 @@ export async function registerRoutes(
     }
   });
 
+  // Unified OTP login - send code via email or phone
+  app.post("/api/auth/otp-login/send", authRateLimiter, async (req, res, next) => {
+    try {
+      const { identifier, method } = z.object({
+        identifier: z.string().min(1),
+        method: z.enum(['email', 'phone']).optional().default('email'),
+      }).parse(req.body);
+
+      let user;
+      let deliveryTarget: string;
+      let deliveryMethod: 'email' | 'phone';
+
+      const isEmail = identifier.includes('@');
+      const isPhone = /^\+?\d{10,}$/.test(identifier.replace(/[\s\-\(\)]/g, ''));
+
+      if (isEmail) {
+        user = await storage.getUserByEmail(identifier.toLowerCase());
+        if (!user) return res.status(404).json({ message: "No account found with this email" });
+        deliveryTarget = user.email;
+        deliveryMethod = 'email';
+      } else if (isPhone) {
+        user = await storage.getUserByPhone(identifier);
+        if (!user) return res.status(404).json({ message: "No account found with this phone number" });
+        deliveryTarget = user.phone!;
+        deliveryMethod = 'phone';
+      } else {
+        const username = identifier.toLowerCase().replace(/^@/, '');
+        user = await storage.getUserByUsername(username);
+        if (!user) return res.status(404).json({ message: "No account found with this username" });
+        if (method === 'phone' && user.phone) {
+          deliveryTarget = user.phone;
+          deliveryMethod = 'phone';
+        } else {
+          deliveryTarget = user.email;
+          deliveryMethod = 'email';
+        }
+      }
+
+      const code = generateOTP();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+      const codeKey = deliveryTarget.toLowerCase();
+      await db.delete(phoneVerificationCodes).where(eq(phoneVerificationCodes.phone, codeKey));
+      await db.insert(phoneVerificationCodes).values({
+        phone: codeKey,
+        code,
+        expiresAt,
+      });
+
+      if (deliveryMethod === 'email') {
+        await sendVerificationEmail(deliveryTarget, code);
+        const parts = deliveryTarget.split('@');
+        const masked = parts[0].substring(0, 2) + '***@' + parts[1];
+        res.json({ message: `Login code sent to ${masked}`, deliveryMethod: 'email', maskedTarget: masked });
+      } else {
+        await sendVerificationSMS(deliveryTarget, code);
+        const masked = '••••' + deliveryTarget.slice(-4);
+        res.json({ message: `Login code sent to ${masked}`, deliveryMethod: 'phone', maskedTarget: masked });
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Unified OTP login - verify code and log in
+  app.post("/api/auth/otp-login/verify", authRateLimiter, async (req, res, next) => {
+    try {
+      const { identifier, code } = z.object({
+        identifier: z.string().min(1),
+        code: z.string().length(6),
+      }).parse(req.body);
+
+      let user;
+
+      const isEmail = identifier.includes('@');
+      const isPhone = /^\+?\d{10,}$/.test(identifier.replace(/[\s\-\(\)]/g, ''));
+
+      if (isEmail) {
+        user = await storage.getUserByEmail(identifier.toLowerCase());
+      } else if (isPhone) {
+        user = await storage.getUserByPhone(identifier);
+      } else {
+        const username = identifier.toLowerCase().replace(/^@/, '');
+        user = await storage.getUserByUsername(username);
+      }
+
+      if (!user) {
+        return res.status(404).json({ message: "No account found" });
+      }
+
+      let codeKey: string;
+      if (isEmail) {
+        codeKey = identifier.toLowerCase();
+      } else if (isPhone) {
+        codeKey = user.phone!.toLowerCase();
+      } else {
+        codeKey = user.email.toLowerCase();
+      }
+
+      let [verification] = await db.select()
+        .from(phoneVerificationCodes)
+        .where(eq(phoneVerificationCodes.phone, codeKey))
+        .orderBy(desc(phoneVerificationCodes.createdAt))
+        .limit(1);
+
+      if (!verification && user.phone && !isEmail && !isPhone) {
+        const [phoneVerification] = await db.select()
+          .from(phoneVerificationCodes)
+          .where(eq(phoneVerificationCodes.phone, user.phone.toLowerCase()))
+          .orderBy(desc(phoneVerificationCodes.createdAt))
+          .limit(1);
+        if (phoneVerification) verification = phoneVerification;
+      }
+
+      if (!verification) {
+        return res.status(400).json({ message: "No verification code found. Please request a new code." });
+      }
+
+      if (verification.code !== code) {
+        return res.status(400).json({ message: "Invalid verification code" });
+      }
+
+      if (new Date() > verification.expiresAt) {
+        return res.status(400).json({ message: "Code expired. Please request a new code." });
+      }
+
+      await db.delete(phoneVerificationCodes).where(eq(phoneVerificationCodes.id, verification.id));
+
+      if (user.twoFactorEnabled) {
+        req.session.pendingMfaUserId = user.id;
+        return res.json({ mfaRequired: true, userId: user.id });
+      }
+
+      req.session.userId = user.id;
+      req.session.save((err) => {
+        if (err) return next(err);
+        const { password, ...userWithoutPassword } = user;
+        res.json({ user: userWithoutPassword });
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Forgot password - send reset link
   app.post("/api/auth/forgot-password", authRateLimiter, async (req, res, next) => {
     try {
