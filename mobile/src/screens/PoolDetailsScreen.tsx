@@ -396,13 +396,14 @@ export default function PoolDetailsScreen() {
 
       <View style={styles.secondaryButtonsRow}>
         <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={openContributeModal}
+          style={[styles.secondaryButton, pool?.status !== 'active' && { opacity: 0.5 }]}
+          onPress={pool?.status === 'active' ? openContributeModal : undefined}
           activeOpacity={0.7}
+          disabled={pool?.status !== 'active'}
           data-testid="button-contribute"
         >
           <Ionicons name="add-circle-outline" size={20} color="#7FFFD4" />
-          <Text style={styles.secondaryButtonText}>Contribute</Text>
+          <Text style={styles.secondaryButtonText}>{pool?.status === 'active' ? 'Contribute' : 'Pool Closed'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.secondaryButton} onPress={handleShare} activeOpacity={0.7} data-testid="button-share">
           <Ionicons name="share-outline" size={20} color="#7FFFD4" />
@@ -420,23 +421,6 @@ export default function PoolDetailsScreen() {
             <TouchableOpacity
               style={styles.actionButton}
               onPress={() => {
-                setTransferRecipient('');
-                setTransferAmount('');
-                setTransferBankId('');
-                setTransferPayoutSpeed('standard');
-                setShowTransfer(true);
-              }}
-              activeOpacity={0.7}
-              data-testid="button-send-contributor"
-            >
-              <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(96,165,250,0.15)' }]}>
-                <Ionicons name="send-outline" size={20} color="#60A5FA" />
-              </View>
-              <Text style={styles.actionButtonText}>Send to Contributor</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => {
                 setDistributions([]);
                 setClosePoolAfterDistribute(false);
                 setShowDistribute(true);
@@ -444,10 +428,10 @@ export default function PoolDetailsScreen() {
               activeOpacity={0.7}
               data-testid="button-distribute"
             >
-              <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(167,139,250,0.15)' }]}>
-                <Ionicons name="git-branch-outline" size={20} color="#A78BFA" />
+              <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(96,165,250,0.15)' }]}>
+                <Ionicons name="send-outline" size={20} color="#60A5FA" />
               </View>
-              <Text style={styles.actionButtonText}>Distribute</Text>
+              <Text style={styles.actionButtonText}>Send</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionButton}
@@ -841,20 +825,20 @@ export default function PoolDetailsScreen() {
 
             <View style={{ padding: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', marginBottom: 16 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text style={{ color: '#708090', fontSize: 13 }}>Pool Balance</Text>
+                <Text style={{ color: '#708090', fontSize: 13 }}>Available Balance</Text>
                 <Text style={{ color: '#7FFFD4', fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] as any }}>
-                  ${parseFloat(pool?.currentAmount || '0').toFixed(2)}
+                  ${(parseFloat(pool?.currentAmount || '0') - parseFloat(pool?.spentAmount || '0')).toFixed(2)}
                 </Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={{ color: '#708090', fontSize: 13 }}>Distributing</Text>
-                <Text style={{ color: distributeTotal > parseFloat(pool?.currentAmount || '0') ? '#f87171' : '#FFFFFF', fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] as any }}>
+                <Text style={{ color: distributeTotal > (parseFloat(pool?.currentAmount || '0') - parseFloat(pool?.spentAmount || '0')) ? '#f87171' : '#FFFFFF', fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] as any }}>
                   ${distributeTotal.toFixed(2)}
                 </Text>
               </View>
-              {distributeTotal > parseFloat(pool?.currentAmount || '0') && (
+              {distributeTotal > (parseFloat(pool?.currentAmount || '0') - parseFloat(pool?.spentAmount || '0')) && (
                 <Text style={{ color: '#f87171', fontSize: 12, marginTop: 6 }}>
-                  Total exceeds pool balance!
+                  Total exceeds available balance!
                 </Text>
               )}
             </View>
@@ -869,7 +853,7 @@ export default function PoolDetailsScreen() {
                     allRecipients.push({ userId: currentUser.id, firstName: currentUser.firstName, lastName: currentUser.lastName });
                   }
                   if (allRecipients.length === 0) return;
-                  const poolBalance = parseFloat(pool?.currentAmount || '0');
+                  const poolBalance = parseFloat(pool?.currentAmount || '0') - parseFloat(pool?.spentAmount || '0');
                   const perPerson = Math.floor((poolBalance / allRecipients.length) * 100) / 100;
                   const newDistributions = allRecipients.map((c: any) => ({
                     userId: c.userId || c.id,
@@ -980,9 +964,9 @@ export default function PoolDetailsScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.confirmButton, { marginTop: 16 }, (distributeMutation.isPending || distributions.length === 0 || distributeTotal <= 0 || distributeTotal > parseFloat(pool?.currentAmount || '0')) && styles.confirmButtonDisabled]}
+              style={[styles.confirmButton, { marginTop: 16 }, (distributeMutation.isPending || distributions.length === 0 || distributeTotal <= 0 || distributeTotal > (parseFloat(pool?.currentAmount || '0') - parseFloat(pool?.spentAmount || '0'))) && styles.confirmButtonDisabled]}
               onPress={() => distributeMutation.mutate()}
-              disabled={distributeMutation.isPending || distributions.length === 0 || distributeTotal <= 0 || distributeTotal > parseFloat(pool?.currentAmount || '0')}
+              disabled={distributeMutation.isPending || distributions.length === 0 || distributeTotal <= 0 || distributeTotal > (parseFloat(pool?.currentAmount || '0') - parseFloat(pool?.spentAmount || '0'))}
               activeOpacity={0.8}
               data-testid="button-confirm-distribute"
             >

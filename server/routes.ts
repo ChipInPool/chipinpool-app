@@ -1210,6 +1210,10 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Pool not found" });
       }
 
+      if (pool.status !== 'active') {
+        return res.status(400).json({ message: "This pool is no longer accepting contributions" });
+      }
+
       const user = await storage.getUser(req.session.userId!);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
@@ -2145,6 +2149,10 @@ export async function registerRoutes(
       const pool = await storage.getPool(req.params.id);
       if (!pool) {
         return res.status(404).json({ error: "Pool not found" });
+      }
+
+      if (pool.status !== 'active') {
+        return res.status(400).json({ error: "This pool is no longer accepting contributions" });
       }
 
       const user = await storage.getUser(req.session.userId!);

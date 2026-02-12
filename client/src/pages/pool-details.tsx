@@ -922,8 +922,8 @@ export default function PoolDetails() {
 
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button size="lg" className="w-full h-14 text-lg font-bold shadow-lg shadow-primary/25" data-testid="button-chip-in">
-                      <Wallet className="w-5 h-5 mr-2" /> Chip In Now
+                    <Button size="lg" className="w-full h-14 text-lg font-bold shadow-lg shadow-primary/25" data-testid="button-chip-in" disabled={pool.status !== 'active'}>
+                      <Wallet className="w-5 h-5 mr-2" /> {pool.status !== 'active' ? 'Pool Closed' : 'Chip In Now'}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md bg-card border-white/10">
@@ -1132,6 +1132,7 @@ export default function PoolDetails() {
                       size="lg" 
                       className="w-full h-12 border-white/10 hover:bg-primary/5 hover:border-primary/30" 
                       data-testid="button-auto-contribute"
+                      disabled={pool.status !== 'active'}
                     >
                       <RefreshCw className="w-4 h-4 mr-2" /> Set Up Auto-Contribute
                     </Button>
