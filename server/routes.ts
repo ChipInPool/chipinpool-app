@@ -4505,11 +4505,6 @@ export async function registerRoutes(
           description: `Withdrew to bank account`,
           referenceId: transfer.id,
         });
-        
-        // Update pool spent amount
-        const currentSpent = parseFloat(pool.spentAmount);
-        const newSpentAmount = (currentSpent + transferAmount).toFixed(2);
-        await storage.updatePoolSpentAmount(poolId, newSpentAmount);
 
         const updatedPoolCheckTransfer = await storage.getPool(poolId);
         if (updatedPoolCheckTransfer && parseFloat(updatedPoolCheckTransfer.currentAmount) <= 0 && updatedPoolCheckTransfer.status === 'active') {
@@ -5101,14 +5096,6 @@ export async function registerRoutes(
         description: `Sent to ${recipient?.firstName || 'user'} ${recipient?.lastName || ''}`.trim(),
         referenceId: requestId,
       });
-      
-      // Update pool spent amount
-      const poolForSpent = await storage.getPool(transferRequest.poolId);
-      if (poolForSpent) {
-        const currentSpent = parseFloat(poolForSpent.spentAmount);
-        const newSpentAmount = (currentSpent + transferAmount).toFixed(2);
-        await storage.updatePoolSpentAmount(transferRequest.poolId, newSpentAmount);
-      }
 
       const updatedPoolCheckAccept = await storage.getPool(transferRequest.poolId);
       if (updatedPoolCheckAccept && parseFloat(updatedPoolCheckAccept.currentAmount) <= 0 && updatedPoolCheckAccept.status === 'active') {
