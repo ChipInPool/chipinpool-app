@@ -132,7 +132,7 @@ export default function SettingsScreen() {
             <Text style={styles.sectionTitle}>About</Text>
             <MenuItem
               icon="information-circle-outline"
-              label="Version 2.0.1 (Build 8)"
+              label="Version 2.0.1 (Build 12)"
               rightElement={<Text style={styles.versionText}>Latest</Text>}
             />
             <MenuItem icon="document-text-outline" label="Terms of Service" onPress={() => {}} />
