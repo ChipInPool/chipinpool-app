@@ -25,7 +25,7 @@ async function ensureCookieLoaded() {
   }
 }
 
-async function saveSessionCookie(cookie: string) {
+export async function saveSessionCookie(cookie: string) {
   try {
     sessionCookie = cookie;
     await SecureStore.setItemAsync('session_cookie', cookie);
@@ -136,6 +136,9 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
+      if (result.sessionToken) {
+        await saveSessionCookie(result.sessionToken);
+      }
       if (result.mfaRequired) {
         return result;
       }
@@ -176,6 +179,9 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ identifier, code }),
       });
+      if (result.sessionToken) {
+        await saveSessionCookie(result.sessionToken);
+      }
       if (result.mfaRequired) {
         return result;
       }
@@ -191,6 +197,9 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ code, userId }),
       });
+      if (result.sessionToken) {
+        await saveSessionCookie(result.sessionToken);
+      }
       return result.user;
     },
   },

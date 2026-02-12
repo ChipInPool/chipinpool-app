@@ -22,8 +22,7 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [maskedTarget, setMaskedTarget] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState<string>('');
-  const otpInputRefs = useRef<(TextInput | null)[]>([]);
-  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
+  const hiddenInputRef = useRef<TextInput>(null);
 
   const getPlaceholder = () => {
     switch (activeTab) {
@@ -64,7 +63,6 @@ export default function LoginScreen() {
       setMaskedTarget(result.maskedTarget);
       setDeliveryMethod(result.deliveryMethod);
       setStep('otp');
-      setOtpDigits(['', '', '', '', '', '']);
       setOtpCode('');
     } catch (err: any) {
       setError(err.message || 'Failed to send login code');
@@ -73,54 +71,19 @@ export default function LoginScreen() {
     }
   };
 
-  const handleOtpDigitChange = (index: number, value: string) => {
-    if (value.length > 1) {
-      const digits = value.split('').slice(0, 6);
-      const newDigits = [...otpDigits];
-      digits.forEach((d, i) => {
-        if (index + i < 6) newDigits[index + i] = d;
-      });
-      setOtpDigits(newDigits);
-      const code = newDigits.join('');
-      setOtpCode(code);
-      if (code.length === 6) {
-        handleVerifyOTP(code);
-      } else {
-        const nextIndex = Math.min(index + digits.length, 5);
-        otpInputRefs.current[nextIndex]?.focus();
-      }
-      return;
-    }
-
-    const newDigits = [...otpDigits];
-    newDigits[index] = value;
-    setOtpDigits(newDigits);
-    const code = newDigits.join('');
-    setOtpCode(code);
-
-    if (value && index < 5) {
-      otpInputRefs.current[index + 1]?.focus();
-    }
-
-    if (code.length === 6) {
-      handleVerifyOTP(code);
-    }
-  };
-
-  const handleOtpKeyPress = (index: number, key: string) => {
-    if (key === 'Backspace' && !otpDigits[index] && index > 0) {
-      otpInputRefs.current[index - 1]?.focus();
-      const newDigits = [...otpDigits];
-      newDigits[index - 1] = '';
-      setOtpDigits(newDigits);
-      setOtpCode(newDigits.join(''));
+  const handleOtpChange = (value: string) => {
+    const cleaned = value.replace(/[^0-9]/g, '').slice(0, 6);
+    setOtpCode(cleaned);
+    if (cleaned.length === 6 && !isLoading) {
+      hiddenInputRef.current?.blur();
+      handleVerifyOTP(cleaned);
     }
   };
 
   const handleVerifyOTP = async (code?: string) => {
     const verificationCode = code || otpCode;
-    if (verificationCode.length !== 6) {
-      setError('Please enter the 6-digit code');
+    if (verificationCode.length !== 6 || isLoading) {
+      if (verificationCode.length !== 6) setError('Please enter the 6-digit code');
       return;
     }
 
@@ -134,9 +97,8 @@ export default function LoginScreen() {
       }
     } catch (err: any) {
       setError(err.message || 'Invalid code');
-      setOtpDigits(['', '', '', '', '', '']);
       setOtpCode('');
-      otpInputRefs.current[0]?.focus();
+      hiddenInputRef.current?.focus();
     } finally {
       setIsLoading(false);
     }
@@ -161,7 +123,6 @@ export default function LoginScreen() {
     if (step === 'otp') {
       setStep('identifier');
       setOtpCode('');
-      setOtpDigits(['', '', '', '', '', '']);
       setError('');
     } else {
       navigation.goBack();
@@ -281,25 +242,35 @@ export default function LoginScreen() {
                 </Text>
               </View>
 
-              <View style={styles.otpContainer}>
-                {otpDigits.map((digit, index) => (
-                  <TextInput
+              <TouchableOpacity 
+                style={styles.otpContainer} 
+                activeOpacity={1}
+                onPress={() => hiddenInputRef.current?.focus()}
+              >
+                <TextInput
+                  ref={hiddenInputRef}
+                  style={styles.hiddenInput}
+                  value={otpCode}
+                  onChangeText={handleOtpChange}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  textContentType="oneTimeCode"
+                  autoComplete="sms-otp"
+                  autoFocus
+                  caretHidden
+                />
+                {[0, 1, 2, 3, 4, 5].map((index) => (
+                  <View
                     key={index}
-                    ref={(ref) => { otpInputRefs.current[index] = ref; }}
                     style={[
                       styles.otpInput,
-                      digit ? styles.otpInputFilled : {},
+                      otpCode[index] ? styles.otpInputFilled : {},
                     ]}
-                    value={digit}
-                    onChangeText={(value) => handleOtpDigitChange(index, value)}
-                    onKeyPress={({ nativeEvent }) => handleOtpKeyPress(index, nativeEvent.key)}
-                    keyboardType="number-pad"
-                    maxLength={1}
-                    selectTextOnFocus
-                    autoFocus={index === 0}
-                  />
+                  >
+                    <Text style={styles.otpDigitText}>{otpCode[index] || ''}</Text>
+                  </View>
                 ))}
-              </View>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.primaryButton, (otpCode.length !== 6 || isLoading) && styles.disabledButton]}
@@ -498,6 +469,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
+    position: 'relative',
+  },
+  hiddenInput: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    opacity: 0,
   },
   otpInput: {
     width: 48,
@@ -506,10 +484,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 12,
-    textAlign: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  otpDigitText: {
     color: '#fff',
     fontSize: 22,
     fontWeight: '700',
+    textAlign: 'center',
   },
   otpInputFilled: {
     borderColor: '#7FFFD4',

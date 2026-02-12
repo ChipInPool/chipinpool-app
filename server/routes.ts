@@ -417,7 +417,7 @@ export async function registerRoutes(
       req.session.save((err) => {
         if (err) return next(err);
         const { password, ...userWithoutPassword } = user;
-        res.json({ user: userWithoutPassword });
+        res.json({ user: userWithoutPassword, sessionToken: `connect.sid=${req.sessionID}` });
       });
     } catch (error) {
       next(error);
@@ -454,7 +454,7 @@ export async function registerRoutes(
       req.session.save((err) => {
         if (err) return next(err);
         const { password, ...userWithoutPassword } = user;
-        res.json({ user: userWithoutPassword });
+        res.json({ user: userWithoutPassword, sessionToken: `connect.sid=${req.sessionID}` });
       });
     } catch (error) {
       next(error);
@@ -494,12 +494,14 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid verification code" });
       }
 
-      // Complete the login
       req.session.userId = userId;
       delete req.session.pendingMfaUserId;
       
-      const { password, ...userWithoutPassword } = user;
-      res.json({ user: userWithoutPassword });
+      req.session.save((err) => {
+        if (err) return next(err);
+        const { password, ...userWithoutPassword } = user;
+        res.json({ user: userWithoutPassword, sessionToken: `connect.sid=${req.sessionID}` });
+      });
     } catch (error) {
       next(error);
     }
@@ -712,7 +714,7 @@ export async function registerRoutes(
       req.session.save((err) => {
         if (err) return next(err);
         const { password, ...userWithoutPassword } = user;
-        res.json({ user: userWithoutPassword });
+        res.json({ user: userWithoutPassword, sessionToken: `connect.sid=${req.sessionID}` });
       });
     } catch (error) {
       next(error);
