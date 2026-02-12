@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { PoolCard } from "@/components/pool-card";
-import { ArrowRight, Plus, Wallet, TrendingUp, Users, CreditCard, Bell, Clock, DollarSign, Activity, Expand, Compass } from "lucide-react";
+import { ArrowRight, Plus, Wallet, TrendingUp, Users, CreditCard, Bell, Clock, DollarSign, Activity, Expand, Compass, Sparkles } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery } from "@tanstack/react-query";
@@ -14,10 +14,19 @@ import { format, formatDistanceToNow } from "date-fns";
 import { GuidedTour } from "@/components/guided-tour";
 import { FeatureTooltip } from "@/components/feature-tooltip";
 
+function getTimeGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 export default function Home() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const [, setLocation] = useLocation();
   const [showTour, setShowTour] = useState(false);
+
+  const greeting = useMemo(() => getTimeGreeting(), []);
 
   const { data: poolsData, isLoading: poolsLoading } = useQuery({
     queryKey: queryKeys.pools,
@@ -87,116 +96,134 @@ export default function Home() {
 
   return (
     <Layout>
-      <div className="mb-4 md:mb-8">
-        <h1 className="text-2xl md:text-3xl font-display font-bold mb-2">
-          Welcome back, {user?.firstName}!
-        </h1>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
-          <p className="text-sm md:text-base text-muted-foreground">Here's what's happening with your pools and wallet.</p>
+      <div className="mb-6 md:mb-10">
+        <div className="flex items-center gap-2 mb-1">
+          <h1 className="text-2xl md:text-4xl font-display font-bold tracking-tight">
+            {greeting}, {user?.firstName} 👋
+          </h1>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
+          <p className="text-sm md:text-base text-muted-foreground/80">Here's what's happening with your pools and wallet.</p>
           <Button
             variant="ghost"
             size="sm"
-            className="text-muted-foreground hover:text-primary flex items-center gap-1.5"
+            className="text-muted-foreground/60 hover:text-primary flex items-center gap-1.5 text-xs"
             onClick={() => setShowTour(true)}
             data-testid="button-take-tour"
           >
-            <Compass className="w-4 h-4" /> Take a Tour
+            <Compass className="w-3.5 h-3.5" /> Take a Tour
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
-        <Card className="bg-white/[0.02] border-white/5">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-6 md:pb-2">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5 mb-8 md:mb-10">
+        <Card className="relative overflow-hidden border-white/[0.08] bg-gradient-to-br from-white/[0.04] to-white/[0.01] hover:border-white/[0.12] transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-4 md:p-6 md:pb-2">
             <FeatureTooltip id="stat-wallet" title="Wallet Balance" description="Your ChipIn wallet holds your funds. Deposit money via Stripe to start contributing to pools.">
-              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Wallet Balance</CardTitle>
+              <CardTitle className="text-[11px] md:text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">Wallet Balance</CardTitle>
             </FeatureTooltip>
-            <Wallet className="h-4 w-4 text-primary" />
+            <div className="p-2 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5">
+              <Wallet className="h-4 w-4 text-primary" />
+            </div>
           </CardHeader>
-          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-            <div className="text-xl md:text-2xl font-bold font-mono">${parseFloat(user?.balance || '0').toLocaleString()}</div>
+          <CardContent className="p-4 pt-1 md:p-6 md:pt-1">
+            <div className="text-2xl md:text-3xl font-bold font-mono tracking-tight">${parseFloat(user?.balance || '0').toLocaleString()}</div>
             <Link href="/profile?action=deposit">
-              <p className="text-xs text-primary hover:underline cursor-pointer mt-1">+ Add funds</p>
+              <p className="text-xs text-primary/80 hover:text-primary hover:underline cursor-pointer mt-2 font-medium">+ Add funds</p>
             </Link>
           </CardContent>
         </Card>
 
-        <Card className="bg-white/[0.02] border-white/5">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-6 md:pb-2">
+        <Card className="relative overflow-hidden border-white/[0.08] bg-gradient-to-br from-white/[0.04] to-white/[0.01] hover:border-white/[0.12] transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-4 md:p-6 md:pb-2">
             <FeatureTooltip id="stat-active-pools" title="Active Pools" description="Pools you've created that are currently accepting contributions.">
-              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Active Pools</CardTitle>
+              <CardTitle className="text-[11px] md:text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">Active Pools</CardTitle>
             </FeatureTooltip>
-            <TrendingUp className="h-4 w-4 text-green-400" />
+            <div className="p-2 rounded-lg bg-gradient-to-br from-green-400/20 to-green-400/5">
+              <TrendingUp className="h-4 w-4 text-green-400" />
+            </div>
           </CardHeader>
-          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-            <div className="text-xl md:text-2xl font-bold">{activePools.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">{myPools.length} total created</p>
+          <CardContent className="p-4 pt-1 md:p-6 md:pt-1">
+            <div className="text-2xl md:text-3xl font-bold tracking-tight">{activePools.length}</div>
+            <p className="text-[11px] md:text-xs text-muted-foreground/60 mt-2">{myPools.length} total created</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-white/[0.02] border-white/5">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-6 md:pb-2">
+        <Card className="relative overflow-hidden border-white/[0.08] bg-gradient-to-br from-white/[0.04] to-white/[0.01] hover:border-white/[0.12] transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-4 md:p-6 md:pb-2">
             <FeatureTooltip id="stat-total-contributed" title="Total Contributed" description="The total amount you've contributed across all pools you've joined.">
-              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Total Contributed</CardTitle>
+              <CardTitle className="text-[11px] md:text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">Total Contributed</CardTitle>
             </FeatureTooltip>
-            <DollarSign className="h-4 w-4 text-accent" />
+            <div className="p-2 rounded-lg bg-gradient-to-br from-accent/20 to-accent/5">
+              <DollarSign className="h-4 w-4 text-accent" />
+            </div>
           </CardHeader>
-          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-            <div className="text-xl md:text-2xl font-bold font-mono">${totalContributed.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground mt-1">Across {contributedPools.length} pools</p>
+          <CardContent className="p-4 pt-1 md:p-6 md:pt-1">
+            <div className="text-2xl md:text-3xl font-bold font-mono tracking-tight">${totalContributed.toLocaleString()}</div>
+            <p className="text-[11px] md:text-xs text-muted-foreground/60 mt-2">Across {contributedPools.length} pools</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-white/[0.02] border-white/5">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-6 md:pb-2">
+        <Card className="relative overflow-hidden border-white/[0.08] bg-gradient-to-br from-white/[0.04] to-white/[0.01] hover:border-white/[0.12] transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-4 md:p-6 md:pb-2">
             <FeatureTooltip id="stat-pools-created" title="Pools Created" description="The number of pools you've started. Create pools for trips, gifts, events, and more.">
-              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Pools Created</CardTitle>
+              <CardTitle className="text-[11px] md:text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">Pools Created</CardTitle>
             </FeatureTooltip>
-            <Users className="h-4 w-4 text-purple-400" />
+            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-400/20 to-purple-400/5">
+              <Users className="h-4 w-4 text-purple-400" />
+            </div>
           </CardHeader>
-          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-            <div className="text-xl md:text-2xl font-bold">{poolsCreatedCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">{activePools.length} currently active</p>
+          <CardContent className="p-4 pt-1 md:p-6 md:pt-1">
+            <div className="text-2xl md:text-3xl font-bold tracking-tight">{poolsCreatedCount}</div>
+            <p className="text-[11px] md:text-xs text-muted-foreground/60 mt-2">{activePools.length} currently active</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 mb-8 md:mb-12">
         <div className="lg:col-span-2">
-          <div className="flex items-center justify-between mb-4 md:mb-6">
-            <h2 className="text-lg md:text-xl font-display font-bold">Quick Actions</h2>
+          <div className="flex items-center justify-between mb-4 md:mb-5">
+            <h2 className="text-lg md:text-xl font-display font-bold tracking-tight">Quick Actions</h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8 md:mb-10">
             <Link href="/create">
-              <div className="p-3 md:p-4 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-colors cursor-pointer text-center" data-testid="quick-action-create-pool">
-                <Plus className="w-5 h-5 md:w-6 md:h-6 mx-auto mb-1.5 md:mb-2 text-primary" />
-                <span className="text-xs md:text-sm font-medium">New Pool</span>
+              <div className="group relative p-5 md:p-6 rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/20 hover:border-primary/40 hover:from-primary/25 hover:to-primary/10 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 cursor-pointer text-center hover:-translate-y-0.5" data-testid="quick-action-create-pool">
+                <div className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                  <Plus className="w-5 h-5 md:w-6 md:h-6 text-primary" />
+                </div>
+                <span className="text-xs md:text-sm font-semibold">New Pool</span>
               </div>
             </Link>
             <Link href="/profile?action=deposit">
-              <div className="p-3 md:p-4 rounded-xl bg-green-500/10 border border-green-500/20 hover:bg-green-500/20 transition-colors cursor-pointer text-center" data-testid="quick-action-deposit">
-                <Wallet className="w-5 h-5 md:w-6 md:h-6 mx-auto mb-1.5 md:mb-2 text-green-400" />
-                <span className="text-xs md:text-sm font-medium">Deposit</span>
+              <div className="group relative p-5 md:p-6 rounded-2xl bg-gradient-to-br from-green-500/15 to-green-500/5 border border-green-500/20 hover:border-green-500/40 hover:from-green-500/25 hover:to-green-500/10 hover:shadow-lg hover:shadow-green-500/5 transition-all duration-300 cursor-pointer text-center hover:-translate-y-0.5" data-testid="quick-action-deposit">
+                <div className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-green-400/30 to-green-400/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                  <Wallet className="w-5 h-5 md:w-6 md:h-6 text-green-400" />
+                </div>
+                <span className="text-xs md:text-sm font-semibold">Deposit</span>
               </div>
             </Link>
             <Link href="/explore">
-              <div className="p-3 md:p-4 rounded-xl bg-accent/10 border border-accent/20 hover:bg-accent/20 transition-colors cursor-pointer text-center" data-testid="quick-action-explore">
-                <Users className="w-5 h-5 md:w-6 md:h-6 mx-auto mb-1.5 md:mb-2 text-accent" />
-                <span className="text-xs md:text-sm font-medium">Explore</span>
+              <div className="group relative p-5 md:p-6 rounded-2xl bg-gradient-to-br from-accent/15 to-accent/5 border border-accent/20 hover:border-accent/40 hover:from-accent/25 hover:to-accent/10 hover:shadow-lg hover:shadow-accent/5 transition-all duration-300 cursor-pointer text-center hover:-translate-y-0.5" data-testid="quick-action-explore">
+                <div className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-accent/30 to-accent/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                  <Users className="w-5 h-5 md:w-6 md:h-6 text-accent" />
+                </div>
+                <span className="text-xs md:text-sm font-semibold">Explore</span>
               </div>
             </Link>
             <Link href="/profile">
-              <div className="p-3 md:p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 transition-colors cursor-pointer text-center" data-testid="quick-action-profile">
-                <CreditCard className="w-5 h-5 md:w-6 md:h-6 mx-auto mb-1.5 md:mb-2 text-purple-400" />
-                <span className="text-xs md:text-sm font-medium">My Cards</span>
+              <div className="group relative p-5 md:p-6 rounded-2xl bg-gradient-to-br from-purple-500/15 to-purple-500/5 border border-purple-500/20 hover:border-purple-500/40 hover:from-purple-500/25 hover:to-purple-500/10 hover:shadow-lg hover:shadow-purple-500/5 transition-all duration-300 cursor-pointer text-center hover:-translate-y-0.5" data-testid="quick-action-profile">
+                <div className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-purple-400/30 to-purple-400/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                  <CreditCard className="w-5 h-5 md:w-6 md:h-6 text-purple-400" />
+                </div>
+                <span className="text-xs md:text-sm font-semibold">My Cards</span>
               </div>
             </Link>
           </div>
 
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg md:text-xl font-display font-bold">Your Pools</h2>
-            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary" asChild>
-              <Link href="/explore">View All <ArrowRight className="w-4 h-4 ml-1" /></Link>
+            <h2 className="text-lg md:text-xl font-display font-bold tracking-tight">Your Pools</h2>
+            <Button variant="ghost" size="sm" className="text-muted-foreground/60 hover:text-primary text-xs" asChild>
+              <Link href="/explore">View All <ArrowRight className="w-3.5 h-3.5 ml-1" /></Link>
             </Button>
           </div>
 
@@ -207,11 +234,20 @@ export default function Home() {
               ))}
             </div>
           ) : myPools.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 md:p-8 text-center">
-              <p className="text-muted-foreground mb-4">You haven't created any pools yet</p>
-              <Button asChild>
-                <Link href="/create"><Plus className="w-4 h-4 mr-2" /> Create Your First Pool</Link>
-              </Button>
+            <div className="relative rounded-2xl border border-dashed border-white/[0.1] bg-gradient-to-br from-white/[0.04] to-white/[0.01] p-8 md:p-12 text-center overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.03] to-transparent pointer-events-none" />
+              <div className="relative">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                  <Sparkles className="w-8 h-8 text-primary/60" />
+                </div>
+                <h3 className="text-base md:text-lg font-semibold mb-2">Start your first pool!</h3>
+                <p className="text-sm text-muted-foreground/70 mb-6 max-w-sm mx-auto">
+                  Create a pool to collect funds for trips, gifts, events, or anything you want to chip in for together.
+                </p>
+                <Button size="lg" className="shadow-lg shadow-primary/20" asChild>
+                  <Link href="/create"><Plus className="w-4 h-4 mr-2" /> Create Your First Pool</Link>
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -223,8 +259,8 @@ export default function Home() {
 
           {contributedPools.length > 0 && (
             <>
-              <div className="flex items-center justify-between mb-4 mt-8">
-                <h2 className="text-lg md:text-xl font-display font-bold">Pools You've Joined</h2>
+              <div className="flex items-center justify-between mb-4 mt-8 md:mt-10">
+                <h2 className="text-lg md:text-xl font-display font-bold tracking-tight">Pools You've Joined</h2>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {contributedPools.slice(0, 4).map((pool: any) => (
@@ -237,40 +273,42 @@ export default function Home() {
 
         <div className="space-y-6">
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg md:text-xl font-display font-bold flex items-center gap-2">
-                <Activity className="w-5 h-5 text-primary" /> Friend Activity
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base md:text-lg font-display font-bold flex items-center gap-2 tracking-tight">
+                <Activity className="w-4 h-4 text-primary" /> Friend Activity
               </h2>
-              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary" asChild>
-                <Link href="/activity"><Expand className="w-4 h-4 mr-1" /> Expand</Link>
+              <Button variant="ghost" size="sm" className="text-muted-foreground/60 hover:text-primary text-xs h-8 px-2" asChild>
+                <Link href="/activity"><Expand className="w-3.5 h-3.5 mr-1" /> Expand</Link>
               </Button>
             </div>
-            <Card className="bg-white/[0.02] border-white/5">
+            <Card className="border-white/[0.08] bg-gradient-to-br from-white/[0.03] to-transparent overflow-hidden">
               <CardContent className="p-0">
                 {activities.length === 0 ? (
-                  <div className="p-6 text-center text-muted-foreground text-sm">
-                    <Activity className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p>No activity from friends yet</p>
-                    <p className="text-xs mt-1">Follow people to see their contributions here</p>
+                  <div className="p-8 text-center">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center">
+                      <Activity className="w-5 h-5 text-primary/50" />
+                    </div>
+                    <p className="text-sm font-medium text-muted-foreground/80">No activity yet</p>
+                    <p className="text-xs text-muted-foreground/50 mt-1">Follow people to see their contributions</p>
                   </div>
                 ) : (
-                  <div className="divide-y divide-white/5">
+                  <div className="divide-y divide-white/[0.06]">
                     {activities.slice(0, 4).map((activity: any) => (
                       <Link key={activity.id} href={`/pool/${activity.poolId}`}>
-                        <div className="p-4 hover:bg-white/5 transition-colors cursor-pointer">
+                        <div className="p-3.5 hover:bg-white/[0.04] transition-colors cursor-pointer">
                           <div className="flex items-start gap-3">
-                            <Avatar className="w-8 h-8">
+                            <Avatar className="w-8 h-8 ring-1 ring-white/10">
                               <AvatarImage src={activity.userAvatar} />
-                              <AvatarFallback>{activity.userName?.[0] || '?'}</AvatarFallback>
+                              <AvatarFallback className="text-[10px]">{activity.userName?.[0] || '?'}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm">
-                                <span className="font-medium">{activity.userName}</span>
-                                <span className="text-muted-foreground"> chipped in </span>
-                                <span className="text-green-400 font-semibold">${parseFloat(activity.amount).toFixed(2)}</span>
+                              <p className="text-[13px] leading-snug">
+                                <span className="font-semibold">{activity.userName}</span>
+                                <span className="text-muted-foreground/70"> chipped in </span>
+                                <span className="text-green-400 font-bold">${parseFloat(activity.amount).toFixed(2)}</span>
                               </p>
-                              <p className="text-xs text-muted-foreground truncate">to {activity.poolTitle}</p>
-                              <p className="text-[10px] text-muted-foreground mt-1">
+                              <p className="text-xs text-muted-foreground/60 truncate mt-0.5">to {activity.poolTitle}</p>
+                              <p className="text-[10px] text-muted-foreground/40 mt-1">
                                 {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
                               </p>
                             </div>
@@ -285,30 +323,34 @@ export default function Home() {
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg md:text-xl font-display font-bold flex items-center gap-2">
-                <Bell className="w-5 h-5" /> Notifications
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base md:text-lg font-display font-bold flex items-center gap-2 tracking-tight">
+                <Bell className="w-4 h-4" /> Notifications
               </h2>
             </div>
-            <Card className="bg-white/[0.02] border-white/5">
+            <Card className="border-white/[0.08] bg-gradient-to-br from-white/[0.03] to-transparent overflow-hidden">
               <CardContent className="p-0">
                 {recentNotifications.length === 0 ? (
-                  <div className="p-6 text-center text-muted-foreground text-sm">
-                    No recent notifications
+                  <div className="p-8 text-center">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] flex items-center justify-center">
+                      <Bell className="w-5 h-5 text-muted-foreground/40" />
+                    </div>
+                    <p className="text-sm font-medium text-muted-foreground/80">All caught up!</p>
+                    <p className="text-xs text-muted-foreground/50 mt-1">No recent notifications</p>
                   </div>
                 ) : (
-                  <div className="divide-y divide-white/5">
+                  <div className="divide-y divide-white/[0.06]">
                     {recentNotifications.map((notification: any) => (
                       <Link key={notification.id} href={notification.link || '#'}>
-                        <div className={`p-4 hover:bg-white/5 transition-colors cursor-pointer ${!notification.read ? 'bg-primary/5' : ''}`}>
+                        <div className={`p-3.5 hover:bg-white/[0.04] transition-colors cursor-pointer ${!notification.read ? 'bg-primary/[0.06] border-l-2 border-l-primary' : ''}`}>
                           <div className="flex items-start gap-3">
-                            <div className="p-2 rounded-full bg-white/5">
-                              <Clock className="w-3 h-3 text-muted-foreground" />
+                            <div className={`p-2 rounded-lg ${!notification.read ? 'bg-primary/10' : 'bg-white/[0.05]'}`}>
+                              <Clock className="w-3.5 h-3.5 text-muted-foreground/60" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{notification.title}</p>
-                              <p className="text-xs text-muted-foreground line-clamp-2">{notification.message}</p>
-                              <p className="text-[10px] text-muted-foreground mt-1">
+                              <p className="text-[13px] font-semibold leading-snug truncate">{notification.title}</p>
+                              <p className="text-xs text-muted-foreground/60 line-clamp-2 mt-0.5 leading-relaxed">{notification.message}</p>
+                              <p className="text-[10px] text-muted-foreground/40 mt-1.5">
                                 {format(new Date(notification.createdAt), 'MMM d, h:mm a')}
                               </p>
                             </div>
@@ -323,13 +365,13 @@ export default function Home() {
           </div>
 
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Recent Contributors</h3>
+            <h3 className="text-xs font-medium text-muted-foreground/60 mb-3 uppercase tracking-wider">Recent Contributors</h3>
             <div className="flex -space-x-2">
               {pools.slice(0, 5).flatMap((p: any) => p.contributors || []).slice(0, 8).map((contributor: any, i: number) => (
                 <Link key={`${contributor.id}-${i}`} href={`/user/${contributor.id}`}>
-                  <Avatar className="w-8 h-8 border-2 border-background hover:z-10 hover:scale-110 transition-transform cursor-pointer">
+                  <Avatar className="w-9 h-9 border-2 border-background hover:z-10 hover:scale-110 transition-transform duration-200 cursor-pointer ring-1 ring-white/10">
                     <AvatarImage src={contributor.avatar || undefined} />
-                    <AvatarFallback className="text-xs">{contributor.name?.slice(0, 2).toUpperCase()}</AvatarFallback>
+                    <AvatarFallback className="text-[10px] bg-gradient-to-br from-white/10 to-white/5">{contributor.name?.slice(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                 </Link>
               ))}

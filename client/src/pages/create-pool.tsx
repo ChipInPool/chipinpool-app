@@ -15,6 +15,24 @@ import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
+const categoryGradients: Record<string, string> = {
+  gift: "from-pink-500/10 to-rose-500/5",
+  trip: "from-blue-500/10 to-cyan-500/5",
+  recurring: "from-emerald-500/10 to-green-500/5",
+  purchase: "from-amber-500/10 to-yellow-500/5",
+  event: "from-violet-500/10 to-purple-500/5",
+  other: "from-gray-500/10 to-slate-500/5",
+};
+
+const categoryIcons: Record<string, React.ElementType> = {
+  gift: Gift,
+  trip: Plane,
+  purchase: ShoppingBag,
+  event: Calendar,
+  other: Sparkles,
+  recurring: RefreshCw,
+};
+
 export default function CreatePool() {
   const [, setLocation] = useLocation();
   const search = useSearch();
@@ -47,8 +65,8 @@ export default function CreatePool() {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [showImageDialog, setShowImageDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
 
-  // Image upload mutation
   const uploadImageMutation = useMutation({
     mutationFn: async (file: File) => {
       return await uploadFile(file);
@@ -82,7 +100,6 @@ export default function CreatePool() {
     }
   };
 
-  // Stock image options based on category
   const getStockImages = () => {
     const images: Record<string, string[]> = {
       trip: [
@@ -155,6 +172,23 @@ export default function CreatePool() {
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!title.trim()) {
+      toast({ description: "Please enter a pool name", variant: "destructive" });
+      return;
+    }
+    if (!category) {
+      toast({ description: "Please select a category", variant: "destructive" });
+      return;
+    }
+    if (!targetAmount || parseFloat(targetAmount) <= 0) {
+      toast({ description: "Please enter a valid target amount", variant: "destructive" });
+      return;
+    }
+    if (!deadline) {
+      toast({ description: "Please set a deadline", variant: "destructive" });
+      return;
+    }
     
     const categoryMap: Record<string, string> = {
       gift: "Gift",
@@ -177,6 +211,20 @@ export default function CreatePool() {
     });
   };
 
+  const templates = [
+    { icon: PartyPopper, label: "Birthday Gift", category: "gift", amount: "100", desc: "Chip in for a birthday present" },
+    { icon: Plane, label: "Group Trip", category: "trip", amount: "500", desc: "Pool funds for travel expenses" },
+    { icon: Home, label: "Housewarming", category: "gift", amount: "200", desc: "Welcome gift for a new home" },
+    { icon: GraduationCap, label: "Graduation", category: "gift", amount: "150", desc: "Celebrate a graduate" },
+    { icon: Heart, label: "Wedding Gift", category: "gift", amount: "300", desc: "Gift for the newlyweds" },
+    { icon: Coffee, label: "Office Fund", category: "recurring", amount: "50", desc: "Monthly office snacks/coffee" },
+    { icon: RefreshCw, label: "Rent Split", category: "recurring", amount: "1000", desc: "Monthly rent contributions" },
+    { icon: RefreshCw, label: "Utilities", category: "recurring", amount: "150", desc: "Monthly utility bills" },
+    { icon: RefreshCw, label: "Subscription", category: "recurring", amount: "30", desc: "Shared streaming/service" },
+  ];
+
+  const SelectedCategoryIcon = category ? categoryIcons[category] : null;
+
   return (
     <Layout>
       <div className="max-w-2xl mx-auto px-1 sm:px-0">
@@ -185,59 +233,71 @@ export default function CreatePool() {
         </Link>
 
         {!isKycVerified && !statusLoading && (
-          <div className="mb-4 flex items-center gap-2 rounded-lg border border-orange-500/30 bg-orange-500/5 px-4 py-2.5 text-sm text-orange-300" data-testid="banner-kyc-notice">
-            <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0" />
-            <span>
-              Complete KYC verification in{" "}
-              <Link href="/security" className="underline font-medium text-orange-400 hover:text-orange-300">Security settings</Link>{" "}
-              for full features
-            </span>
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-orange-500/20 bg-gradient-to-r from-orange-500/8 to-amber-500/5 px-4 py-3 text-sm" data-testid="banner-kyc-notice">
+            <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-500/15">
+              <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
+            </div>
+            <div>
+              <p className="font-medium text-orange-300">Identity Verification Required</p>
+              <p className="text-orange-300/70 mt-0.5">
+                Complete KYC verification in{" "}
+                <Link href="/security" className="underline font-medium text-orange-400 hover:text-orange-300 transition-colors">Security settings</Link>{" "}
+                for full features.
+              </p>
+            </div>
           </div>
         )}
         
-        <div className="mb-6 md:mb-8">
+        <div className="mb-8 md:mb-10">
           <h1 className="text-2xl md:text-3xl font-display font-bold mb-2">Create a New Pool</h1>
           <p className="text-sm md:text-base text-muted-foreground">Set up a pool to split costs for a gift, trip, or purchase.</p>
         </div>
 
-        <div className="mb-8">
+        <div className="mb-10">
           <h2 className="font-semibold mb-4 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" /> Quick Templates
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {[
-              { icon: PartyPopper, label: "Birthday Gift", category: "gift", amount: "100", desc: "Chip in for a birthday present" },
-              { icon: Plane, label: "Group Trip", category: "trip", amount: "500", desc: "Pool funds for travel expenses" },
-              { icon: Home, label: "Housewarming", category: "gift", amount: "200", desc: "Welcome gift for a new home" },
-              { icon: GraduationCap, label: "Graduation", category: "gift", amount: "150", desc: "Celebrate a graduate" },
-              { icon: Heart, label: "Wedding Gift", category: "gift", amount: "300", desc: "Gift for the newlyweds" },
-              { icon: Coffee, label: "Office Fund", category: "recurring", amount: "50", desc: "Monthly office snacks/coffee" },
-              { icon: RefreshCw, label: "Rent Split", category: "recurring", amount: "1000", desc: "Monthly rent contributions" },
-              { icon: RefreshCw, label: "Utilities", category: "recurring", amount: "150", desc: "Monthly utility bills" },
-              { icon: RefreshCw, label: "Subscription", category: "recurring", amount: "30", desc: "Shared streaming/service" },
-            ].map((template) => (
-              <button
-                key={template.label}
-                type="button"
-                onClick={() => {
-                  setCategory(template.category);
-                  setTargetAmount(template.amount);
-                  setDescription(template.desc);
-                  setIsRecurring(template.category === "recurring");
-                }}
-                className="p-3 md:p-4 rounded-xl border border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all text-left group"
-                data-testid={`template-${template.label.toLowerCase().replace(' ', '-')}`}
-              >
-                <template.icon className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors mb-2" />
-                <div className="font-medium text-sm">{template.label}</div>
-                <div className="text-xs text-muted-foreground">${template.amount}</div>
-              </button>
-            ))}
+            {templates.map((template) => {
+              const isActive = activeTemplate === template.label;
+              const gradient = categoryGradients[template.category] || categoryGradients.other;
+              return (
+                <button
+                  key={template.label}
+                  type="button"
+                  onClick={() => {
+                    setActiveTemplate(template.label);
+                    setCategory(template.category);
+                    setTargetAmount(template.amount);
+                    setDescription(template.desc);
+                    setIsRecurring(template.category === "recurring");
+                    const defaultDeadline = new Date();
+                    defaultDeadline.setDate(defaultDeadline.getDate() + 30);
+                    setDeadline(defaultDeadline.toISOString().split('T')[0]);
+                  }}
+                  className={`p-3 md:p-4 rounded-xl border bg-gradient-to-br ${gradient} transition-all duration-200 text-left group hover:scale-[1.02] ${
+                    isActive
+                      ? "ring-2 ring-primary border-primary/50 shadow-md shadow-primary/10"
+                      : "border-white/10 hover:border-primary/40 hover:shadow-sm"
+                  }`}
+                  data-testid={`template-${template.label.toLowerCase().replace(' ', '-')}`}
+                >
+                  <template.icon className={`w-6 h-6 transition-colors mb-2 ${isActive ? "text-primary" : "text-muted-foreground group-hover:text-primary"}`} />
+                  <div className="font-medium text-sm">{template.label}</div>
+                  <div className="text-xs text-muted-foreground">${template.amount}</div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8">
-          <div className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-8 md:space-y-10">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 md:p-6 space-y-6">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="h-6 w-1 rounded-full bg-primary" />
+              <h2 className="font-semibold text-base">Pool Details</h2>
+            </div>
+
             <div className="space-y-4">
               <Label htmlFor="title" className="text-base">What are you pooling for?</Label>
               <Input 
@@ -254,30 +314,38 @@ export default function CreatePool() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label>Category</Label>
-                <Select required onValueChange={(val) => { setCategory(val); setIsRecurring(val === 'recurring'); }}>
+                <Select required value={category} onValueChange={(val) => { setCategory(val); setIsRecurring(val === 'recurring'); setActiveTemplate(null); }}>
                   <SelectTrigger className="h-12 bg-white/5 border-white/10" data-testid="select-category">
-                    <SelectValue placeholder="Select category" />
+                    <div className="flex items-center gap-2">
+                      {SelectedCategoryIcon && <SelectedCategoryIcon className="w-4 h-4 text-primary shrink-0" />}
+                      <SelectValue placeholder="Select category" />
+                    </div>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="gift"><div className="flex items-center gap-2"><Gift className="w-4 h-4" /> Gift</div></SelectItem>
                     <SelectItem value="trip"><div className="flex items-center gap-2"><Plane className="w-4 h-4" /> Trip</div></SelectItem>
                     <SelectItem value="purchase"><div className="flex items-center gap-2"><ShoppingBag className="w-4 h-4" /> Purchase</div></SelectItem>
+                    <SelectItem value="event"><div className="flex items-center gap-2"><Calendar className="w-4 h-4" /> Event</div></SelectItem>
+                    <SelectItem value="other"><div className="flex items-center gap-2"><Sparkles className="w-4 h-4" /> Other</div></SelectItem>
                     <SelectItem value="recurring"><div className="flex items-center gap-2"><RefreshCw className="w-4 h-4 text-primary" /> Recurring / Bill</div></SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="amount">Target Amount ($)</Label>
-                <Input 
-                  id="amount" 
-                  type="number" 
-                  placeholder="0.00" 
-                  className="h-12 bg-white/5 border-white/10 font-mono" 
-                  value={targetAmount}
-                  onChange={(e) => setTargetAmount(e.target.value)}
-                  required 
-                  data-testid="input-target-amount"
-                />
+                <Label htmlFor="amount">Target Amount</Label>
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-base select-none">$</div>
+                  <Input 
+                    id="amount" 
+                    type="number" 
+                    placeholder="0.00" 
+                    className="h-12 bg-white/5 border-white/10 font-mono pl-8" 
+                    value={targetAmount}
+                    onChange={(e) => setTargetAmount(e.target.value)}
+                    required 
+                    data-testid="input-target-amount"
+                  />
+                </div>
               </div>
             </div>
 
@@ -330,9 +398,12 @@ export default function CreatePool() {
             </div>
           </div>
 
-          <div className="h-px bg-white/5" />
+          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 md:p-6 space-y-6">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="h-6 w-1 rounded-full bg-primary" />
+              <h2 className="font-semibold text-base">Schedule & Media</h2>
+            </div>
 
-          <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label>Deadline</Label>
@@ -385,7 +456,6 @@ export default function CreatePool() {
                         <DialogTitle>Add Cover Image</DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4">
-                        {/* Upload option */}
                         <div>
                           <input
                             ref={fileInputRef}
@@ -417,7 +487,6 @@ export default function CreatePool() {
                           </Button>
                         </div>
 
-                        {/* Stock images */}
                         <div>
                           <p className="text-sm font-medium mb-3">Or choose a stock image:</p>
                           <div className="grid grid-cols-3 gap-2">
@@ -445,12 +514,12 @@ export default function CreatePool() {
             </div>
           </div>
 
-          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 sm:gap-4 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 sm:gap-4 pt-2">
             <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => setLocation("/")}>Cancel</Button>
             <Button 
               type="submit" 
               size="lg" 
-              className="w-full sm:w-auto font-semibold shadow-lg shadow-primary/20" 
+              className="w-full sm:w-auto font-semibold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all duration-200" 
               disabled={createPoolMutation.isPending}
               data-testid="button-create-pool"
             >

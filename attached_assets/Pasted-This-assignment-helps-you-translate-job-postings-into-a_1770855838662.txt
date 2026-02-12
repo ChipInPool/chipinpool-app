@@ -1,0 +1,73 @@
+This assignment helps you translate job postings into actionable career insights by analyzing how employers define the Business Analytics role, the skills they value, and how those expectations align with your current preparation and career goals. The deliverable is a table with three rows (one for headings and two for the jobs) and several columns (job title, company, location, primary purpose, required qualifications, etc).
+
+Part 1. Job Opportunity Screening
+
+Identify two distinct job postings for Business Analytics–related roles.
+?        Roles should be relevant to MSBA graduates (e.g., Business Analyst, Data Analyst, Analytics Consultant, Product Analyst).
+
+?        Jobs must be posted within the last 6 months.
+
+?        Select two different companies (preferably different industries or role types).
+
+?        Source from reputable platforms (LinkedIn, Indeed, Glassdoor, company websites).
+
+Deliverable
+
+?        A table that includes the job title, company, and industry
+
+?        Job posting link
+
+?        Location (or mention if it is remote)
+
+ 
+
+Part 2: Job Description Breakdown
+
+For each job posting, complete a structured analysis.
+
+ 
+
+Role Focus 
+?        What is the primary purpose of the role?
+
+?        Is the role more:
+
+o   Technical
+
+o   Business-facing
+
+o   Hybrid
+
+?        Where does this role sit in the organization (IT, Operations, Marketing, Strategy, etc.)?
+
+ 
+
+Required vs. Preferred (nice-to-have) Qualifications
+Create a two-column table:
+
+?        Required qualifications 
+
+?        Preferred qualifications
+
+Then answer:
+
+?        Which requirements are non-negotiable?
+
+?        Which seems flexible or trainable?
+
+ 
+
+Skills Analysis
+Categorize the identified skills (5 most emphasized skills) into the following buckets:
+
+Technical Skills
+o   Tools (SQL, Python, R, Tableau, Power BI, Excel, cloud platforms, etc.)
+
+Analytical Skills
+o   Problem framing, modeling, forecasting, experimentation, storytelling
+
+Business & Domain Skills
+o   Industry knowledge, process improvement, decision support
+
+Professional Skills
+o   Communication, stakeholder management, teamwork, presentation
