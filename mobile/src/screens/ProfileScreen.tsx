@@ -123,6 +123,13 @@ export default function ProfileScreen() {
             label="Activity"
             onPress={() => navigation.navigate('Activity')}
           />
+          <MenuItem
+            icon="repeat-outline"
+            iconColor="#34D399"
+            iconBg="rgba(52,211,153,0.15)"
+            label="Recurring Payments"
+            onPress={() => navigation.navigate('Recurring')}
+          />
         </View>
 
         <View style={styles.section}>

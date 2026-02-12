@@ -102,6 +102,10 @@ export default function PoolDetailsScreen() {
   const [editDeadline, setEditDeadline] = useState('');
   const [editStatus, setEditStatus] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [showAutoContribute, setShowAutoContribute] = useState(false);
+  const [autoContributeAmount, setAutoContributeAmount] = useState('');
+  const [autoContributeFrequency, setAutoContributeFrequency] = useState<'weekly' | 'monthly' | 'quarterly'>('monthly');
+  const [startImmediately, setStartImmediately] = useState(true);
   const { refreshUser } = useAuth();
 
   const { data: pool, isLoading, isError } = useQuery({
@@ -262,6 +266,21 @@ export default function PoolDetailsScreen() {
     },
   });
 
+  const autoContributeMutation = useMutation({
+    mutationFn: () => api.recurring.create(poolId, autoContributeAmount, autoContributeFrequency, startImmediately),
+    onSuccess: () => {
+      Alert.alert('Success', 'Auto-contribute has been set up!');
+      setShowAutoContribute(false);
+      setAutoContributeAmount('');
+      setAutoContributeFrequency('monthly');
+      setStartImmediately(true);
+      invalidateAllQueries();
+    },
+    onError: (err: any) => {
+      Alert.alert('Error', err?.message || 'Failed to set up auto-contribute');
+    },
+  });
+
   const handleContribute = () => {
     const amount = parseFloat(contributeAmount);
     if (isNaN(amount) || amount <= 0) {
@@ -410,6 +429,18 @@ export default function PoolDetailsScreen() {
           <Text style={styles.secondaryButtonText}>Share</Text>
         </TouchableOpacity>
       </View>
+
+      {pool?.status === 'active' && (
+        <TouchableOpacity
+          style={[styles.secondaryButton, { marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' }]}
+          onPress={() => setShowAutoContribute(true)}
+          activeOpacity={0.7}
+          data-testid="button-auto-contribute"
+        >
+          <Ionicons name="repeat-outline" size={20} color="#7FFFD4" />
+          <Text style={styles.secondaryButtonText}>Set Up Auto-Contribute</Text>
+        </TouchableOpacity>
+      )}
 
       {isCreator && (
         <View style={styles.section}>
@@ -1101,6 +1132,101 @@ export default function PoolDetailsScreen() {
                 <Text style={styles.confirmButtonText}>Save Changes</Text>
               )}
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showAutoContribute} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeaderRow}>
+              <View>
+                <Text style={styles.modalTitle}>Set Up Auto-Contribute</Text>
+              </View>
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowAutoContribute(false)} data-testid="button-close-auto-contribute">
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <Text style={{ color: '#708090', fontSize: 13, marginBottom: 16 }}>
+              Automatically contribute to this pool on a recurring schedule using your wallet balance.
+            </Text>
+
+            <Text style={styles.paymentMethodLabel}>Amount ($)</Text>
+            <View style={styles.amountInputContainer}>
+              <Text style={styles.dollarPrefix}>$</Text>
+              <TextInput
+                style={styles.amountInput}
+                value={autoContributeAmount}
+                onChangeText={setAutoContributeAmount}
+                placeholder="0.00"
+                placeholderTextColor="#708090"
+                keyboardType="decimal-pad"
+                data-testid="input-auto-contribute-amount"
+              />
+            </View>
+
+            <Text style={styles.paymentMethodLabel}>Frequency</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+              {(['weekly', 'monthly', 'quarterly'] as const).map((freq) => (
+                <TouchableOpacity
+                  key={freq}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: autoContributeFrequency === freq ? '#7FFFD4' : 'rgba(255,255,255,0.1)',
+                    backgroundColor: autoContributeFrequency === freq ? 'rgba(127,255,212,0.15)' : 'rgba(255,255,255,0.05)',
+                    alignItems: 'center',
+                  }}
+                  onPress={() => setAutoContributeFrequency(freq)}
+                  data-testid={`button-freq-${freq}`}
+                >
+                  <Text style={{
+                    color: autoContributeFrequency === freq ? '#7FFFD4' : '#708090',
+                    fontSize: 13,
+                    fontWeight: '600',
+                    textTransform: 'capitalize',
+                  }}>
+                    {freq}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingVertical: 8 }}>
+              <Text style={{ color: '#fff', fontSize: 14 }}>Start first payment now</Text>
+              <Switch
+                value={startImmediately}
+                onValueChange={setStartImmediately}
+                trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(127,255,212,0.3)' }}
+                thumbColor={startImmediately ? '#7FFFD4' : '#708090'}
+                data-testid="switch-start-immediately"
+              />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                style={[styles.confirmButton, { backgroundColor: 'rgba(255,255,255,0.1)', flex: 1 }]}
+                onPress={() => setShowAutoContribute(false)}
+              >
+                <Text style={{ color: '#fff', fontWeight: '600', textAlign: 'center' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmButton, {
+                  backgroundColor: '#7FFFD4',
+                  flex: 1,
+                  opacity: (!autoContributeAmount || parseFloat(autoContributeAmount) <= 0 || autoContributeMutation.isPending) ? 0.5 : 1,
+                }]}
+                onPress={() => autoContributeMutation.mutate()}
+                disabled={!autoContributeAmount || parseFloat(autoContributeAmount) <= 0 || autoContributeMutation.isPending}
+                data-testid="button-confirm-auto-contribute"
+              >
+                <Text style={{ color: '#001F3F', fontWeight: '700', textAlign: 'center' }}>
+                  {autoContributeMutation.isPending ? 'Setting up...' : 'Set Up Auto-Contribute'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

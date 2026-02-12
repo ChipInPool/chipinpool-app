@@ -356,6 +356,11 @@ export const api = {
   },
   recurring: {
     list: () => fetchApi<any>('/api/user/recurring-contributions'),
+    create: (poolId: string, amount: string, frequency: string, startImmediately: boolean = true) =>
+      fetchApi<any>(`/api/pools/${poolId}/recurring`, {
+        method: 'POST',
+        body: JSON.stringify({ amount, frequency, startImmediately }),
+      }),
     update: (id: string, data: any) =>
       fetchApi<any>(`/api/recurring/${id}`, {
         method: 'PATCH',

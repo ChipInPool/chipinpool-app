@@ -18,6 +18,7 @@ import NotificationsScreen from '@/screens/NotificationsScreen';
 import ActivityScreen from '@/screens/ActivityScreen';
 import RewardsScreen from '@/screens/RewardsScreen';
 import NotificationSettingsScreen from '@/screens/NotificationSettingsScreen';
+import RecurringScreen from '@/screens/RecurringScreen';
 
 export type AppTabParamList = {
   HomeTab: undefined;
@@ -43,6 +44,7 @@ export type ProfileStackParamList = {
   NotificationSettings: undefined;
   Activity: undefined;
   Rewards: undefined;
+  Recurring: undefined;
 };
 
 const Tab = createBottomTabNavigator();
@@ -83,6 +85,7 @@ function ProfileStackNavigator() {
       <ProfileStackNav.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ title: 'Notification Settings' }} />
       <ProfileStackNav.Screen name="Activity" component={ActivityScreen} options={{ title: 'Activity' }} />
       <ProfileStackNav.Screen name="Rewards" component={RewardsScreen} options={{ title: 'Rewards' }} />
+      <ProfileStackNav.Screen name="Recurring" component={RecurringScreen} options={{ title: 'Auto-Contribute' }} />
     </ProfileStackNav.Navigator>
   );
 }
