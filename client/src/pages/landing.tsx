@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { Sparkles, Zap, ShieldCheck, Users, CreditCard, Code, ArrowRight, CheckCircle, RefreshCw, Bell, Globe, Sun, Moon } from "lucide-react";
-import heroImage from "@assets/generated_images/futuristic_fintech_3d_visualization_of_digital_currency_pooling.png";
 import { useTheme } from "@/components/theme-provider";
 
 export default function Landing() {
@@ -44,11 +43,7 @@ export default function Landing() {
 
       <section className="relative overflow-hidden py-12 sm:py-20 md:py-32">
         <div className="absolute inset-0 z-0">
-          <img 
-            src={heroImage} 
-            alt="Futuristic Pooling" 
-            className="w-full h-full object-cover opacity-30 mix-blend-screen"
-          />
+          <div className="w-full h-full bg-gradient-to-br from-primary/20 via-primary/10 to-accent/20" />
           <div className="absolute inset-0 bg-gradient-to-b from-background via-background/90 to-background" />
         </div>
         

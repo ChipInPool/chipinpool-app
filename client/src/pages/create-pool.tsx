@@ -153,50 +153,6 @@ export default function CreatePool() {
     );
   }
   
-  if (!isKycVerified) {
-    return (
-      <Layout>
-        <div className="max-w-lg mx-auto mt-12">
-          <Card className="border-orange-500/30 bg-orange-500/5">
-            <CardHeader className="text-center">
-              <div className="mx-auto w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center mb-4">
-                <AlertTriangle className="w-8 h-8 text-orange-500" />
-              </div>
-              <CardTitle className="text-xl">Identity Verification Required</CardTitle>
-              <CardDescription>
-                To protect our community and comply with regulations, you need to verify your identity before creating pools.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-sm text-muted-foreground space-y-2">
-                <p>Verification helps us:</p>
-                <ul className="list-disc list-inside space-y-1 ml-2">
-                  <li>Prevent fraud and protect your funds</li>
-                  <li>Ensure secure transactions</li>
-                  <li>Comply with financial regulations</li>
-                </ul>
-              </div>
-              <Button 
-                className="w-full" 
-                onClick={() => setLocation("/security")}
-                data-testid="button-verify-identity"
-              >
-                <Shield className="w-4 h-4 mr-2" /> Verify My Identity
-              </Button>
-              <Button 
-                variant="ghost" 
-                className="w-full" 
-                onClick={() => setLocation("/")}
-              >
-                Back to Dashboard
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </Layout>
-    );
-  }
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -227,6 +183,17 @@ export default function CreatePool() {
         <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4 md:mb-6 transition-colors">
           <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
         </Link>
+
+        {!isKycVerified && !statusLoading && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-orange-500/30 bg-orange-500/5 px-4 py-2.5 text-sm text-orange-300" data-testid="banner-kyc-notice">
+            <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0" />
+            <span>
+              Complete KYC verification in{" "}
+              <Link href="/security" className="underline font-medium text-orange-400 hover:text-orange-300">Security settings</Link>{" "}
+              for full features
+            </span>
+          </div>
+        )}
         
         <div className="mb-6 md:mb-8">
           <h1 className="text-2xl md:text-3xl font-display font-bold mb-2">Create a New Pool</h1>

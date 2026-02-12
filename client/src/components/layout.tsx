@@ -67,10 +67,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Link href="/" className="flex items-center gap-2 group cursor-pointer">
             <img 
               src="/logo.png" 
-              alt="ChipIn" 
+              alt="ChipInPool" 
               className="w-8 h-8 rounded-lg group-hover:scale-105 transition-transform object-cover"
             />
-            <span className="font-display font-bold text-xl tracking-tight">ChipIn</span>
+            <span className="font-display font-bold text-xl tracking-tight">ChipInPool</span>
           </Link>
 
           <div className="hidden md:flex items-center gap-6">

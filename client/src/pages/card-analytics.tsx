@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, CreditCard, DollarSign, TrendingUp, BarChart3 } from "lucide-react";
 import { format } from "date-fns";
 import { Layout } from "@/components/layout";
+import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 
 interface Transaction {
   id: string;
@@ -52,7 +54,16 @@ export default function CardAnalyticsPage() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto px-1 sm:px-0">
+      <div className="relative max-w-4xl mx-auto px-1 sm:px-0">
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm rounded-xl" data-testid="overlay-coming-soon">
+          <CreditCard className="w-16 h-16 text-primary mb-4" />
+          <h2 className="text-2xl md:text-3xl font-bold mb-2">Virtual Cards - Coming Soon</h2>
+          <p className="text-muted-foreground text-center max-w-md mb-6">We're building virtual Visa cards for your pools. Stay tuned!</p>
+          <Link href="/">
+            <Button data-testid="button-back-dashboard">Back to Dashboard</Button>
+          </Link>
+        </div>
+        <div className="opacity-30 blur-[2px] pointer-events-none select-none">
         <div className="mb-4 md:mb-6">
           <h1 className="text-xl md:text-2xl font-bold">Virtual Card Analytics</h1>
           <p className="text-sm md:text-base text-muted-foreground">Track your spending and card usage</p>
@@ -200,6 +211,7 @@ export default function CardAnalyticsPage() {
             )}
           </CardContent>
         </Card>
+        </div>
       </div>
     </Layout>
   );

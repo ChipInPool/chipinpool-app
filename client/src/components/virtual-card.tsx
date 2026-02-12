@@ -36,6 +36,11 @@ export function VirtualCard({
       <div className="absolute -top-20 -right-20 w-64 h-64 bg-primary/30 rounded-full blur-3xl mix-blend-screen animate-pulse-slow" />
       <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-accent/30 rounded-full blur-3xl mix-blend-screen animate-pulse-slow delay-75" />
 
+      {/* Coming Soon Badge */}
+      <div className="absolute top-3 right-3 z-30 bg-primary/90 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-lg" data-testid="badge-coming-soon">
+        Coming Soon
+      </div>
+
       {/* Card Content */}
       <div className="relative z-20 p-6 md:p-8 flex flex-col justify-between h-full text-white">
         <div className="flex justify-between items-start">
