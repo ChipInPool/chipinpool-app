@@ -1441,6 +1441,13 @@ export async function registerRoutes(
           
           console.log(`[ChipInPay] Session ${merchantSession.id} completed. Merchant ${merchantSession.merchantId} earned $${netAmount.toFixed(2)}`);
           
+          const updatedPoolForSpend = await storage.getPool(pool.id);
+          if (updatedPoolForSpend) {
+            const currentSpent = parseFloat(updatedPoolForSpend.spentAmount);
+            const newSpentAmount = (currentSpent + totalAmount).toFixed(2);
+            await storage.updatePoolSpentAmount(pool.id, newSpentAmount);
+          }
+          
           // Send push notification to merchant owner
           if (merchant) {
             const merchantOwner = await storage.getUser(merchant.userId);
