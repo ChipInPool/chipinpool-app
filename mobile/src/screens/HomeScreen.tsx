@@ -54,10 +54,8 @@ export default function HomeScreen() {
   const quickActions = [
     { icon: 'add-circle-outline', label: 'Create Pool', color: '#7FFFD4', screen: 'PoolsTab', params: { screen: 'CreatePool' } },
     { icon: 'people-outline', label: 'Join Pool', color: '#60A5FA', screen: 'PoolsTab' },
-    { icon: 'card-outline', label: 'View Cards', color: '#F472B6', screen: 'CardsTab' },
-    { icon: 'bag-handle-outline', label: 'Spend Now', color: '#7FFFD4', screen: 'PoolsTab', params: { screen: 'SpendNow' } },
-    { icon: 'time-outline', label: 'Activity', color: '#60A5FA', screen: 'ProfileTab', params: { screen: 'Activity' } },
-    { icon: 'trophy-outline', label: 'Rewards', color: '#FBBF24', screen: 'ProfileTab', params: { screen: 'Rewards' } },
+    { icon: 'bag-handle-outline', label: 'Spend Now', color: '#7FFFD4', screen: 'SpendNowTab' },
+    { icon: 'time-outline', label: 'Activity', color: '#60A5FA', screen: 'ProfileModal', params: { screen: 'Activity' } },
   ];
 
   return (

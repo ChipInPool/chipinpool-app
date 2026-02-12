@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Modal, TextInput, Linking, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Modal, TextInput, Linking, ActivityIndicator, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +14,25 @@ export default function WalletScreen() {
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [amount, setAmount] = useState('');
+  const appState = useRef(AppState.currentState);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        refreshUser();
+        queryClient.invalidateQueries({ queryKey: ['walletTransactions'] });
+      }
+      appState.current = nextAppState;
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshUser();
+      queryClient.invalidateQueries({ queryKey: ['walletTransactions'] });
+    }, [])
+  );
 
   const { data: transactions, isLoading, refetch } = useQuery({
     queryKey: ['walletTransactions'],

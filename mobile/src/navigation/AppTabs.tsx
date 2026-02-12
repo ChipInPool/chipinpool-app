@@ -138,9 +138,9 @@ function AppTabsContent() {
     >
       <Tab.Screen name="HomeTab" component={HomeScreen} options={{ title: 'Home' }} />
       <Tab.Screen name="PoolsTab" component={PoolsStackNavigator} options={{ headerShown: false, title: 'Pools' }} />
+      <Tab.Screen name="SpendNowTab" component={SpendNowStackNavigator} options={{ headerShown: false, title: 'Spend Now' }} />
       <Tab.Screen name="WalletTab" component={WalletScreen} options={{ title: 'Wallet' }} />
       <Tab.Screen name="CardsTab" component={CardsScreen} options={{ title: 'Cards' }} />
-      <Tab.Screen name="SpendNowTab" component={SpendNowStackNavigator} options={{ headerShown: false, title: 'Spend Now' }} />
     </Tab.Navigator>
   );
 }

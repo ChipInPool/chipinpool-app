@@ -183,18 +183,7 @@ export default function PoolDetailsScreen() {
 
   const transferMutation = useMutation({
     mutationFn: async () => {
-      const isSelf = transferRecipient === currentUser?.id;
-      if (isSelf && bankAccounts.length === 0) {
-        throw new Error('Please link a bank account first in Security settings');
-      }
-      if (isSelf && !transferBankId) {
-        throw new Error('Please select a bank account for withdrawal');
-      }
       const data: any = { toUserId: transferRecipient, amount: transferAmount };
-      if (isSelf) {
-        data.bankAccountId = transferBankId;
-        data.payoutSpeed = transferPayoutSpeed;
-      }
       return api.pools.transfer(poolId, data);
     },
     onSuccess: () => {
@@ -709,28 +698,8 @@ export default function PoolDetailsScreen() {
             </View>
 
             <Text style={styles.paymentMethodLabel}>Select Recipient</Text>
+            <Text style={{ color: '#708090', fontSize: 12, marginBottom: 8 }}>Funds will be sent to the recipient's wallet</Text>
             <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled>
-              {currentUser && (
-                <TouchableOpacity
-                  style={[styles.paymentMethodCard, transferRecipient === currentUser.id && styles.paymentMethodCardSelected]}
-                  onPress={() => setTransferRecipient(currentUser.id)}
-                  activeOpacity={0.7}
-                  data-testid="button-transfer-self"
-                >
-                  <View style={styles.contributorAvatar}>
-                    <Text style={styles.contributorInitials}>{currentUser.firstName?.[0]}{currentUser.lastName?.[0]}</Text>
-                  </View>
-                  <View style={styles.paymentMethodInfo}>
-                    <Text style={[styles.paymentMethodName, transferRecipient === currentUser.id && styles.paymentMethodNameSelected]}>
-                      Withdraw to Bank
-                    </Text>
-                    <Text style={styles.paymentMethodDesc}>Funds sent to your linked bank account</Text>
-                  </View>
-                  <View style={[styles.paymentMethodRadio, transferRecipient === currentUser.id && styles.paymentMethodRadioSelected]}>
-                    {transferRecipient === currentUser.id && <View style={styles.paymentMethodRadioDot} />}
-                  </View>
-                </TouchableOpacity>
-              )}
               {contributorsList.filter((c: any) => c?.userId !== currentUser?.id).map((c: any, i: number) => (
                 <TouchableOpacity
                   key={c?.userId || i}
@@ -768,78 +737,10 @@ export default function PoolDetailsScreen() {
               />
             </View>
 
-            {transferRecipient === currentUser?.id && (
-              <>
-                {bankAccounts.length > 0 && (
-                  <>
-                    <Text style={styles.paymentMethodLabel}>Select Bank Account</Text>
-                    {bankAccounts.map((account: any) => (
-                      <TouchableOpacity
-                        key={account.id}
-                        style={[styles.paymentMethodCard, transferBankId === account.id && styles.paymentMethodCardSelected]}
-                        onPress={() => setTransferBankId(account.id)}
-                        activeOpacity={0.7}
-                        data-testid={`button-transfer-bank-${account.id}`}
-                      >
-                        <View style={styles.paymentMethodIconWrap}>
-                          <Ionicons name="business-outline" size={20} color={transferBankId === account.id ? '#7FFFD4' : '#708090'} />
-                        </View>
-                        <View style={styles.paymentMethodInfo}>
-                          <Text style={[styles.paymentMethodName, transferBankId === account.id && styles.paymentMethodNameSelected]}>
-                            {account.bankName || account.institutionName || 'Bank Account'}
-                          </Text>
-                          <Text style={styles.paymentMethodDesc}>••••{account.last4 || account.mask || '****'}</Text>
-                        </View>
-                        <View style={[styles.paymentMethodRadio, transferBankId === account.id && styles.paymentMethodRadioSelected]}>
-                          {transferBankId === account.id && <View style={styles.paymentMethodRadioDot} />}
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </>
-                )}
-                {bankAccounts.length === 0 && (
-                  <Text style={{ color: '#FBBF24', fontSize: 13, fontWeight: '500', marginTop: 8, marginBottom: 8 }}>
-                    No bank accounts linked. Link one in Security settings.
-                  </Text>
-                )}
-                <Text style={[styles.paymentMethodLabel, { marginTop: 12 }]}>Payout Speed</Text>
-                <View style={styles.actionsRow}>
-                  <TouchableOpacity
-                    style={[styles.payoutSpeedBtn, transferPayoutSpeed === 'standard' && styles.payoutSpeedBtnSelected]}
-                    onPress={() => setTransferPayoutSpeed('standard')}
-                    activeOpacity={0.7}
-                    data-testid="button-payout-standard"
-                  >
-                    <Text style={[styles.payoutSpeedText, transferPayoutSpeed === 'standard' && styles.payoutSpeedTextSelected]}>Standard</Text>
-                    <Text style={styles.payoutSpeedSubtext}>1-3 days</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.payoutSpeedBtn, transferPayoutSpeed === 'instant' && styles.payoutSpeedBtnSelected]}
-                    onPress={() => setTransferPayoutSpeed('instant')}
-                    activeOpacity={0.7}
-                    data-testid="button-payout-instant"
-                  >
-                    <Text style={[styles.payoutSpeedText, transferPayoutSpeed === 'instant' && styles.payoutSpeedTextSelected]}>Instant</Text>
-                    <Text style={styles.payoutSpeedSubtext}>1.5% fee</Text>
-                  </TouchableOpacity>
-                </View>
-                {transferPayoutSpeed === 'instant' && parseFloat(transferAmount || '0') > 0 && (
-                  <View style={{ marginTop: 8, padding: 12, backgroundColor: 'rgba(251,191,36,0.1)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(251,191,36,0.2)' }}>
-                    <Text style={{ color: '#FBBF24', fontSize: 13, fontWeight: '600' }}>
-                      Fee: ${(parseFloat(transferAmount) * 0.015).toFixed(2)} (1.5%)
-                    </Text>
-                    <Text style={{ color: '#708090', fontSize: 12, marginTop: 2 }}>
-                      You'll receive: ${(parseFloat(transferAmount) * 0.985).toFixed(2)}
-                    </Text>
-                  </View>
-                )}
-              </>
-            )}
-
             <TouchableOpacity
-              style={[styles.confirmButton, { marginTop: 16 }, (transferMutation.isPending || !transferRecipient || !transferAmount || (transferRecipient === currentUser?.id && (!transferBankId || bankAccounts.length === 0))) && styles.confirmButtonDisabled]}
+              style={[styles.confirmButton, { marginTop: 16 }, (transferMutation.isPending || !transferRecipient || !transferAmount) && styles.confirmButtonDisabled]}
               onPress={() => transferMutation.mutate()}
-              disabled={transferMutation.isPending || !transferRecipient || !transferAmount || (transferRecipient === currentUser?.id && (!transferBankId || bankAccounts.length === 0))}
+              disabled={transferMutation.isPending || !transferRecipient || !transferAmount}
               activeOpacity={0.8}
               data-testid="button-confirm-transfer"
             >
