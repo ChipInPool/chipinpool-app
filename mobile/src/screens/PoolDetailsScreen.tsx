@@ -138,6 +138,7 @@ export default function PoolDetailsScreen() {
   const activitySummary = activityData?.summary || { raised: '0.00', spent: '0.00', remaining: '0.00' };
 
   const isCreator = pool?.creatorId === currentUser?.id;
+  const distributeTotal = distributions.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
 
   const invalidateAllQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['pool', poolId] });
@@ -182,8 +183,15 @@ export default function PoolDetailsScreen() {
 
   const transferMutation = useMutation({
     mutationFn: async () => {
+      const isSelf = transferRecipient === currentUser?.id;
+      if (isSelf && bankAccounts.length === 0) {
+        throw new Error('Please link a bank account first in Security settings');
+      }
+      if (isSelf && !transferBankId) {
+        throw new Error('Please select a bank account for withdrawal');
+      }
       const data: any = { toUserId: transferRecipient, amount: transferAmount };
-      if (transferRecipient === currentUser?.id && transferBankId) {
+      if (isSelf) {
         data.bankAccountId = transferBankId;
         data.payoutSpeed = transferPayoutSpeed;
       }
@@ -405,6 +413,38 @@ export default function PoolDetailsScreen() {
                 <Ionicons name="git-branch-outline" size={20} color="#A78BFA" />
               </View>
               <Text style={styles.actionButtonText}>Distribute</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => {
+                Alert.alert(
+                  'Refund All Contributors',
+                  `This will refund all remaining pool balance ($${parseFloat(pool?.currentAmount || '0').toFixed(2)}) proportionally to all contributors. This cannot be undone.`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Refund All',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await api.pools.refundAll(poolId);
+                          invalidateAllQueries();
+                          Alert.alert('Success', 'All contributors have been refunded!');
+                        } catch (error: any) {
+                          Alert.alert('Error', error.message || 'Failed to refund');
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+              activeOpacity={0.7}
+              data-testid="button-refund-all"
+            >
+              <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(251,191,36,0.15)' }]}>
+                <Ionicons name="return-up-back-outline" size={20} color="#FBBF24" />
+              </View>
+              <Text style={styles.actionButtonText}>Refund All</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -714,8 +754,9 @@ export default function PoolDetailsScreen() {
                   </View>
                   <View style={styles.paymentMethodInfo}>
                     <Text style={[styles.paymentMethodName, transferRecipient === currentUser.id && styles.paymentMethodNameSelected]}>
-                      Myself (Bank Withdrawal)
+                      Withdraw to Bank
                     </Text>
+                    <Text style={styles.paymentMethodDesc}>Funds sent to your linked bank account</Text>
                   </View>
                   <View style={[styles.paymentMethodRadio, transferRecipient === currentUser.id && styles.paymentMethodRadioSelected]}>
                     {transferRecipient === currentUser.id && <View style={styles.paymentMethodRadioDot} />}
@@ -737,6 +778,7 @@ export default function PoolDetailsScreen() {
                     <Text style={[styles.paymentMethodName, transferRecipient === c?.user?.id && styles.paymentMethodNameSelected]}>
                       {c?.user?.firstName} {c?.user?.lastName}
                     </Text>
+                    <Text style={styles.paymentMethodDesc}>Funds sent to wallet</Text>
                   </View>
                   <View style={[styles.paymentMethodRadio, transferRecipient === c?.user?.id && styles.paymentMethodRadioSelected]}>
                     {transferRecipient === c?.user?.id && <View style={styles.paymentMethodRadioDot} />}
@@ -787,6 +829,11 @@ export default function PoolDetailsScreen() {
                     ))}
                   </>
                 )}
+                {bankAccounts.length === 0 && (
+                  <Text style={{ color: '#FBBF24', fontSize: 13, fontWeight: '500', marginTop: 8, marginBottom: 8 }}>
+                    No bank accounts linked. Link one in Security settings.
+                  </Text>
+                )}
                 <Text style={[styles.paymentMethodLabel, { marginTop: 12 }]}>Payout Speed</Text>
                 <View style={styles.actionsRow}>
                   <TouchableOpacity
@@ -808,13 +855,23 @@ export default function PoolDetailsScreen() {
                     <Text style={styles.payoutSpeedSubtext}>1.5% fee</Text>
                   </TouchableOpacity>
                 </View>
+                {transferPayoutSpeed === 'instant' && parseFloat(transferAmount || '0') > 0 && (
+                  <View style={{ marginTop: 8, padding: 12, backgroundColor: 'rgba(251,191,36,0.1)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(251,191,36,0.2)' }}>
+                    <Text style={{ color: '#FBBF24', fontSize: 13, fontWeight: '600' }}>
+                      Fee: ${(parseFloat(transferAmount) * 0.015).toFixed(2)} (1.5%)
+                    </Text>
+                    <Text style={{ color: '#708090', fontSize: 12, marginTop: 2 }}>
+                      You'll receive: ${(parseFloat(transferAmount) * 0.985).toFixed(2)}
+                    </Text>
+                  </View>
+                )}
               </>
             )}
 
             <TouchableOpacity
-              style={[styles.confirmButton, { marginTop: 16 }, (transferMutation.isPending || !transferRecipient || !transferAmount) && styles.confirmButtonDisabled]}
+              style={[styles.confirmButton, { marginTop: 16 }, (transferMutation.isPending || !transferRecipient || !transferAmount || (transferRecipient === currentUser?.id && (!transferBankId || bankAccounts.length === 0))) && styles.confirmButtonDisabled]}
               onPress={() => transferMutation.mutate()}
-              disabled={transferMutation.isPending || !transferRecipient || !transferAmount}
+              disabled={transferMutation.isPending || !transferRecipient || !transferAmount || (transferRecipient === currentUser?.id && (!transferBankId || bankAccounts.length === 0))}
               activeOpacity={0.8}
               data-testid="button-confirm-transfer"
             >
@@ -846,6 +903,57 @@ export default function PoolDetailsScreen() {
               </View>
               <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowDistribute(false)} data-testid="button-close-distribute">
                 <Ionicons name="close" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ padding: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ color: '#708090', fontSize: 13 }}>Pool Balance</Text>
+                <Text style={{ color: '#7FFFD4', fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] as any }}>
+                  ${parseFloat(pool?.currentAmount || '0').toFixed(2)}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ color: '#708090', fontSize: 13 }}>Distributing</Text>
+                <Text style={{ color: distributeTotal > parseFloat(pool?.currentAmount || '0') ? '#f87171' : '#FFFFFF', fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] as any }}>
+                  ${distributeTotal.toFixed(2)}
+                </Text>
+              </View>
+              {distributeTotal > parseFloat(pool?.currentAmount || '0') && (
+                <Text style={{ color: '#f87171', fontSize: 12, marginTop: 6 }}>
+                  Total exceeds pool balance!
+                </Text>
+              )}
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+              <TouchableOpacity
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, backgroundColor: 'rgba(127,255,212,0.08)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(127,255,212,0.2)' }}
+                onPress={() => {
+                  const validContributors = contributorsList.filter((c: any) => c?.user?.id);
+                  if (validContributors.length === 0) return;
+                  const poolBalance = parseFloat(pool?.currentAmount || '0');
+                  const perPerson = Math.floor((poolBalance / validContributors.length) * 100) / 100;
+                  const newDistributions = validContributors.map((c: any) => ({
+                    userId: c.user.id,
+                    amount: perPerson.toFixed(2),
+                  }));
+                  setDistributions(newDistributions);
+                }}
+                activeOpacity={0.7}
+                data-testid="button-split-equally"
+              >
+                <Ionicons name="git-compare-outline" size={18} color="#7FFFD4" />
+                <Text style={{ color: '#7FFFD4', fontSize: 14, fontWeight: '600', marginLeft: 8 }}>Split Equally</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, backgroundColor: 'rgba(248,113,113,0.08)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(248,113,113,0.2)' }}
+                onPress={() => setDistributions([])}
+                activeOpacity={0.7}
+                data-testid="button-clear-distribute"
+              >
+                <Ionicons name="close-circle-outline" size={18} color="#f87171" />
+                <Text style={{ color: '#f87171', fontSize: 14, fontWeight: '600', marginLeft: 8 }}>Clear All</Text>
               </TouchableOpacity>
             </View>
 
@@ -901,9 +1009,9 @@ export default function PoolDetailsScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.confirmButton, { marginTop: 16 }, (distributeMutation.isPending || distributions.length === 0) && styles.confirmButtonDisabled]}
+              style={[styles.confirmButton, { marginTop: 16 }, (distributeMutation.isPending || distributions.length === 0 || distributeTotal <= 0 || distributeTotal > parseFloat(pool?.currentAmount || '0')) && styles.confirmButtonDisabled]}
               onPress={() => distributeMutation.mutate()}
-              disabled={distributeMutation.isPending || distributions.length === 0}
+              disabled={distributeMutation.isPending || distributions.length === 0 || distributeTotal <= 0 || distributeTotal > parseFloat(pool?.currentAmount || '0')}
               activeOpacity={0.8}
               data-testid="button-confirm-distribute"
             >
@@ -1434,6 +1542,7 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     gap: 12,
+    flexWrap: 'wrap',
   },
   actionButton: {
     flex: 1,
