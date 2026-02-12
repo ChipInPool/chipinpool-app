@@ -1,11 +1,32 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
+
+const getCategoryIcon = (category: string): string => {
+  switch (category?.toLowerCase()) {
+    case 'gift': return 'gift';
+    case 'trip': return 'airplane';
+    case 'purchase': return 'cart';
+    case 'event': return 'calendar';
+    case 'recurring': return 'repeat';
+    default: return 'ellipsis-horizontal';
+  }
+};
+
+const getActivityIcon = (type: string): { name: string; color: string; bg: string } => {
+  switch (type) {
+    case 'contribution': return { name: 'arrow-down-circle', color: '#34D399', bg: 'rgba(52,211,153,0.15)' };
+    case 'withdrawal': return { name: 'arrow-up-circle', color: '#F87171', bg: 'rgba(248,113,113,0.15)' };
+    case 'pool_created': return { name: 'add-circle', color: '#60A5FA', bg: 'rgba(96,165,250,0.15)' };
+    default: return { name: 'swap-horizontal', color: '#FBBF24', bg: 'rgba(251,191,36,0.15)' };
+  }
+};
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -30,58 +51,78 @@ export default function HomeScreen() {
   const balance = parseFloat(user?.balance || '0');
 
   const quickActions = [
-    { icon: 'add', label: 'Create Pool', color: '#7FFFD4', screen: 'PoolsTab', params: { screen: 'CreatePool' } },
-    { icon: 'people', label: 'Join Pool', color: '#60A5FA', screen: 'PoolsTab' },
-    { icon: 'card', label: 'View Cards', color: '#F472B6', screen: 'CardsTab' },
-    { icon: 'bag-handle', label: 'Spend Now', color: '#7FFFD4', screen: 'PoolsTab', params: { screen: 'SpendNow' } },
-    { icon: 'time', label: 'Activity', color: '#60A5FA', screen: 'ProfileTab', params: { screen: 'Activity' } },
-    { icon: 'trophy', label: 'Rewards', color: '#FBBF24', screen: 'ProfileTab', params: { screen: 'Rewards' } },
+    { icon: 'add-circle-outline', label: 'Create Pool', color: '#7FFFD4', screen: 'PoolsTab', params: { screen: 'CreatePool' } },
+    { icon: 'people-outline', label: 'Join Pool', color: '#60A5FA', screen: 'PoolsTab' },
+    { icon: 'card-outline', label: 'View Cards', color: '#F472B6', screen: 'CardsTab' },
+    { icon: 'bag-handle-outline', label: 'Spend Now', color: '#7FFFD4', screen: 'PoolsTab', params: { screen: 'SpendNow' } },
+    { icon: 'time-outline', label: 'Activity', color: '#60A5FA', screen: 'ProfileTab', params: { screen: 'Activity' } },
+    { icon: 'trophy-outline', label: 'Rewards', color: '#FBBF24', screen: 'ProfileTab', params: { screen: 'Rewards' } },
   ];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor="#7FFFD4" />}
       >
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.appBrand}>ChipInPool</Text>
-            <Text style={styles.greeting}>Hello, {user?.firstName}!</Text>
+            <Text style={styles.appBrand}>CHIPINPOOL</Text>
+            <Text style={styles.greeting}>Hello, {user?.firstName} 👋</Text>
             <Text style={styles.subGreeting}>Here's your overview</Text>
           </View>
           <TouchableOpacity
             style={styles.bellContainer}
             onPress={() => navigation.navigate('ProfileTab', { screen: 'Notifications' })}
             data-testid="button-notifications"
+            activeOpacity={0.7}
           >
-            <Ionicons name="notifications-outline" size={26} color="#fff" />
-            {unreadCount > 0 && <View style={styles.badgeDot} />}
+            <View style={styles.bellCircle}>
+              <Ionicons name="notifications-outline" size={22} color="#fff" />
+            </View>
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Available Balance</Text>
-          <Text style={styles.balanceAmount}>${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-          <View style={styles.balanceActions}>
-            <TouchableOpacity style={styles.balanceAction}>
-              <Ionicons name="add-circle" size={24} color="#7FFFD4" />
-              <Text style={styles.balanceActionText}>Add Funds</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.balanceAction}>
-              <Ionicons name="arrow-up-circle" size={24} color="#7FFFD4" />
-              <Text style={styles.balanceActionText}>Withdraw</Text>
-            </TouchableOpacity>
+        <LinearGradient
+          colors={['#0D2B4E', '#1A3A5C']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.balanceCard}
+        >
+          <View style={styles.balanceCardInner}>
+            <Text style={styles.balanceLabel}>Available Balance</Text>
+            <Text style={styles.balanceAmount}>
+              ${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </Text>
+            <View style={styles.balanceActions}>
+              <TouchableOpacity style={styles.balancePill} activeOpacity={0.8}>
+                <Ionicons name="add-circle-outline" size={18} color="#7FFFD4" />
+                <Text style={styles.balancePillText}>Add Funds</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.balancePill} activeOpacity={0.8}>
+                <Ionicons name="arrow-up-circle-outline" size={18} color="#7FFFD4" />
+                <Text style={styles.balancePillText}>Withdraw</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+          <View style={styles.balanceDecorCircle1} />
+          <View style={styles.balanceDecorCircle2} />
+        </LinearGradient>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.quickActions}>
+          <View style={styles.quickActionsGrid}>
             {quickActions.map((action) => (
               <TouchableOpacity
                 key={action.label}
-                style={styles.quickAction}
+                style={styles.quickActionCard}
+                activeOpacity={0.7}
                 onPress={() => {
                   if (action.params) {
                     navigation.navigate(action.screen, action.params);
@@ -91,7 +132,7 @@ export default function HomeScreen() {
                 }}
                 data-testid={`button-quick-${action.label.toLowerCase().replace(/\s/g, '-')}`}
               >
-                <View style={[styles.quickActionIcon, { backgroundColor: `${action.color}20` }]}>
+                <View style={[styles.quickActionIconBg, { backgroundColor: `${action.color}20` }]}>
                   <Ionicons name={action.icon as any} size={24} color={action.color} />
                 </View>
                 <Text style={styles.quickActionLabel}>{action.label}</Text>
@@ -101,105 +142,437 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Pools</Text>
-          {pools?.slice(0, 3).map((pool: any) => (
-            <TouchableOpacity
-              key={pool.id}
-              style={styles.poolCard}
-              onPress={() => navigation.navigate('PoolsTab', { screen: 'PoolDetails', params: { poolId: pool.id } })}
-              data-testid={`card-pool-${pool.id}`}
-            >
-              <View style={styles.poolInfo}>
-                <Text style={styles.poolName}>{pool.title}</Text>
-                <Text style={styles.poolDescription} numberOfLines={1}>{pool.description}</Text>
-              </View>
-              <View style={styles.poolProgress}>
-                <Text style={styles.poolAmount}>${parseFloat(pool.currentAmount).toLocaleString()}</Text>
-                <Text style={styles.poolTarget}>of ${parseFloat(pool.targetAmount).toLocaleString()}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-          {(!pools || pools.length === 0) && (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Pools</Text>
+            {pools && pools.length > 0 && (
+              <TouchableOpacity onPress={() => navigation.navigate('PoolsTab')} activeOpacity={0.7}>
+                <Text style={styles.seeAll}>See All</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {pools && pools.length > 0 ? (
+            pools.slice(0, 3).map((pool: any) => {
+              const current = parseFloat(pool.currentAmount || '0');
+              const target = parseFloat(pool.targetAmount || '1');
+              const percent = Math.min(Math.round((current / target) * 100), 100);
+              const catIcon = getCategoryIcon(pool.category);
+              return (
+                <TouchableOpacity
+                  key={pool.id}
+                  style={styles.poolCard}
+                  activeOpacity={0.7}
+                  onPress={() => navigation.navigate('PoolsTab', { screen: 'PoolDetails', params: { poolId: pool.id } })}
+                  data-testid={`card-pool-${pool.id}`}
+                >
+                  <View style={styles.poolCategoryIcon}>
+                    <Ionicons name={catIcon as any} size={20} color="#7FFFD4" />
+                  </View>
+                  <View style={styles.poolContent}>
+                    <View style={styles.poolTopRow}>
+                      <Text style={styles.poolName} numberOfLines={1}>{pool.title}</Text>
+                      <Text style={styles.poolPercent}>{percent}%</Text>
+                    </View>
+                    <View style={styles.poolProgressBarBg}>
+                      <View style={[styles.poolProgressBarFill, { width: `${percent}%` }]} />
+                    </View>
+                    <View style={styles.poolBottomRow}>
+                      <Text style={styles.poolAmountText}>
+                        ${current.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </Text>
+                      <Text style={styles.poolTargetText}>
+                        of ${target.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No pools yet. Create your first pool!</Text>
+              <View style={styles.emptyIconBg}>
+                <Ionicons name="layers-outline" size={32} color="#708090" />
+              </View>
+              <Text style={styles.emptyTitle}>No Pools Yet</Text>
+              <Text style={styles.emptySubtitle}>Create your first pool and start saving together!</Text>
             </View>
           )}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          {activityFeed?.slice(0, 3).map((item: any, index: number) => (
-            <View key={item.id || index} style={styles.activityCard} data-testid={`card-activity-${item.id || index}`}>
-              <View style={styles.activityIconContainer}>
-                <Ionicons
-                  name={
-                    item.type === 'contribution' ? 'arrow-down-circle' :
-                    item.type === 'withdrawal' ? 'arrow-up-circle' :
-                    item.type === 'pool_created' ? 'add-circle' :
-                    'swap-horizontal'
-                  }
-                  size={24}
-                  color="#7FFFD4"
-                />
-              </View>
-              <View style={styles.activityInfo}>
-                <Text style={styles.activityDescription} numberOfLines={1}>{item.description || item.message}</Text>
-                <Text style={styles.activityDate}>
-                  {new Date(item.createdAt || item.date).toLocaleDateString()}
-                </Text>
-              </View>
-              {item.amount && (
-                <Text style={styles.activityAmount}>
-                  ${parseFloat(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </Text>
-              )}
-            </View>
-          ))}
-          {(!activityFeed || activityFeed.length === 0) && (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            {activityFeed && activityFeed.length > 0 && (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('ProfileTab', { screen: 'Activity' })}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.seeAll}>See All</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {activityFeed && activityFeed.length > 0 ? (
+            activityFeed.slice(0, 3).map((item: any, index: number) => {
+              const actIcon = getActivityIcon(item.type);
+              return (
+                <View
+                  key={item.id || index}
+                  style={styles.activityCard}
+                  data-testid={`card-activity-${item.id || index}`}
+                >
+                  <View style={[styles.activityIconCircle, { backgroundColor: actIcon.bg }]}>
+                    <Ionicons name={actIcon.name as any} size={22} color={actIcon.color} />
+                  </View>
+                  <View style={styles.activityInfo}>
+                    <Text style={styles.activityDescription} numberOfLines={1}>
+                      {item.description || item.message}
+                    </Text>
+                    <Text style={styles.activityDate}>
+                      {new Date(item.createdAt || item.date).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </Text>
+                  </View>
+                  {item.amount && (
+                    <Text
+                      style={[
+                        styles.activityAmount,
+                        { color: item.type === 'withdrawal' ? '#F87171' : '#34D399' },
+                      ]}
+                    >
+                      {item.type === 'withdrawal' ? '-' : '+'}$
+                      {parseFloat(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </Text>
+                  )}
+                </View>
+              );
+            })
+          ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No recent activity</Text>
+              <View style={styles.emptyIconBg}>
+                <Ionicons name="pulse-outline" size={32} color="#708090" />
+              </View>
+              <Text style={styles.emptyTitle}>No Recent Activity</Text>
+              <Text style={styles.emptySubtitle}>Your transactions and updates will appear here.</Text>
             </View>
           )}
         </View>
+
+        <View style={{ height: 24 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#001F3F' },
-  scrollContent: { padding: 20 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
-  appBrand: { fontSize: 14, fontWeight: '600', color: '#7FFFD4', marginBottom: 4, letterSpacing: 1 },
-  greeting: { fontSize: 28, fontWeight: 'bold', color: '#fff' },
-  subGreeting: { fontSize: 16, color: '#708090', marginTop: 4 },
-  bellContainer: { position: 'relative', padding: 4 },
-  badgeDot: { position: 'absolute', top: 2, right: 2, width: 10, height: 10, borderRadius: 5, backgroundColor: '#f87171' },
-  balanceCard: { backgroundColor: 'rgba(127, 255, 212, 0.1)', borderRadius: 16, padding: 24, marginBottom: 24, borderWidth: 1, borderColor: 'rgba(127, 255, 212, 0.2)' },
-  balanceLabel: { fontSize: 14, color: '#708090' },
-  balanceAmount: { fontSize: 36, fontWeight: 'bold', color: '#7FFFD4', marginTop: 8 },
-  balanceActions: { flexDirection: 'row', marginTop: 20, gap: 20 },
-  balanceAction: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  balanceActionText: { color: '#7FFFD4', fontSize: 14, fontWeight: '500' },
-  section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#fff', marginBottom: 16 },
-  quickActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  quickAction: { width: '47%', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 16, alignItems: 'center' },
-  quickActionIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  quickActionLabel: { color: '#fff', fontSize: 14, fontWeight: '500' },
-  poolCard: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 16, marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  poolInfo: { flex: 1 },
-  poolName: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  poolDescription: { fontSize: 14, color: '#708090', marginTop: 4 },
-  poolProgress: { alignItems: 'flex-end' },
-  poolAmount: { fontSize: 18, fontWeight: '600', color: '#7FFFD4' },
-  poolTarget: { fontSize: 12, color: '#708090' },
-  emptyState: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 24, alignItems: 'center' },
-  emptyStateText: { color: '#708090', fontSize: 14 },
-  activityCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  activityIconContainer: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(127,255,212,0.15)', alignItems: 'center', justifyContent: 'center' },
-  activityInfo: { flex: 1, marginLeft: 12 },
-  activityDescription: { color: '#fff', fontSize: 14, fontWeight: '500' },
-  activityDate: { color: '#708090', fontSize: 12, marginTop: 2 },
-  activityAmount: { color: '#7FFFD4', fontSize: 16, fontWeight: '600' },
+  container: {
+    flex: 1,
+    backgroundColor: '#001F3F',
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 20,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 24,
+  },
+  appBrand: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#7FFFD4',
+    letterSpacing: 2,
+    marginBottom: 6,
+  },
+  greeting: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  subGreeting: {
+    fontSize: 15,
+    color: '#708090',
+    marginTop: 4,
+  },
+  bellContainer: {
+    position: 'relative',
+    marginTop: 4,
+  },
+  bellCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    borderWidth: 2,
+    borderColor: '#001F3F',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  balanceCard: {
+    borderRadius: 16,
+    marginBottom: 28,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  balanceCardInner: {
+    padding: 24,
+    zIndex: 1,
+  },
+  balanceDecorCircle1: {
+    position: 'absolute',
+    top: -30,
+    right: -30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(127,255,212,0.06)',
+  },
+  balanceDecorCircle2: {
+    position: 'absolute',
+    bottom: -20,
+    left: -20,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(127,255,212,0.04)',
+  },
+  balanceLabel: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    fontWeight: '500',
+    letterSpacing: 0.5,
+  },
+  balanceAmount: {
+    fontSize: 38,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginTop: 8,
+    letterSpacing: -0.5,
+  },
+  balanceActions: {
+    flexDirection: 'row',
+    marginTop: 20,
+    gap: 12,
+  },
+  balancePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(127,255,212,0.12)',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(127,255,212,0.25)',
+  },
+  balancePillText: {
+    color: '#7FFFD4',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  section: {
+    marginBottom: 28,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  seeAll: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#7FFFD4',
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 0,
+  },
+  quickActionCard: {
+    width: '31%',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 14,
+    paddingVertical: 18,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  quickActionIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  quickActionLabel: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  poolCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  poolCategoryIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(127,255,212,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  poolContent: {
+    flex: 1,
+  },
+  poolTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  poolName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    flex: 1,
+    marginRight: 8,
+  },
+  poolPercent: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#7FFFD4',
+  },
+  poolProgressBarBg: {
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  poolProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#7FFFD4',
+    borderRadius: 3,
+  },
+  poolBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  poolAmountText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
+  },
+  poolTargetText: {
+    fontSize: 12,
+    color: '#708090',
+  },
+  emptyState: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    borderStyle: 'dashed',
+  },
+  emptyIconBg: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(112,128,144,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: '#708090',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  activityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  activityIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activityInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  activityDescription: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  activityDate: {
+    color: '#708090',
+    fontSize: 12,
+    marginTop: 3,
+  },
+  activityAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
 });

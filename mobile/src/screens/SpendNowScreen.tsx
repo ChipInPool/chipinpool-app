@@ -166,7 +166,7 @@ export default function SpendNowScreen() {
         {selectedPool ? (
           <View style={styles.poolSelectorRight}>
             <Text style={styles.poolSelectorName} numberOfLines={1}>
-              {selectedPool.name || selectedPool.title}
+              {selectedPool.title}
             </Text>
             <Text style={styles.poolSelectorBalance}>
               ${getPoolBalance(selectedPool)}
@@ -193,7 +193,7 @@ export default function SpendNowScreen() {
               }}
             >
               <Text style={styles.poolOptionName}>
-                {pool.name || pool.title}
+                {pool.title}
               </Text>
               <Text style={styles.poolOptionBalance}>
                 ${getPoolBalance(pool)}

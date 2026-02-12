@@ -5,12 +5,22 @@ const API_URL = Constants.expoConfig?.extra?.apiUrl || 'https://chipinpool-csekd
 console.log('[API] Connecting to:', API_URL);
 
 let sessionCookie: string | null = null;
+let cookieLoadPromise: Promise<void> | null = null;
 
 async function loadSessionCookie() {
   try {
     sessionCookie = await SecureStore.getItemAsync('session_cookie');
   } catch (error) {
     console.error('Failed to load session cookie:', error);
+  }
+}
+
+cookieLoadPromise = loadSessionCookie();
+
+async function ensureCookieLoaded() {
+  if (cookieLoadPromise) {
+    await cookieLoadPromise;
+    cookieLoadPromise = null;
   }
 }
 
@@ -32,9 +42,8 @@ export async function clearSessionCookie() {
   }
 }
 
-loadSessionCookie();
-
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  await ensureCookieLoaded();
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...options.headers,
@@ -66,6 +75,13 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[API] Error:', response.status, endpoint, errorText.substring(0, 200));
+
+    if (response.status === 401) {
+      sessionCookie = null;
+      try { await SecureStore.deleteItemAsync('session_cookie'); } catch {}
+      throw new Error('Unauthorized');
+    }
+
     let error: any;
     try {
       error = JSON.parse(errorText);

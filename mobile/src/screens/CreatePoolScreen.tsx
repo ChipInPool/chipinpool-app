@@ -119,7 +119,9 @@ export default function CreatePoolScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templatesRow}>
             {TEMPLATES.map((t) => (
               <TouchableOpacity key={t.label} style={styles.templateCard} onPress={() => applyTemplate(t)} activeOpacity={0.7}>
-                <Text style={styles.templateEmoji}>{t.label.split(' ')[0]}</Text>
+                <View style={styles.templateEmojiContainer}>
+                  <Text style={styles.templateEmoji}>{t.label.split(' ')[0]}</Text>
+                </View>
                 <Text style={styles.templateLabel} numberOfLines={1}>{t.label.split(' ').slice(1).join(' ')}</Text>
                 <Text style={styles.templateAmount}>${t.amount}</Text>
               </TouchableOpacity>
@@ -127,6 +129,9 @@ export default function CreatePoolScreen() {
           </ScrollView>
         </View>
 
+        {/* For focus-state styling in React Native, use onFocus/onBlur callbacks
+            to toggle a state variable and conditionally apply a highlighted border style,
+            e.g.: borderColor: '#7FFFD4', borderWidth: 1.5 */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Title *</Text>
           <TextInput
@@ -148,7 +153,9 @@ export default function CreatePoolScreen() {
                 onPress={() => { setCategory(cat.value); setError(''); }}
                 activeOpacity={0.7}
               >
-                <Ionicons name={cat.icon} size={20} color={category === cat.value ? '#001F3F' : '#7FFFD4'} />
+                <View style={[styles.categoryIconWrap, category === cat.value && styles.categoryIconWrapSelected]}>
+                  <Ionicons name={cat.icon} size={18} color={category === cat.value ? '#001F3F' : '#7FFFD4'} />
+                </View>
                 <Text style={[styles.categoryLabel, category === cat.value && styles.categoryLabelSelected]}>{cat.label}</Text>
               </TouchableOpacity>
             ))}
@@ -186,7 +193,9 @@ export default function CreatePoolScreen() {
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Deadline *</Text>
           <View style={styles.deadlineRow}>
-            <Ionicons name="calendar-outline" size={20} color="#7FFFD4" style={{ marginRight: 10 }} />
+            <View style={styles.calendarIconWrap}>
+              <Ionicons name="calendar-outline" size={20} color="#7FFFD4" />
+            </View>
             <TextInput
               style={styles.deadlineInput}
               placeholder="YYYY-MM-DD"
@@ -229,7 +238,7 @@ export default function CreatePoolScreen() {
             <ActivityIndicator color="#001F3F" />
           ) : (
             <>
-              <Ionicons name="add-circle" size={22} color="#001F3F" />
+              <Ionicons name="add-circle" size={24} color="#001F3F" />
               <Text style={styles.createButtonText}>Create Pool</Text>
             </>
           )}
@@ -255,7 +264,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(239, 68, 68, 0.15)',
     padding: 14,
-    borderRadius: 12,
+    borderRadius: 14,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: 'rgba(248, 113, 113, 0.3)',
@@ -267,68 +276,104 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   sectionTitle: {
     color: '#7FFFD4',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     marginBottom: 12,
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   templatesRow: {
-    gap: 10,
+    gap: 12,
     paddingRight: 4,
+    paddingBottom: 4,
   },
   templateCard: {
-    backgroundColor: 'rgba(127, 255, 212, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(127, 255, 212, 0.2)',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    backgroundColor: 'rgba(127, 255, 212, 0.06)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(127, 255, 212, 0.3)',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 18,
     alignItems: 'center',
-    minWidth: 100,
+    minWidth: 110,
+    shadowColor: '#7FFFD4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  templateEmojiContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(127, 255, 212, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
   templateEmoji: {
-    fontSize: 28,
-    marginBottom: 6,
+    fontSize: 26,
   },
   templateLabel: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 6,
+    letterSpacing: 0.3,
   },
   templateAmount: {
     color: '#7FFFD4',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
   label: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
+    color: '#7FFFD4',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 10,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   categoryRow: {
-    gap: 8,
+    gap: 10,
     paddingRight: 4,
+    paddingBottom: 4,
   },
   categoryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1.5,
-    borderColor: 'rgba(127, 255, 212, 0.25)',
-    borderRadius: 24,
+    borderColor: 'rgba(127, 255, 212, 0.2)',
+    borderRadius: 28,
     paddingVertical: 10,
     paddingHorizontal: 16,
   },
   categoryButtonSelected: {
     backgroundColor: '#7FFFD4',
     borderColor: '#7FFFD4',
+    shadowColor: '#7FFFD4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  categoryIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(127, 255, 212, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryIconWrapSelected: {
+    backgroundColor: 'rgba(0, 31, 63, 0.15)',
   },
   categoryLabel: {
     color: '#fff',
@@ -337,40 +382,45 @@ const styles = StyleSheet.create({
   },
   categoryLabelSelected: {
     color: '#001F3F',
+    fontWeight: '700',
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   input: {
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 12,
-    padding: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     color: '#fff',
     fontSize: 16,
   },
   textArea: {
     height: 90,
     textAlignVertical: 'top',
+    paddingTop: 16,
   },
   amountInput: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 14,
     paddingHorizontal: 16,
   },
   currencySymbol: {
     color: '#7FFFD4',
     fontSize: 24,
     fontWeight: '700',
+    marginRight: 4,
   },
   amountField: {
     flex: 1,
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
     color: '#fff',
     fontSize: 24,
     fontWeight: '600',
@@ -379,10 +429,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 14,
     paddingHorizontal: 16,
+  },
+  calendarIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(127, 255, 212, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   deadlineInput: {
     flex: 1,
@@ -397,33 +456,44 @@ const styles = StyleSheet.create({
   frequencyButton: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 14,
+    borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1.5,
-    borderColor: 'rgba(127, 255, 212, 0.25)',
+    borderColor: 'rgba(127, 255, 212, 0.2)',
   },
   frequencyButtonSelected: {
     backgroundColor: '#7FFFD4',
     borderColor: '#7FFFD4',
+    shadowColor: '#7FFFD4',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   frequencyLabel: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   frequencyLabelSelected: {
     color: '#001F3F',
+    fontWeight: '700',
   },
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 10,
     backgroundColor: '#7FFFD4',
-    paddingVertical: 18,
-    borderRadius: 14,
-    marginTop: 8,
+    height: 56,
+    borderRadius: 16,
+    marginTop: 12,
+    shadowColor: '#7FFFD4',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    elevation: 8,
   },
   createButtonDisabled: {
     opacity: 0.7,
@@ -431,6 +501,7 @@ const styles = StyleSheet.create({
   createButtonText: {
     color: '#001F3F',
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });
