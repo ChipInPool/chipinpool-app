@@ -90,7 +90,7 @@ export default function HomeScreen() {
           </View>
           <TouchableOpacity
             style={styles.bellContainer}
-            onPress={() => navigation.navigate('ProfileTab', { screen: 'Notifications' })}
+            onPress={() => navigation.navigate('ProfileModal', { screen: 'Notifications' })}
             data-testid="button-notifications"
             activeOpacity={0.7}
           >
@@ -219,7 +219,7 @@ export default function HomeScreen() {
             <Text style={styles.sectionTitle}>Recent Activity</Text>
             {Array.isArray(activityFeed) && activityFeed.length > 0 && (
               <TouchableOpacity
-                onPress={() => navigation.navigate('ProfileTab', { screen: 'Activity' })}
+                onPress={() => navigation.navigate('ProfileModal', { screen: 'Activity' })}
                 activeOpacity={0.7}
               >
                 <Text style={styles.seeAll}>See All</Text>
@@ -295,24 +295,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 24,
+    marginBottom: 14,
   },
   appBrand: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '700',
     color: '#7FFFD4',
     letterSpacing: 2,
-    marginBottom: 6,
+    marginBottom: 2,
   },
   greeting: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
   subGreeting: {
-    fontSize: 15,
+    fontSize: 13,
     color: '#708090',
-    marginTop: 4,
+    marginTop: 2,
   },
   bellContainer: {
     position: 'relative',
