@@ -230,6 +230,20 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ distributions, closePool }),
       }),
+    contributeBank: (poolId: string, amount: string, bankAccountId: string) =>
+      fetchApi<any>(`/api/pools/${poolId}/contribute-bank`, {
+        method: 'POST',
+        body: JSON.stringify({ amount, bankAccountId }),
+      }),
+    transfer: (poolId: string, data: { toUserId: string; amount: string; bankAccountId?: string; payoutSpeed?: string; notes?: string }) =>
+      fetchApi<any>(`/api/pools/${poolId}/transfer`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    getActivity: async (poolId: string) => {
+      const result = await fetchApi<any>(`/api/pools/${poolId}/activity`);
+      return result;
+    },
   },
   wallet: {
     getBalance: () => fetchApi<any>('/api/auth/me').then((r: any) => {

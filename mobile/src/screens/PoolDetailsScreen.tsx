@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Share, Modal, TextInput, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Share, Modal, TextInput, Linking, Switch } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
@@ -36,6 +36,44 @@ const getCategoryColor = (category: string): string => {
   }
 };
 
+const formatTimeAgo = (dateStr: string): string => {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+  const diffWeek = Math.floor(diffDay / 7);
+  const diffMonth = Math.floor(diffDay / 30);
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHr < 24) return `${diffHr}h ago`;
+  if (diffDay < 7) return `${diffDay}d ago`;
+  if (diffWeek < 5) return `${diffWeek}w ago`;
+  return `${diffMonth}mo ago`;
+};
+
+const getActivityIcon = (type: string): keyof typeof Ionicons.glyphMap => {
+  switch (type) {
+    case 'contribution': return 'arrow-down' as keyof typeof Ionicons.glyphMap;
+    case 'transfer': return 'arrow-up' as keyof typeof Ionicons.glyphMap;
+    case 'withdrawal': return 'arrow-up' as keyof typeof Ionicons.glyphMap;
+    case 'spend': return 'arrow-up' as keyof typeof Ionicons.glyphMap;
+    default: return 'ellipse-outline';
+  }
+};
+
+const getActivityColor = (type: string): string => {
+  switch (type) {
+    case 'contribution': return '#34D399';
+    case 'transfer': return '#60A5FA';
+    case 'withdrawal': return '#FBBF24';
+    case 'spend': return '#f87171';
+    default: return '#708090';
+  }
+};
+
 export default function PoolDetailsScreen() {
   const route = useRoute<RouteProps>();
   const navigation = useNavigation<any>();
@@ -44,7 +82,18 @@ export default function PoolDetailsScreen() {
 
   const [showContribute, setShowContribute] = useState(false);
   const [contributeAmount, setContributeAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'balance'>('stripe');
+  const [paymentMethod, setPaymentMethod] = useState<string>('stripe');
+  const [contributeStep, setContributeStep] = useState<1 | 2>(1);
+
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [transferRecipient, setTransferRecipient] = useState<string>('');
+  const [transferAmount, setTransferAmount] = useState('');
+  const [transferBankId, setTransferBankId] = useState('');
+  const [transferPayoutSpeed, setTransferPayoutSpeed] = useState<'standard' | 'instant'>('standard');
+
+  const [showDistribute, setShowDistribute] = useState(false);
+  const [distributions, setDistributions] = useState<{ userId: string; amount: string }[]>([]);
+  const [closePoolAfterDistribute, setClosePoolAfterDistribute] = useState(false);
 
   const { data: pool, isLoading, isError } = useQuery({
     queryKey: ['pool', poolId],
@@ -62,11 +111,42 @@ export default function PoolDetailsScreen() {
     queryFn: () => api.wallet.getBalance(),
   });
 
+  const { data: currentUser } = useQuery({
+    queryKey: ['user'],
+    queryFn: () => api.user.getProfile(),
+  });
+
+  const { data: bankAccountsData } = useQuery({
+    queryKey: ['bankAccounts'],
+    queryFn: () => api.bankAccounts.list(),
+  });
+
+  const { data: activityData } = useQuery({
+    queryKey: ['poolActivity', poolId],
+    queryFn: () => api.pools.getActivity(poolId),
+    enabled: !!pool,
+  });
+
+  const bankAccounts = Array.isArray(bankAccountsData) ? bankAccountsData : (bankAccountsData as any)?.accounts || [];
   const walletBalance = walletData?.balance || '0.00';
 
   const contributorsList = Array.isArray(contributions) && contributions.length > 0
     ? contributions
     : Array.isArray(pool?.contributors) ? pool.contributors : [];
+
+  const activityList = activityData?.activities || [];
+  const activitySummary = activityData?.summary || { raised: '0.00', spent: '0.00', remaining: '0.00' };
+
+  const isCreator = pool?.creatorId === currentUser?.id;
+
+  const invalidateAllQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['pool', poolId] });
+    queryClient.invalidateQueries({ queryKey: ['contributions', poolId] });
+    queryClient.invalidateQueries({ queryKey: ['poolActivity', poolId] });
+    queryClient.invalidateQueries({ queryKey: ['walletBalance'] });
+    queryClient.invalidateQueries({ queryKey: ['user'] });
+    queryClient.invalidateQueries({ queryKey: ['pools'] });
+  };
 
   const contributeMutation = useMutation({
     mutationFn: async (amount: string) => {
@@ -76,16 +156,19 @@ export default function PoolDetailsScreen() {
           await Linking.openURL(result.url);
         }
         return result;
+      } else if (paymentMethod.startsWith('bank_')) {
+        const bankAccountId = paymentMethod.replace('bank_', '');
+        return api.pools.contributeBank(poolId, amount, bankAccountId);
       } else {
         return api.pools.contribute(poolId, amount);
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pool', poolId] });
-      queryClient.invalidateQueries({ queryKey: ['contributions', poolId] });
-      queryClient.invalidateQueries({ queryKey: ['walletBalance'] });
+      invalidateAllQueries();
       setShowContribute(false);
       setContributeAmount('');
+      setContributeStep(1);
+      setPaymentMethod('stripe');
       if (paymentMethod === 'stripe') {
         Alert.alert('Stripe Checkout', 'Complete your payment in the browser.');
       } else {
@@ -94,6 +177,45 @@ export default function PoolDetailsScreen() {
     },
     onError: (error: any) => {
       Alert.alert('Error', error.message || 'Failed to contribute');
+    },
+  });
+
+  const transferMutation = useMutation({
+    mutationFn: async () => {
+      const data: any = { toUserId: transferRecipient, amount: transferAmount };
+      if (transferRecipient === currentUser?.id && transferBankId) {
+        data.bankAccountId = transferBankId;
+        data.payoutSpeed = transferPayoutSpeed;
+      }
+      return api.pools.transfer(poolId, data);
+    },
+    onSuccess: () => {
+      invalidateAllQueries();
+      setShowTransfer(false);
+      setTransferRecipient('');
+      setTransferAmount('');
+      setTransferBankId('');
+      setTransferPayoutSpeed('standard');
+      Alert.alert('Success', 'Transfer completed successfully!');
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', error.message || 'Failed to transfer');
+    },
+  });
+
+  const distributeMutation = useMutation({
+    mutationFn: async () => {
+      return api.pools.distribute(poolId, distributions, closePoolAfterDistribute);
+    },
+    onSuccess: () => {
+      invalidateAllQueries();
+      setShowDistribute(false);
+      setDistributions([]);
+      setClosePoolAfterDistribute(false);
+      Alert.alert('Success', 'Distribution completed successfully!');
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', error.message || 'Failed to distribute');
     },
   });
 
@@ -113,6 +235,20 @@ export default function PoolDetailsScreen() {
         url: `https://chipinpool.com/pool/${poolId}`,
       });
     } catch (error) {}
+  };
+
+  const openContributeModal = () => {
+    setContributeStep(1);
+    setContributeAmount('');
+    setPaymentMethod('stripe');
+    setShowContribute(true);
+  };
+
+  const closeContributeModal = () => {
+    setShowContribute(false);
+    setContributeStep(1);
+    setContributeAmount('');
+    setPaymentMethod('stripe');
   };
 
   if (isLoading) {
@@ -207,7 +343,7 @@ export default function PoolDetailsScreen() {
 
       <TouchableOpacity
         style={styles.primaryButton}
-        onPress={() => setShowContribute(true)}
+        onPress={openContributeModal}
         activeOpacity={0.8}
         data-testid="button-contribute"
       >
@@ -230,6 +366,49 @@ export default function PoolDetailsScreen() {
           <Text style={styles.secondaryButtonText}>Spend Now</Text>
         </TouchableOpacity>
       </View>
+
+      {isCreator && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="settings-outline" size={20} color="#7FFFD4" />
+            <Text style={styles.sectionTitle}>Pool Actions</Text>
+          </View>
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => {
+                setTransferRecipient('');
+                setTransferAmount('');
+                setTransferBankId('');
+                setTransferPayoutSpeed('standard');
+                setShowTransfer(true);
+              }}
+              activeOpacity={0.7}
+              data-testid="button-send-contributor"
+            >
+              <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(96,165,250,0.15)' }]}>
+                <Ionicons name="send-outline" size={20} color="#60A5FA" />
+              </View>
+              <Text style={styles.actionButtonText}>Send to Contributor</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => {
+                setDistributions([]);
+                setClosePoolAfterDistribute(false);
+                setShowDistribute(true);
+              }}
+              activeOpacity={0.7}
+              data-testid="button-distribute"
+            >
+              <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(167,139,250,0.15)' }]}>
+                <Ionicons name="git-branch-outline" size={20} color="#A78BFA" />
+              </View>
+              <Text style={styles.actionButtonText}>Distribute</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
@@ -266,89 +445,472 @@ export default function PoolDetailsScreen() {
         )}
       </View>
 
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="pulse-outline" size={20} color="#7FFFD4" />
+          <Text style={styles.sectionTitle}>Activity</Text>
+        </View>
+
+        <View style={styles.activitySummaryRow}>
+          <View style={[styles.activitySummaryCard, { borderColor: 'rgba(52,211,153,0.2)' }]}>
+            <Text style={[styles.activitySummaryLabel, { color: '#34D399' }]}>Raised</Text>
+            <Text style={[styles.activitySummaryValue, { color: '#34D399' }]}>${parseFloat(activitySummary.raised || '0').toFixed(2)}</Text>
+          </View>
+          <View style={[styles.activitySummaryCard, { borderColor: 'rgba(248,113,113,0.2)' }]}>
+            <Text style={[styles.activitySummaryLabel, { color: '#f87171' }]}>Spent</Text>
+            <Text style={[styles.activitySummaryValue, { color: '#f87171' }]}>${parseFloat(activitySummary.spent || '0').toFixed(2)}</Text>
+          </View>
+          <View style={[styles.activitySummaryCard, { borderColor: 'rgba(96,165,250,0.2)' }]}>
+            <Text style={[styles.activitySummaryLabel, { color: '#60A5FA' }]}>Remaining</Text>
+            <Text style={[styles.activitySummaryValue, { color: '#60A5FA' }]}>${parseFloat(activitySummary.remaining || '0').toFixed(2)}</Text>
+          </View>
+        </View>
+
+        {activityList.length > 0 ? activityList.map((activity: any, index: number) => {
+          const actColor = getActivityColor(activity.type);
+          return (
+            <View key={activity.id ?? `activity-${index}`} style={styles.activityRow} data-testid={`card-activity-${activity.id || index}`}>
+              <View style={[styles.activityIconWrap, { backgroundColor: `${actColor}20` }]}>
+                <Ionicons name={getActivityIcon(activity.type)} size={16} color={actColor} />
+              </View>
+              <View style={styles.activityInfo}>
+                <Text style={styles.activityDesc} numberOfLines={2}>{activity.description}</Text>
+                <Text style={styles.activityTime}>{formatTimeAgo(activity.createdAt || activity.date || new Date().toISOString())}</Text>
+              </View>
+              {activity.amount && (
+                <Text style={[styles.activityAmount, { color: actColor }]}>
+                  {activity.type === 'contribution' ? '+' : '-'}${parseFloat(activity.amount).toFixed(2)}
+                </Text>
+              )}
+            </View>
+          );
+        }) : (
+          <View style={styles.emptyContributors}>
+            <Ionicons name="pulse-outline" size={32} color="#708090" />
+            <Text style={styles.emptyText}>No activity yet</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Contribute Modal - Two Step Flow */}
       <Modal
         visible={showContribute}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowContribute(false)}
+        onRequestClose={closeContributeModal}
       >
         <View style={styles.modalOverlay}>
-          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowContribute(false)} />
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={closeContributeModal} />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHandle} />
+
+            {contributeStep === 1 ? (
+              <>
+                <View style={styles.modalHeaderRow}>
+                  <View>
+                    <Text style={styles.modalTitle}>Contribute to Pool</Text>
+                    <Text style={styles.modalSubtitle}>{pool?.title ?? ''}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.modalCloseBtn} onPress={closeContributeModal} data-testid="button-close-modal">
+                    <Ionicons name="close" size={22} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.quickAmountsRow}>
+                  {['25', '50', '100'].map((amt) => (
+                    <TouchableOpacity
+                      key={amt}
+                      style={[styles.quickAmountBtn, contributeAmount === amt && styles.quickAmountBtnSelected]}
+                      onPress={() => setContributeAmount(amt)}
+                      activeOpacity={0.7}
+                      data-testid={`button-quick-amount-${amt}`}
+                    >
+                      <Text style={[styles.quickAmountText, contributeAmount === amt && styles.quickAmountTextSelected]}>${amt}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <View style={styles.amountInputContainer}>
+                  <Text style={styles.dollarPrefix}>$</Text>
+                  <TextInput
+                    style={styles.amountInput}
+                    placeholder="0.00"
+                    placeholderTextColor="#708090"
+                    keyboardType="decimal-pad"
+                    value={contributeAmount}
+                    onChangeText={setContributeAmount}
+                    data-testid="input-contribute-amount"
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.confirmButton, { marginTop: 8 }, (!contributeAmount || parseFloat(contributeAmount) <= 0) && styles.confirmButtonDisabled]}
+                  onPress={() => {
+                    const amount = parseFloat(contributeAmount);
+                    if (isNaN(amount) || amount <= 0) {
+                      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0');
+                      return;
+                    }
+                    setContributeStep(2);
+                  }}
+                  disabled={!contributeAmount || parseFloat(contributeAmount) <= 0}
+                  activeOpacity={0.8}
+                  data-testid="button-continue-step2"
+                >
+                  <Text style={styles.confirmButtonText}>Continue</Text>
+                </TouchableOpacity>
+
+                <View style={styles.walletBalanceRow}>
+                  <Ionicons name="wallet-outline" size={16} color="#708090" />
+                  <Text style={styles.walletBalanceText}>Wallet Balance: ${parseFloat(walletBalance).toFixed(2)}</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.modalHeaderRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <TouchableOpacity onPress={() => setContributeStep(1)} data-testid="button-back-step1">
+                      <Ionicons name="arrow-back" size={24} color="#fff" />
+                    </TouchableOpacity>
+                    <View>
+                      <Text style={styles.modalTitle}>Payment Method</Text>
+                      <Text style={styles.modalSubtitle}>Amount: ${parseFloat(contributeAmount).toFixed(2)}</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={styles.modalCloseBtn} onPress={closeContributeModal} data-testid="button-close-modal-step2">
+                    <Ionicons name="close" size={22} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.paymentMethodCard,
+                    paymentMethod === 'stripe' && styles.paymentMethodCardSelected,
+                  ]}
+                  onPress={() => setPaymentMethod('stripe')}
+                  activeOpacity={0.7}
+                  data-testid="button-payment-stripe"
+                >
+                  <View style={styles.paymentMethodIconWrap}>
+                    <Ionicons name="card-outline" size={24} color={paymentMethod === 'stripe' ? '#7FFFD4' : '#708090'} />
+                  </View>
+                  <View style={styles.paymentMethodInfo}>
+                    <Text style={[styles.paymentMethodName, paymentMethod === 'stripe' && styles.paymentMethodNameSelected]}>Pay with Card</Text>
+                    <Text style={styles.paymentMethodDesc}>Secure checkout via Stripe</Text>
+                  </View>
+                  <View style={[styles.paymentMethodRadio, paymentMethod === 'stripe' && styles.paymentMethodRadioSelected]}>
+                    {paymentMethod === 'stripe' && <View style={styles.paymentMethodRadioDot} />}
+                  </View>
+                </TouchableOpacity>
+
+                {bankAccounts.length > 0 && (
+                  <>
+                    <Text style={styles.paymentMethodLabel}>Linked Bank Accounts</Text>
+                    {bankAccounts.map((account: any) => {
+                      const methodKey = `bank_${account.id}`;
+                      return (
+                        <TouchableOpacity
+                          key={account.id}
+                          style={[
+                            styles.paymentMethodCard,
+                            paymentMethod === methodKey && styles.paymentMethodCardSelected,
+                          ]}
+                          onPress={() => setPaymentMethod(methodKey)}
+                          activeOpacity={0.7}
+                          data-testid={`button-payment-bank-${account.id}`}
+                        >
+                          <View style={styles.paymentMethodIconWrap}>
+                            <Ionicons name="business-outline" size={24} color={paymentMethod === methodKey ? '#7FFFD4' : '#708090'} />
+                          </View>
+                          <View style={styles.paymentMethodInfo}>
+                            <Text style={[styles.paymentMethodName, paymentMethod === methodKey && styles.paymentMethodNameSelected]}>
+                              {account.bankName || account.institutionName || 'Bank Account'}
+                            </Text>
+                            <Text style={styles.paymentMethodDesc}>
+                              ••••{account.last4 || account.mask || '****'}
+                            </Text>
+                          </View>
+                          <View style={[styles.paymentMethodRadio, paymentMethod === methodKey && styles.paymentMethodRadioSelected]}>
+                            {paymentMethod === methodKey && <View style={styles.paymentMethodRadioDot} />}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </>
+                )}
+
+                <TouchableOpacity
+                  style={[
+                    styles.paymentMethodCard,
+                    paymentMethod === 'balance' && styles.paymentMethodCardSelected,
+                  ]}
+                  onPress={() => setPaymentMethod('balance')}
+                  activeOpacity={0.7}
+                  data-testid="button-payment-balance"
+                >
+                  <View style={styles.paymentMethodIconWrap}>
+                    <Ionicons name="wallet-outline" size={24} color={paymentMethod === 'balance' ? '#7FFFD4' : '#708090'} />
+                  </View>
+                  <View style={styles.paymentMethodInfo}>
+                    <Text style={[styles.paymentMethodName, paymentMethod === 'balance' && styles.paymentMethodNameSelected]}>Wallet Balance</Text>
+                    <Text style={styles.paymentMethodDesc}>${parseFloat(walletBalance).toFixed(2)} available</Text>
+                  </View>
+                  <View style={[styles.paymentMethodRadio, paymentMethod === 'balance' && styles.paymentMethodRadioSelected]}>
+                    {paymentMethod === 'balance' && <View style={styles.paymentMethodRadioDot} />}
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.confirmButton, { marginTop: 16 }, contributeMutation.isPending && styles.confirmButtonDisabled]}
+                  onPress={handleContribute}
+                  disabled={contributeMutation.isPending}
+                  activeOpacity={0.8}
+                  data-testid="button-confirm-contribute"
+                >
+                  {contributeMutation.isPending ? (
+                    <ActivityIndicator color="#001F3F" />
+                  ) : (
+                    <Text style={styles.confirmButtonText}>Confirm Payment</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Transfer Modal */}
+      <Modal
+        visible={showTransfer}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTransfer(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowTransfer(false)} />
           <View style={styles.modalContent}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeaderRow}>
               <View>
-                <Text style={styles.modalTitle}>Contribute to Pool</Text>
+                <Text style={styles.modalTitle}>Send to Contributor</Text>
                 <Text style={styles.modalSubtitle}>{pool?.title ?? ''}</Text>
               </View>
-              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowContribute(false)} data-testid="button-close-modal">
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowTransfer(false)} data-testid="button-close-transfer">
                 <Ionicons name="close" size={22} color="#fff" />
               </TouchableOpacity>
             </View>
-            <View style={styles.amountInputContainer}>
+
+            <Text style={styles.paymentMethodLabel}>Select Recipient</Text>
+            <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled>
+              {currentUser && (
+                <TouchableOpacity
+                  style={[styles.paymentMethodCard, transferRecipient === currentUser.id && styles.paymentMethodCardSelected]}
+                  onPress={() => setTransferRecipient(currentUser.id)}
+                  activeOpacity={0.7}
+                  data-testid="button-transfer-self"
+                >
+                  <View style={styles.contributorAvatar}>
+                    <Text style={styles.contributorInitials}>{currentUser.firstName?.[0]}{currentUser.lastName?.[0]}</Text>
+                  </View>
+                  <View style={styles.paymentMethodInfo}>
+                    <Text style={[styles.paymentMethodName, transferRecipient === currentUser.id && styles.paymentMethodNameSelected]}>
+                      Myself (Bank Withdrawal)
+                    </Text>
+                  </View>
+                  <View style={[styles.paymentMethodRadio, transferRecipient === currentUser.id && styles.paymentMethodRadioSelected]}>
+                    {transferRecipient === currentUser.id && <View style={styles.paymentMethodRadioDot} />}
+                  </View>
+                </TouchableOpacity>
+              )}
+              {contributorsList.filter((c: any) => c?.user?.id !== currentUser?.id).map((c: any, i: number) => (
+                <TouchableOpacity
+                  key={c?.user?.id || i}
+                  style={[styles.paymentMethodCard, transferRecipient === c?.user?.id && styles.paymentMethodCardSelected]}
+                  onPress={() => setTransferRecipient(c?.user?.id)}
+                  activeOpacity={0.7}
+                  data-testid={`button-transfer-user-${c?.user?.id}`}
+                >
+                  <View style={styles.contributorAvatar}>
+                    <Text style={styles.contributorInitials}>{c?.user?.firstName?.[0]}{c?.user?.lastName?.[0]}</Text>
+                  </View>
+                  <View style={styles.paymentMethodInfo}>
+                    <Text style={[styles.paymentMethodName, transferRecipient === c?.user?.id && styles.paymentMethodNameSelected]}>
+                      {c?.user?.firstName} {c?.user?.lastName}
+                    </Text>
+                  </View>
+                  <View style={[styles.paymentMethodRadio, transferRecipient === c?.user?.id && styles.paymentMethodRadioSelected]}>
+                    {transferRecipient === c?.user?.id && <View style={styles.paymentMethodRadioDot} />}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={[styles.amountInputContainer, { marginTop: 16 }]}>
               <Text style={styles.dollarPrefix}>$</Text>
               <TextInput
                 style={styles.amountInput}
                 placeholder="0.00"
                 placeholderTextColor="#708090"
                 keyboardType="decimal-pad"
-                value={contributeAmount}
-                onChangeText={setContributeAmount}
-                data-testid="input-contribute-amount"
+                value={transferAmount}
+                onChangeText={setTransferAmount}
+                data-testid="input-transfer-amount"
               />
             </View>
-            <Text style={styles.paymentMethodLabel}>Payment Method</Text>
+
+            {transferRecipient === currentUser?.id && (
+              <>
+                {bankAccounts.length > 0 && (
+                  <>
+                    <Text style={styles.paymentMethodLabel}>Select Bank Account</Text>
+                    {bankAccounts.map((account: any) => (
+                      <TouchableOpacity
+                        key={account.id}
+                        style={[styles.paymentMethodCard, transferBankId === account.id && styles.paymentMethodCardSelected]}
+                        onPress={() => setTransferBankId(account.id)}
+                        activeOpacity={0.7}
+                        data-testid={`button-transfer-bank-${account.id}`}
+                      >
+                        <View style={styles.paymentMethodIconWrap}>
+                          <Ionicons name="business-outline" size={20} color={transferBankId === account.id ? '#7FFFD4' : '#708090'} />
+                        </View>
+                        <View style={styles.paymentMethodInfo}>
+                          <Text style={[styles.paymentMethodName, transferBankId === account.id && styles.paymentMethodNameSelected]}>
+                            {account.bankName || account.institutionName || 'Bank Account'}
+                          </Text>
+                          <Text style={styles.paymentMethodDesc}>••••{account.last4 || account.mask || '****'}</Text>
+                        </View>
+                        <View style={[styles.paymentMethodRadio, transferBankId === account.id && styles.paymentMethodRadioSelected]}>
+                          {transferBankId === account.id && <View style={styles.paymentMethodRadioDot} />}
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </>
+                )}
+                <Text style={[styles.paymentMethodLabel, { marginTop: 12 }]}>Payout Speed</Text>
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity
+                    style={[styles.payoutSpeedBtn, transferPayoutSpeed === 'standard' && styles.payoutSpeedBtnSelected]}
+                    onPress={() => setTransferPayoutSpeed('standard')}
+                    activeOpacity={0.7}
+                    data-testid="button-payout-standard"
+                  >
+                    <Text style={[styles.payoutSpeedText, transferPayoutSpeed === 'standard' && styles.payoutSpeedTextSelected]}>Standard</Text>
+                    <Text style={styles.payoutSpeedSubtext}>1-3 days</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.payoutSpeedBtn, transferPayoutSpeed === 'instant' && styles.payoutSpeedBtnSelected]}
+                    onPress={() => setTransferPayoutSpeed('instant')}
+                    activeOpacity={0.7}
+                    data-testid="button-payout-instant"
+                  >
+                    <Text style={[styles.payoutSpeedText, transferPayoutSpeed === 'instant' && styles.payoutSpeedTextSelected]}>Instant</Text>
+                    <Text style={styles.payoutSpeedSubtext}>1.5% fee</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
             <TouchableOpacity
-              style={[
-                styles.paymentMethodCard,
-                paymentMethod === 'stripe' && styles.paymentMethodCardSelected,
-              ]}
-              onPress={() => setPaymentMethod('stripe')}
-              activeOpacity={0.7}
-              data-testid="button-payment-stripe"
-            >
-              <View style={styles.paymentMethodIconWrap}>
-                <Ionicons name="card-outline" size={24} color={paymentMethod === 'stripe' ? '#7FFFD4' : '#708090'} />
-              </View>
-              <View style={styles.paymentMethodInfo}>
-                <Text style={[styles.paymentMethodName, paymentMethod === 'stripe' && styles.paymentMethodNameSelected]}>Pay with Card</Text>
-                <Text style={styles.paymentMethodDesc}>Secure payment via Stripe</Text>
-              </View>
-              <View style={[styles.paymentMethodRadio, paymentMethod === 'stripe' && styles.paymentMethodRadioSelected]}>
-                {paymentMethod === 'stripe' && <View style={styles.paymentMethodRadioDot} />}
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.paymentMethodCard,
-                paymentMethod === 'balance' && styles.paymentMethodCardSelected,
-              ]}
-              onPress={() => setPaymentMethod('balance')}
-              activeOpacity={0.7}
-              data-testid="button-payment-balance"
-            >
-              <View style={styles.paymentMethodIconWrap}>
-                <Ionicons name="wallet-outline" size={24} color={paymentMethod === 'balance' ? '#7FFFD4' : '#708090'} />
-              </View>
-              <View style={styles.paymentMethodInfo}>
-                <Text style={[styles.paymentMethodName, paymentMethod === 'balance' && styles.paymentMethodNameSelected]}>Wallet Balance</Text>
-                <Text style={styles.paymentMethodDesc}>${parseFloat(walletBalance).toFixed(2)} available</Text>
-              </View>
-              <View style={[styles.paymentMethodRadio, paymentMethod === 'balance' && styles.paymentMethodRadioSelected]}>
-                {paymentMethod === 'balance' && <View style={styles.paymentMethodRadioDot} />}
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.confirmButton, { marginTop: 16 }, contributeMutation.isPending && styles.confirmButtonDisabled]}
-              onPress={handleContribute}
-              disabled={contributeMutation.isPending}
+              style={[styles.confirmButton, { marginTop: 16 }, (transferMutation.isPending || !transferRecipient || !transferAmount) && styles.confirmButtonDisabled]}
+              onPress={() => transferMutation.mutate()}
+              disabled={transferMutation.isPending || !transferRecipient || !transferAmount}
               activeOpacity={0.8}
-              data-testid="button-confirm-contribute"
+              data-testid="button-confirm-transfer"
             >
-              {contributeMutation.isPending ? (
+              {transferMutation.isPending ? (
                 <ActivityIndicator color="#001F3F" />
               ) : (
-                <Text style={styles.confirmButtonText}>{paymentMethod === 'stripe' ? 'Continue to Stripe' : 'Confirm Contribution'}</Text>
+                <Text style={styles.confirmButtonText}>Send Transfer</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Distribute Modal */}
+      <Modal
+        visible={showDistribute}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDistribute(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowDistribute(false)} />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeaderRow}>
+              <View>
+                <Text style={styles.modalTitle}>Distribute Funds</Text>
+                <Text style={styles.modalSubtitle}>{pool?.title ?? ''}</Text>
+              </View>
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowDistribute(false)} data-testid="button-close-distribute">
+                <Ionicons name="close" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 300 }} nestedScrollEnabled>
+              {contributorsList.map((c: any, i: number) => {
+                const existing = distributions.find(d => d.userId === c?.user?.id);
+                return (
+                  <View key={c?.user?.id || i} style={styles.distributeRow} data-testid={`distribute-row-${c?.user?.id || i}`}>
+                    <View style={styles.contributorAvatar}>
+                      <Text style={styles.contributorInitials}>{c?.user?.firstName?.[0]}{c?.user?.lastName?.[0]}</Text>
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.contributorName}>{c?.user?.firstName} {c?.user?.lastName}</Text>
+                    </View>
+                    <View style={styles.distributeAmountWrap}>
+                      <Text style={styles.dollarPrefix}>$</Text>
+                      <TextInput
+                        style={styles.distributeAmountInput}
+                        placeholder="0"
+                        placeholderTextColor="#708090"
+                        keyboardType="decimal-pad"
+                        value={existing?.amount || ''}
+                        onChangeText={(text) => {
+                          setDistributions(prev => {
+                            const filtered = prev.filter(d => d.userId !== c?.user?.id);
+                            if (text) {
+                              filtered.push({ userId: c?.user?.id, amount: text });
+                            }
+                            return filtered;
+                          });
+                        }}
+                        data-testid={`input-distribute-${c?.user?.id || i}`}
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+              {contributorsList.length === 0 && (
+                <View style={styles.emptyContributors}>
+                  <Text style={styles.emptyText}>No contributors to distribute to</Text>
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={styles.closePoolRow}>
+              <Text style={styles.closePoolText}>Close pool after distribution</Text>
+              <Switch
+                value={closePoolAfterDistribute}
+                onValueChange={setClosePoolAfterDistribute}
+                trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(127,255,212,0.3)' }}
+                thumbColor={closePoolAfterDistribute ? '#7FFFD4' : '#708090'}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.confirmButton, { marginTop: 16 }, (distributeMutation.isPending || distributions.length === 0) && styles.confirmButtonDisabled]}
+              onPress={() => distributeMutation.mutate()}
+              disabled={distributeMutation.isPending || distributions.length === 0}
+              activeOpacity={0.8}
+              data-testid="button-confirm-distribute"
+            >
+              {distributeMutation.isPending ? (
+                <ActivityIndicator color="#001F3F" />
+              ) : (
+                <Text style={styles.confirmButtonText}>Confirm Distribution</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -787,7 +1349,7 @@ const styles = StyleSheet.create({
   },
   paymentMethodCardSelected: {
     borderColor: '#7FFFD4',
-    backgroundColor: 'rgba(127,255,212,0.06)',
+    backgroundColor: 'rgba(127,255,212,0.08)',
   },
   paymentMethodIconWrap: {
     width: 44,
@@ -831,5 +1393,193 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     backgroundColor: '#7FFFD4',
+  },
+  quickAmountsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  quickAmountBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  quickAmountBtnSelected: {
+    borderColor: '#7FFFD4',
+    backgroundColor: 'rgba(127,255,212,0.08)',
+  },
+  quickAmountText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  quickAmountTextSelected: {
+    color: '#7FFFD4',
+  },
+  walletBalanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 16,
+  },
+  walletBalanceText: {
+    color: '#708090',
+    fontSize: 13,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  actionIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  actionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  activitySummaryRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  activitySummaryCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  activitySummaryLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  activitySummaryValue: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  activityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  activityIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activityInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  activityDesc: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  activityTime: {
+    color: '#708090',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  activityAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  distributeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  distributeAmountWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(127,255,212,0.2)',
+    width: 100,
+  },
+  distributeAmountInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '600',
+    paddingVertical: 10,
+  },
+  closePoolRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    paddingHorizontal: 4,
+  },
+  closePoolText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  payoutSpeedBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  payoutSpeedBtnSelected: {
+    borderColor: '#7FFFD4',
+    backgroundColor: 'rgba(127,255,212,0.08)',
+  },
+  payoutSpeedText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  payoutSpeedTextSelected: {
+    color: '#7FFFD4',
+  },
+  payoutSpeedSubtext: {
+    color: '#708090',
+    fontSize: 11,
+    marginTop: 2,
   },
 });
