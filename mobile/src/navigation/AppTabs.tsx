@@ -1,4 +1,5 @@
 import React from 'react';
+import { TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +23,7 @@ export type AppTabParamList = {
   PoolsTab: undefined;
   WalletTab: undefined;
   CardsTab: undefined;
-  ProfileTab: undefined;
+  SpendNowTab: undefined;
 };
 
 export type PoolsStackParamList = {
@@ -45,6 +46,8 @@ export type ProfileStackParamList = {
 const Tab = createBottomTabNavigator();
 const PoolsStackNav = createNativeStackNavigator();
 const ProfileStackNav = createNativeStackNavigator();
+const SpendNowStackNav = createNativeStackNavigator();
+const RootStack = createNativeStackNavigator();
 
 function PoolsStackNavigator() {
   return (
@@ -81,10 +84,23 @@ function ProfileStackNavigator() {
   );
 }
 
-export default function AppTabs() {
+function SpendNowStackNavigator() {
+  return (
+    <SpendNowStackNav.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: '#001F3F' },
+        headerTintColor: '#fff',
+      }}
+    >
+      <SpendNowStackNav.Screen name="SpendNowMain" component={SpendNowScreen} options={{ title: 'Spend Now' }} />
+    </SpendNowStackNav.Navigator>
+  );
+}
+
+function AppTabsContent() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      screenOptions={({ route, navigation }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap = 'home';
 
@@ -96,8 +112,8 @@ export default function AppTabs() {
             iconName = focused ? 'wallet' : 'wallet-outline';
           } else if (route.name === 'CardsTab') {
             iconName = focused ? 'card' : 'card-outline';
-          } else if (route.name === 'ProfileTab') {
-            iconName = focused ? 'person' : 'person-outline';
+          } else if (route.name === 'SpendNowTab') {
+            iconName = focused ? 'bag-handle' : 'bag-handle-outline';
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -110,13 +126,32 @@ export default function AppTabs() {
         },
         headerStyle: { backgroundColor: '#001F3F' },
         headerTintColor: '#fff',
+        headerRight: () => (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('ProfileModal')}
+            style={{ marginRight: 16 }}
+          >
+            <Ionicons name="person-circle-outline" size={28} color="#7FFFD4" />
+          </TouchableOpacity>
+        ),
       })}
     >
       <Tab.Screen name="HomeTab" component={HomeScreen} options={{ title: 'Home' }} />
       <Tab.Screen name="PoolsTab" component={PoolsStackNavigator} options={{ headerShown: false, title: 'Pools' }} />
       <Tab.Screen name="WalletTab" component={WalletScreen} options={{ title: 'Wallet' }} />
       <Tab.Screen name="CardsTab" component={CardsScreen} options={{ title: 'Cards' }} />
-      <Tab.Screen name="ProfileTab" component={ProfileStackNavigator} options={{ headerShown: false, title: 'Profile' }} />
+      <Tab.Screen name="SpendNowTab" component={SpendNowStackNavigator} options={{ headerShown: false, title: 'Spend Now' }} />
     </Tab.Navigator>
+  );
+}
+
+export default function AppTabs() {
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+      <RootStack.Screen name="MainTabs" component={AppTabsContent} />
+      <RootStack.Group screenOptions={{ presentation: 'modal', headerStyle: { backgroundColor: '#001F3F' }, headerTintColor: '#fff' }}>
+        <RootStack.Screen name="ProfileModal" component={ProfileStackNavigator} options={{ headerShown: false }} />
+      </RootStack.Group>
+    </RootStack.Navigator>
   );
 }

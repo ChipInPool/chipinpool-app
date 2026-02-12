@@ -414,38 +414,6 @@ export default function PoolDetailsScreen() {
               </View>
               <Text style={styles.actionButtonText}>Distribute</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => {
-                Alert.alert(
-                  'Refund All Contributors',
-                  `This will refund all remaining pool balance ($${parseFloat(pool?.currentAmount || '0').toFixed(2)}) proportionally to all contributors. This cannot be undone.`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Refund All',
-                      style: 'destructive',
-                      onPress: async () => {
-                        try {
-                          await api.pools.refundAll(poolId);
-                          invalidateAllQueries();
-                          Alert.alert('Success', 'All contributors have been refunded!');
-                        } catch (error: any) {
-                          Alert.alert('Error', error.message || 'Failed to refund');
-                        }
-                      },
-                    },
-                  ]
-                );
-              }}
-              activeOpacity={0.7}
-              data-testid="button-refund-all"
-            >
-              <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(251,191,36,0.15)' }]}>
-                <Ionicons name="return-up-back-outline" size={20} color="#FBBF24" />
-              </View>
-              <Text style={styles.actionButtonText}>Refund All</Text>
-            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -464,16 +432,16 @@ export default function PoolDetailsScreen() {
           <View key={contribution?.id ?? `contrib-${index}`} style={styles.contributorRow} data-testid={`card-contributor-${contribution?.id}`}>
             <View style={styles.contributorAvatar}>
               <Text style={styles.contributorInitials}>
-                {contribution?.user?.firstName?.[0] ?? ''}{contribution?.user?.lastName?.[0] ?? ''}
+                {contribution?.firstName?.[0] ?? ''}{contribution?.lastName?.[0] ?? ''}
               </Text>
             </View>
             <View style={styles.contributorInfo}>
-              <Text style={styles.contributorName}>{contribution?.user?.firstName ?? ''} {contribution?.user?.lastName ?? ''}</Text>
+              <Text style={styles.contributorName}>{contribution?.firstName ?? ''} {contribution?.lastName ?? ''}</Text>
               <Text style={styles.contributorDate}>
                 {new Date(contribution?.date ?? contribution?.createdAt ?? Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </Text>
             </View>
-            <Text style={styles.contributorAmount}>${parseFloat(contribution?.amount ?? '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+            <Text style={styles.contributorAmount}>${parseFloat(contribution?.totalContributed || contribution?.amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
           </View>
         ))}
         {contributorsList.length === 0 && (
@@ -763,25 +731,25 @@ export default function PoolDetailsScreen() {
                   </View>
                 </TouchableOpacity>
               )}
-              {contributorsList.filter((c: any) => c?.user?.id !== currentUser?.id).map((c: any, i: number) => (
+              {contributorsList.filter((c: any) => c?.userId !== currentUser?.id).map((c: any, i: number) => (
                 <TouchableOpacity
-                  key={c?.user?.id || i}
-                  style={[styles.paymentMethodCard, transferRecipient === c?.user?.id && styles.paymentMethodCardSelected]}
-                  onPress={() => setTransferRecipient(c?.user?.id)}
+                  key={c?.userId || i}
+                  style={[styles.paymentMethodCard, transferRecipient === c?.userId && styles.paymentMethodCardSelected]}
+                  onPress={() => setTransferRecipient(c?.userId)}
                   activeOpacity={0.7}
-                  data-testid={`button-transfer-user-${c?.user?.id}`}
+                  data-testid={`button-transfer-user-${c?.userId}`}
                 >
                   <View style={styles.contributorAvatar}>
-                    <Text style={styles.contributorInitials}>{c?.user?.firstName?.[0]}{c?.user?.lastName?.[0]}</Text>
+                    <Text style={styles.contributorInitials}>{c?.firstName?.[0]}{c?.lastName?.[0]}</Text>
                   </View>
                   <View style={styles.paymentMethodInfo}>
-                    <Text style={[styles.paymentMethodName, transferRecipient === c?.user?.id && styles.paymentMethodNameSelected]}>
-                      {c?.user?.firstName} {c?.user?.lastName}
+                    <Text style={[styles.paymentMethodName, transferRecipient === c?.userId && styles.paymentMethodNameSelected]}>
+                      {c?.firstName} {c?.lastName}
                     </Text>
                     <Text style={styles.paymentMethodDesc}>Funds sent to wallet</Text>
                   </View>
-                  <View style={[styles.paymentMethodRadio, transferRecipient === c?.user?.id && styles.paymentMethodRadioSelected]}>
-                    {transferRecipient === c?.user?.id && <View style={styles.paymentMethodRadioDot} />}
+                  <View style={[styles.paymentMethodRadio, transferRecipient === c?.userId && styles.paymentMethodRadioSelected]}>
+                    {transferRecipient === c?.userId && <View style={styles.paymentMethodRadioDot} />}
                   </View>
                 </TouchableOpacity>
               ))}
@@ -930,12 +898,16 @@ export default function PoolDetailsScreen() {
               <TouchableOpacity
                 style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, backgroundColor: 'rgba(127,255,212,0.08)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(127,255,212,0.2)' }}
                 onPress={() => {
-                  const validContributors = contributorsList.filter((c: any) => c?.user?.id);
-                  if (validContributors.length === 0) return;
+                  const validContributors = contributorsList.filter((c: any) => c?.userId);
+                  const allRecipients = [...validContributors];
+                  if (currentUser && !validContributors.some((c: any) => c?.userId === currentUser.id)) {
+                    allRecipients.push({ userId: currentUser.id, firstName: currentUser.firstName, lastName: currentUser.lastName });
+                  }
+                  if (allRecipients.length === 0) return;
                   const poolBalance = parseFloat(pool?.currentAmount || '0');
-                  const perPerson = Math.floor((poolBalance / validContributors.length) * 100) / 100;
-                  const newDistributions = validContributors.map((c: any) => ({
-                    userId: c.user.id,
+                  const perPerson = Math.floor((poolBalance / allRecipients.length) * 100) / 100;
+                  const newDistributions = allRecipients.map((c: any) => ({
+                    userId: c.userId || c.id,
                     amount: perPerson.toFixed(2),
                   }));
                   setDistributions(newDistributions);
@@ -958,15 +930,16 @@ export default function PoolDetailsScreen() {
             </View>
 
             <ScrollView style={{ maxHeight: 300 }} nestedScrollEnabled>
-              {contributorsList.map((c: any, i: number) => {
-                const existing = distributions.find(d => d.userId === c?.user?.id);
+              {currentUser && !contributorsList.some((c: any) => c?.userId === currentUser.id) && (() => {
+                const existing = distributions.find(d => d.userId === currentUser.id);
                 return (
-                  <View key={c?.user?.id || i} style={styles.distributeRow} data-testid={`distribute-row-${c?.user?.id || i}`}>
-                    <View style={styles.contributorAvatar}>
-                      <Text style={styles.contributorInitials}>{c?.user?.firstName?.[0]}{c?.user?.lastName?.[0]}</Text>
+                  <View key={`owner-${currentUser.id}`} style={styles.distributeRow} data-testid={`distribute-row-owner`}>
+                    <View style={[styles.contributorAvatar, { borderWidth: 1, borderColor: '#7FFFD4' }]}>
+                      <Text style={styles.contributorInitials}>{currentUser.firstName?.[0]}{currentUser.lastName?.[0]}</Text>
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.contributorName}>{c?.user?.firstName} {c?.user?.lastName}</Text>
+                      <Text style={styles.contributorName}>{currentUser.firstName} {currentUser.lastName}</Text>
+                      <Text style={{ color: '#7FFFD4', fontSize: 11 }}>Pool Owner</Text>
                     </View>
                     <View style={styles.distributeAmountWrap}>
                       <Text style={styles.dollarPrefix}>$</Text>
@@ -978,14 +951,47 @@ export default function PoolDetailsScreen() {
                         value={existing?.amount || ''}
                         onChangeText={(text) => {
                           setDistributions(prev => {
-                            const filtered = prev.filter(d => d.userId !== c?.user?.id);
+                            const filtered = prev.filter(d => d.userId !== currentUser.id);
                             if (text) {
-                              filtered.push({ userId: c?.user?.id, amount: text });
+                              filtered.push({ userId: currentUser.id, amount: text });
                             }
                             return filtered;
                           });
                         }}
-                        data-testid={`input-distribute-${c?.user?.id || i}`}
+                        data-testid={`input-distribute-owner`}
+                      />
+                    </View>
+                  </View>
+                );
+              })()}
+              {contributorsList.map((c: any, i: number) => {
+                const existing = distributions.find(d => d.userId === c?.userId);
+                return (
+                  <View key={c?.userId || i} style={styles.distributeRow} data-testid={`distribute-row-${c?.userId || i}`}>
+                    <View style={styles.contributorAvatar}>
+                      <Text style={styles.contributorInitials}>{c?.firstName?.[0]}{c?.lastName?.[0]}</Text>
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.contributorName}>{c?.firstName} {c?.lastName}</Text>
+                    </View>
+                    <View style={styles.distributeAmountWrap}>
+                      <Text style={styles.dollarPrefix}>$</Text>
+                      <TextInput
+                        style={styles.distributeAmountInput}
+                        placeholder="0"
+                        placeholderTextColor="#708090"
+                        keyboardType="decimal-pad"
+                        value={existing?.amount || ''}
+                        onChangeText={(text) => {
+                          setDistributions(prev => {
+                            const filtered = prev.filter(d => d.userId !== c?.userId);
+                            if (text) {
+                              filtered.push({ userId: c?.userId, amount: text });
+                            }
+                            return filtered;
+                          });
+                        }}
+                        data-testid={`input-distribute-${c?.userId || i}`}
                       />
                     </View>
                   </View>
