@@ -106,6 +106,7 @@ export default function PoolDetailsScreen() {
   const [autoContributeAmount, setAutoContributeAmount] = useState('');
   const [autoContributeFrequency, setAutoContributeFrequency] = useState<'weekly' | 'monthly' | 'quarterly'>('monthly');
   const [startImmediately, setStartImmediately] = useState(true);
+  const [autoPaymentMethod, setAutoPaymentMethod] = useState<'wallet' | string>('wallet');
   const { refreshUser } = useAuth();
 
   const { data: pool, isLoading, isError } = useQuery({
@@ -267,13 +268,18 @@ export default function PoolDetailsScreen() {
   });
 
   const autoContributeMutation = useMutation({
-    mutationFn: () => api.recurring.create(poolId, autoContributeAmount, autoContributeFrequency, startImmediately),
+    mutationFn: () => {
+      const pm = autoPaymentMethod === 'wallet' ? 'wallet' : 'bank';
+      const bankId = autoPaymentMethod.startsWith('bank_') ? autoPaymentMethod.replace('bank_', '') : undefined;
+      return api.recurring.create(poolId, autoContributeAmount, autoContributeFrequency, startImmediately, pm as 'wallet' | 'bank', bankId);
+    },
     onSuccess: () => {
       Alert.alert('Success', 'Auto-contribute has been set up!');
       setShowAutoContribute(false);
       setAutoContributeAmount('');
       setAutoContributeFrequency('monthly');
       setStartImmediately(true);
+      setAutoPaymentMethod('wallet');
       invalidateAllQueries();
     },
     onError: (err: any) => {
@@ -1148,7 +1154,7 @@ export default function PoolDetailsScreen() {
               </TouchableOpacity>
             </View>
             <Text style={{ color: '#708090', fontSize: 13, marginBottom: 16 }}>
-              Automatically contribute to this pool on a recurring schedule using your wallet balance.
+              Automatically contribute to this pool on a recurring schedule using your wallet or linked bank account.
             </Text>
 
             <Text style={styles.paymentMethodLabel}>Amount ($)</Text>
@@ -1190,6 +1196,59 @@ export default function PoolDetailsScreen() {
                   }}>
                     {freq}
                   </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.paymentMethodLabel}>Payment Method</Text>
+            <View style={{ gap: 8, marginBottom: 16 }}>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: autoPaymentMethod === 'wallet' ? '#7FFFD4' : 'rgba(255,255,255,0.1)',
+                  backgroundColor: autoPaymentMethod === 'wallet' ? 'rgba(127,255,212,0.1)' : 'rgba(255,255,255,0.05)',
+                }}
+                onPress={() => setAutoPaymentMethod('wallet')}
+                data-testid="auto-payment-wallet"
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Ionicons name="wallet-outline" size={20} color={autoPaymentMethod === 'wallet' ? '#7FFFD4' : '#708090'} />
+                  <View>
+                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>Wallet Balance</Text>
+                    <Text style={{ color: '#708090', fontSize: 12 }}>${walletData?.balance ? parseFloat(walletData.balance).toLocaleString() : '0'} available</Text>
+                  </View>
+                </View>
+                {autoPaymentMethod === 'wallet' && <Ionicons name="checkmark-circle" size={20} color="#7FFFD4" />}
+              </TouchableOpacity>
+              {bankAccounts.map((account: any) => (
+                <TouchableOpacity
+                  key={account.id}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: 12,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: autoPaymentMethod === `bank_${account.id}` ? '#7FFFD4' : 'rgba(255,255,255,0.1)',
+                    backgroundColor: autoPaymentMethod === `bank_${account.id}` ? 'rgba(127,255,212,0.1)' : 'rgba(255,255,255,0.05)',
+                  }}
+                  onPress={() => setAutoPaymentMethod(`bank_${account.id}`)}
+                  data-testid={`auto-payment-bank-${account.id}`}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Ionicons name="business-outline" size={20} color={autoPaymentMethod === `bank_${account.id}` ? '#7FFFD4' : '#708090'} />
+                    <View>
+                      <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>{account.bankName || 'Bank Account'}</Text>
+                      <Text style={{ color: '#708090', fontSize: 12 }}>••••{account.accountMask}</Text>
+                    </View>
+                  </View>
+                  {autoPaymentMethod === `bank_${account.id}` && <Ionicons name="checkmark-circle" size={20} color="#7FFFD4" />}
                 </TouchableOpacity>
               ))}
             </View>

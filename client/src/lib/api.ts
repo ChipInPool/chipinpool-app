@@ -134,8 +134,8 @@ export const api = {
     getWalletHistory: () => fetchApi("/api/user/wallet-history"),
   },
   recurring: {
-    create: (poolId: string, amount: string, frequency: 'weekly' | 'monthly' | 'quarterly', startImmediately: boolean = true) =>
-      fetchApi(`/api/pools/${poolId}/recurring`, { method: "POST", body: JSON.stringify({ amount, frequency, startImmediately }) }),
+    create: (poolId: string, amount: string, frequency: 'weekly' | 'monthly' | 'quarterly', startImmediately: boolean = true, paymentMethod: 'wallet' | 'bank' = 'wallet', bankAccountId?: string) =>
+      fetchApi(`/api/pools/${poolId}/recurring`, { method: "POST", body: JSON.stringify({ amount, frequency, startImmediately, paymentMethod, bankAccountId }) }),
     getByPool: (poolId: string) => fetchApi(`/api/pools/${poolId}/recurring`),
     getUserRecurring: () => fetchApi("/api/user/recurring-contributions"),
     update: (id: string, data: { amount?: string; frequency?: 'weekly' | 'monthly' | 'quarterly'; status?: 'active' | 'paused' }) =>

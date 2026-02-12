@@ -2495,13 +2495,15 @@ export async function registerRoutes(
   // Create a recurring contribution (subscription)
   app.post("/api/pools/:id/recurring", requireAuth, async (req, res, next) => {
     try {
-      const { amount, frequency, startImmediately } = z.object({
+      const { amount, frequency, startImmediately, paymentMethod, bankAccountId } = z.object({
         amount: z.string().refine((val) => {
           const num = parseFloat(val);
           return !isNaN(num) && num > 0;
         }, { message: "Amount must be a positive number" }),
         frequency: z.enum(['weekly', 'monthly', 'quarterly']),
         startImmediately: z.boolean().optional().default(true),
+        paymentMethod: z.enum(['wallet', 'bank']).optional().default('wallet'),
+        bankAccountId: z.string().optional(),
       }).parse(req.body);
 
       const pool = await storage.getPool(req.params.id);
@@ -2520,18 +2522,111 @@ export async function registerRoutes(
       const contributionAmount = parseFloat(amount);
       const userBalance = parseFloat(user.balance);
 
-      // If starting immediately, validate sufficient balance
-      if (startImmediately && userBalance < contributionAmount) {
-        return res.status(400).json({ 
-          message: "Insufficient balance for the first contribution. Please add funds to your wallet." 
-        });
+      if (paymentMethod === 'bank') {
+        if (!bankAccountId) {
+          return res.status(400).json({ message: "Bank account ID is required for bank payments" });
+        }
+        const bankAccount = await storage.getBankAccountById(bankAccountId);
+        if (!bankAccount || bankAccount.userId !== userId) {
+          return res.status(404).json({ message: "Bank account not found" });
+        }
+
+        if (startImmediately) {
+          if (!bankAccount.stripeFinancialConnectionsAccountId) {
+            return res.status(400).json({ message: "Bank account not properly linked. Please re-link in Settings." });
+          }
+
+          const stripe = await getUncachableStripeClient();
+          const amountCents = Math.round(contributionAmount * 100);
+
+          let paymentMethodId = bankAccount.stripePaymentMethodId;
+          if (!paymentMethodId && user.stripeCustomerId) {
+            try {
+              const paymentMethods = await stripe.paymentMethods.list({
+                customer: user.stripeCustomerId,
+                type: 'us_bank_account',
+              });
+              const matchingPM = paymentMethods.data.find(pm => pm.us_bank_account?.last4 === bankAccount.accountMask);
+              if (matchingPM) {
+                paymentMethodId = matchingPM.id;
+                try {
+                  await storage.updateBankAccount(bankAccount.id, { stripePaymentMethodId: matchingPM.id });
+                } catch (updateErr) {
+                  console.log('[Recurring Bank] Could not store payment method ID');
+                }
+              }
+            } catch (e: any) {
+              console.log('[Recurring Bank] Could not retrieve payment methods:', e.message);
+            }
+          }
+
+          if (!paymentMethodId || !user.stripeCustomerId) {
+            return res.status(400).json({
+              message: "Your bank account needs to be re-linked to enable direct payments. Please go to Settings and re-link your bank account.",
+            });
+          }
+
+          try {
+            const paymentIntent = await stripe.paymentIntents.create({
+              amount: amountCents,
+              currency: 'usd',
+              customer: user.stripeCustomerId,
+              payment_method: paymentMethodId,
+              payment_method_types: ['us_bank_account'],
+              confirm: true,
+              mandate_data: {
+                customer_acceptance: {
+                  type: 'online',
+                  online: {
+                    ip_address: getClientIp(req),
+                    user_agent: req.get('user-agent') || 'ChipInPool',
+                  },
+                },
+              },
+              metadata: {
+                poolId: pool.id,
+                userId: user.id,
+                bankAccountId: bankAccount.id,
+                paymentType: 'recurring_bank_ach',
+              },
+            });
+
+            if (paymentIntent.status === 'processing' || paymentIntent.status === 'succeeded') {
+              await storage.createContribution({
+                poolId: pool.id,
+                userId,
+                amount,
+                stripeSessionId: paymentIntent.id,
+              });
+              await storage.updatePoolAmount(pool.id, (parseFloat(pool.currentAmount) + contributionAmount).toFixed(2));
+            } else {
+              return res.status(400).json({ message: `Bank payment failed with status: ${paymentIntent.status}` });
+            }
+          } catch (paymentError: any) {
+            console.error('[Recurring Bank] Payment error:', paymentError.message);
+            return res.status(400).json({
+              message: `Bank payment failed: ${paymentError.message}`,
+            });
+          }
+        }
+      } else {
+        if (startImmediately && userBalance < contributionAmount) {
+          return res.status(400).json({ 
+            message: "Insufficient balance for the first contribution. Please add funds to your wallet." 
+          });
+        }
+
+        if (startImmediately) {
+          await storage.updateUserBalance(userId, (userBalance - contributionAmount).toFixed(2));
+          await storage.createContribution({ poolId: pool.id, userId, amount });
+          await storage.updatePoolAmount(pool.id, (parseFloat(pool.currentAmount) + contributionAmount).toFixed(2));
+        }
       }
 
       // Calculate next payment date based on frequency
       const now = new Date();
       let nextPaymentDate = new Date(now);
       if (startImmediately) {
-        // If starting immediately, next payment is in the future
         if (frequency === 'weekly') {
           nextPaymentDate.setDate(now.getDate() + 7);
         } else if (frequency === 'monthly') {
@@ -2540,22 +2635,15 @@ export async function registerRoutes(
           nextPaymentDate.setMonth(now.getMonth() + 3);
         }
       }
-      // If not starting immediately, nextPaymentDate is now (will be processed by cron)
 
-      // Process first contribution immediately if requested
-      if (startImmediately) {
-        await storage.updateUserBalance(userId, (userBalance - contributionAmount).toFixed(2));
-        await storage.createContribution({ poolId: pool.id, userId, amount });
-        await storage.updatePoolAmount(pool.id, (parseFloat(pool.currentAmount) + contributionAmount).toFixed(2));
-      }
-
-      // Create recurring contribution record
       const recurringContribution = await storage.createRecurringContribution({
         poolId: pool.id,
         userId,
         amount,
         frequency,
         nextPaymentDate,
+        paymentMethod,
+        bankAccountId: bankAccountId || null,
       });
 
       res.json({ 

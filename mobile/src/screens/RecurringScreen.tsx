@@ -41,6 +41,8 @@ interface RecurringContribution {
   userId: string;
   amount: string;
   frequency: 'weekly' | 'monthly' | 'quarterly';
+  paymentMethod?: string;
+  bankAccountId?: string;
   status: string;
   nextPaymentDate: string;
   createdAt: string;
@@ -268,6 +270,12 @@ export default function RecurringScreen() {
                         {contribution.status}
                       </Text>
                     </View>
+                    {contribution.paymentMethod && contribution.paymentMethod !== 'wallet' && (
+                      <View style={[styles.badge, { backgroundColor: 'rgba(74,144,217,0.15)' }]}>
+                        <Ionicons name="business-outline" size={10} color={COLORS.blue} style={{ marginRight: 3 }} />
+                        <Text style={[styles.badgeText, { color: COLORS.blue }]}>Bank</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
                 <View style={styles.amountSection}>

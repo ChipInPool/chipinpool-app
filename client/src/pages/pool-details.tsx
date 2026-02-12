@@ -79,6 +79,7 @@ export default function PoolDetails() {
   const [autoContributeAmount, setAutoContributeAmount] = useState("");
   const [autoContributeFrequency, setAutoContributeFrequency] = useState<'weekly' | 'monthly' | 'quarterly'>('monthly');
   const [startImmediately, setStartImmediately] = useState(true);
+  const [autoPaymentMethod, setAutoPaymentMethod] = useState<'wallet' | string>('wallet');
   const [editImage, setEditImage] = useState("");
   const [isUploadingPoolImage, setIsUploadingPoolImage] = useState(false);
   const poolImageInputRef = useRef<HTMLInputElement>(null);
@@ -187,7 +188,11 @@ export default function PoolDetails() {
   });
 
   const autoContributeMutation = useMutation({
-    mutationFn: () => api.recurring.create(params?.id || '', autoContributeAmount, autoContributeFrequency, startImmediately),
+    mutationFn: () => {
+      const pm = autoPaymentMethod === 'wallet' ? 'wallet' : 'bank';
+      const bankId = autoPaymentMethod.startsWith('bank_') ? autoPaymentMethod.replace('bank_', '') : undefined;
+      return api.recurring.create(params?.id || '', autoContributeAmount, autoContributeFrequency, startImmediately, pm as 'wallet' | 'bank', bankId);
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.pool(params?.id || '') });
       queryClient.invalidateQueries({ queryKey: queryKeys.pools });
@@ -201,6 +206,7 @@ export default function PoolDetails() {
       setAutoContributeAmount("");
       setAutoContributeFrequency('monthly');
       setStartImmediately(true);
+      setAutoPaymentMethod('wallet');
     },
     onError: (error: any) => {
       toast({
@@ -1169,6 +1175,48 @@ export default function PoolDetails() {
                           </SelectContent>
                         </Select>
                       </div>
+                      <div className="space-y-2">
+                        <Label>Payment Method</Label>
+                        <div className="space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => setAutoPaymentMethod('wallet')}
+                            className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${
+                              autoPaymentMethod === 'wallet' ? 'bg-primary/10 border-primary' : 'bg-white/5 border-white/10 hover:border-white/20'
+                            }`}
+                            data-testid="auto-payment-wallet"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Wallet className="w-5 h-5" />
+                              <div className="text-left">
+                                <div className="font-medium text-sm">Wallet Balance</div>
+                                <div className="text-xs text-muted-foreground">${user ? parseFloat(user.balance).toLocaleString() : '0'} available</div>
+                              </div>
+                            </div>
+                            {autoPaymentMethod === 'wallet' && <ShieldCheck className="w-5 h-5 text-primary" />}
+                          </button>
+                          {linkedBankAccounts.map((account: any) => (
+                            <button
+                              key={account.id}
+                              type="button"
+                              onClick={() => setAutoPaymentMethod(`bank_${account.id}`)}
+                              className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${
+                                autoPaymentMethod === `bank_${account.id}` ? 'bg-primary/10 border-primary' : 'bg-white/5 border-white/10 hover:border-white/20'
+                              }`}
+                              data-testid={`auto-payment-bank-${account.id}`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Building2 className="w-5 h-5" />
+                                <div className="text-left">
+                                  <div className="font-medium text-sm">{account.bankName || 'Bank Account'}</div>
+                                  <div className="text-xs text-muted-foreground">••••{account.accountMask}</div>
+                                </div>
+                              </div>
+                              {autoPaymentMethod === `bank_${account.id}` && <ShieldCheck className="w-5 h-5 text-primary" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id="start-immediately"
@@ -1195,7 +1243,7 @@ export default function PoolDetails() {
                       </Button>
                       <Button 
                         onClick={() => autoContributeMutation.mutate()}
-                        disabled={!autoContributeAmount || parseFloat(autoContributeAmount) <= 0 || autoContributeMutation.isPending}
+                        disabled={!autoContributeAmount || parseFloat(autoContributeAmount) <= 0 || autoContributeMutation.isPending || (autoPaymentMethod === 'wallet' && startImmediately && user && parseFloat(autoContributeAmount) > parseFloat(user.balance))}
                         data-testid="button-confirm-auto-contribute"
                       >
                         {autoContributeMutation.isPending ? (

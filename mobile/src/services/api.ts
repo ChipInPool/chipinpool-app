@@ -356,10 +356,10 @@ export const api = {
   },
   recurring: {
     list: () => fetchApi<any>('/api/user/recurring-contributions'),
-    create: (poolId: string, amount: string, frequency: string, startImmediately: boolean = true) =>
+    create: (poolId: string, amount: string, frequency: string, startImmediately: boolean = true, paymentMethod: 'wallet' | 'bank' = 'wallet', bankAccountId?: string) =>
       fetchApi<any>(`/api/pools/${poolId}/recurring`, {
         method: 'POST',
-        body: JSON.stringify({ amount, frequency, startImmediately }),
+        body: JSON.stringify({ amount, frequency, startImmediately, paymentMethod, bankAccountId }),
       }),
     update: (id: string, data: any) =>
       fetchApi<any>(`/api/recurring/${id}`, {
