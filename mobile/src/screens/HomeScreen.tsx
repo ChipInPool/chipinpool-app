@@ -227,7 +227,7 @@ export default function HomeScreen() {
             )}
           </View>
           {Array.isArray(activityFeed) && activityFeed.length > 0 ? (
-            activityFeed.slice(0, 3).map((item: any, index: number) => {
+            activityFeed.slice(0, 5).map((item: any, index: number) => {
               const actIcon = getActivityIcon(item.type);
               return (
                 <View
@@ -433,31 +433,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginTop: 0,
+    marginTop: 4,
   },
   quickActionCard: {
-    width: '31%',
+    width: '47%',
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 14,
-    paddingVertical: 18,
-    paddingHorizontal: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
   },
   quickActionIconBg: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
   },
   quickActionLabel: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    textAlign: 'center',
   },
   poolCard: {
     flexDirection: 'row',

@@ -217,35 +217,43 @@ export default function WalletScreen() {
             <View style={styles.sectionDivider} />
           </View>
 
-          {(Array.isArray(transactions) ? transactions : []).slice(0, 10).map((tx: any) => {
-            const isDeposit = tx?.type === 'deposit';
-            return (
-              <View key={tx?.id ?? Math.random()} style={styles.transactionRow} data-testid={`row-transaction-${tx?.id}`}>
-                <View style={[styles.txIcon, { backgroundColor: isDeposit ? 'rgba(76, 175, 80, 0.15)' : 'rgba(239, 83, 80, 0.15)' }]}>
-                  <Ionicons
-                    name={isDeposit ? 'arrow-down' : 'arrow-up'}
-                    size={20}
-                    color={isDeposit ? '#4CAF50' : '#EF5350'}
-                  />
+          <ScrollView style={{ maxHeight: 320 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+            {(Array.isArray(transactions) ? transactions : []).slice(0, 5).map((tx: any) => {
+              const isDeposit = tx?.type === 'deposit';
+              const status = tx?.status || 'completed';
+              const statusColor = status === 'completed' ? '#34D399' : status === 'pending' ? '#FBBF24' : status === 'failed' ? '#F87171' : '#708090';
+              return (
+                <View key={tx?.id ?? Math.random()} style={styles.transactionRow} data-testid={`row-transaction-${tx?.id}`}>
+                  <View style={[styles.txIcon, { backgroundColor: isDeposit ? 'rgba(76, 175, 80, 0.15)' : 'rgba(239, 83, 80, 0.15)' }]}>
+                    <Ionicons
+                      name={isDeposit ? 'arrow-down' : 'arrow-up'}
+                      size={20}
+                      color={isDeposit ? '#4CAF50' : '#EF5350'}
+                    />
+                  </View>
+                  <View style={styles.txInfo}>
+                    <Text style={styles.txDescription}>{tx?.description || tx?.type || 'Transaction'}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                      <Text style={styles.txDate}>{formatDate(tx?.createdAt ?? '')}</Text>
+                      <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#708090' }} />
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: statusColor, textTransform: 'capitalize' }}>{status}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.txAmount, { color: isDeposit ? '#4CAF50' : '#fff' }]}>
+                    {isDeposit ? '+' : '-'}${parseFloat(tx?.amount ?? '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </Text>
                 </View>
-                <View style={styles.txInfo}>
-                  <Text style={styles.txDescription}>{tx?.description || tx?.type || 'Transaction'}</Text>
-                  <Text style={styles.txDate}>{formatDate(tx?.createdAt ?? '')}</Text>
-                </View>
-                <Text style={[styles.txAmount, { color: isDeposit ? '#4CAF50' : '#fff' }]}>
-                  {isDeposit ? '+' : '-'}${parseFloat(tx?.amount ?? '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </Text>
-              </View>
-            );
-          })}
+              );
+            })}
 
-          {(!transactions || transactions.length === 0) && (
-            <View style={styles.emptyState}>
-              <Ionicons name="wallet-outline" size={48} color="#708090" />
-              <Text style={styles.emptyTitle}>No transactions yet</Text>
-              <Text style={styles.emptySubtitle}>Your transaction history will appear here</Text>
-            </View>
-          )}
+            {(!transactions || transactions.length === 0) && (
+              <View style={styles.emptyState}>
+                <Ionicons name="wallet-outline" size={48} color="#708090" />
+                <Text style={styles.emptyTitle}>No transactions yet</Text>
+                <Text style={styles.emptySubtitle}>Your transaction history will appear here</Text>
+              </View>
+            )}
+          </ScrollView>
         </View>
       </ScrollView>
 

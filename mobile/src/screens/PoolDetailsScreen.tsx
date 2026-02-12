@@ -95,6 +95,11 @@ export default function PoolDetailsScreen() {
   const [showDistribute, setShowDistribute] = useState(false);
   const [distributions, setDistributions] = useState<{ userId: string; amount: string }[]>([]);
   const [closePoolAfterDistribute, setClosePoolAfterDistribute] = useState(false);
+  const [showEditPool, setShowEditPool] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editTargetAmount, setEditTargetAmount] = useState('');
+  const [editDeadline, setEditDeadline] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const { refreshUser } = useAuth();
 
@@ -236,6 +241,25 @@ export default function PoolDetailsScreen() {
     },
   });
 
+  const editPoolMutation = useMutation({
+    mutationFn: async () => {
+      const data: any = {};
+      if (editTitle.trim()) data.title = editTitle.trim();
+      if (editDescription.trim()) data.description = editDescription.trim();
+      if (editTargetAmount.trim()) data.targetAmount = editTargetAmount.trim();
+      if (editDeadline.trim()) data.deadline = editDeadline.trim();
+      return api.pools.update(poolId, data);
+    },
+    onSuccess: () => {
+      invalidateAllQueries();
+      setShowEditPool(false);
+      Alert.alert('Success', 'Pool updated successfully!');
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', error.message || 'Failed to update pool');
+    },
+  });
+
   const handleContribute = () => {
     const amount = parseFloat(contributeAmount);
     if (isNaN(amount) || amount <= 0) {
@@ -360,27 +384,27 @@ export default function PoolDetailsScreen() {
 
       <TouchableOpacity
         style={styles.primaryButton}
-        onPress={openContributeModal}
+        onPress={() => navigation.navigate('SpendNow')}
         activeOpacity={0.8}
-        data-testid="button-contribute"
+        data-testid="button-spend-now"
       >
-        <Ionicons name="add-circle" size={22} color="#001F3F" />
-        <Text style={styles.primaryButtonText}>Contribute</Text>
+        <Ionicons name="bag-handle" size={22} color="#001F3F" />
+        <Text style={styles.primaryButtonText}>Spend Now</Text>
       </TouchableOpacity>
 
       <View style={styles.secondaryButtonsRow}>
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={openContributeModal}
+          activeOpacity={0.7}
+          data-testid="button-contribute"
+        >
+          <Ionicons name="add-circle-outline" size={20} color="#7FFFD4" />
+          <Text style={styles.secondaryButtonText}>Contribute</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.secondaryButton} onPress={handleShare} activeOpacity={0.7} data-testid="button-share">
           <Ionicons name="share-outline" size={20} color="#7FFFD4" />
           <Text style={styles.secondaryButtonText}>Share</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate('SpendNow')}
-          activeOpacity={0.7}
-          data-testid="button-spend-now"
-        >
-          <Ionicons name="bag-handle-outline" size={20} color="#7FFFD4" />
-          <Text style={styles.secondaryButtonText}>Spend Now</Text>
         </TouchableOpacity>
       </View>
 
@@ -422,6 +446,23 @@ export default function PoolDetailsScreen() {
                 <Ionicons name="git-branch-outline" size={20} color="#A78BFA" />
               </View>
               <Text style={styles.actionButtonText}>Distribute</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => {
+                setEditTitle(pool?.title || '');
+                setEditDescription(pool?.description || '');
+                setEditTargetAmount(pool?.targetAmount || '');
+                setEditDeadline(pool?.deadline ? new Date(pool.deadline).toISOString().split('T')[0] : '');
+                setShowEditPool(true);
+              }}
+              activeOpacity={0.7}
+              data-testid="button-edit-pool"
+            >
+              <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(251,191,36,0.15)' }]}>
+                <Ionicons name="create-outline" size={20} color="#FBBF24" />
+              </View>
+              <Text style={styles.actionButtonText}>Edit Pool</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -946,6 +987,91 @@ export default function PoolDetailsScreen() {
                 <ActivityIndicator color="#001F3F" />
               ) : (
                 <Text style={styles.confirmButtonText}>Confirm Distribution</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showEditPool}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditPool(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowEditPool(false)} />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeaderRow}>
+              <View>
+                <Text style={styles.modalTitle}>Edit Pool</Text>
+                <Text style={styles.modalSubtitle}>Update pool details</Text>
+              </View>
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowEditPool(false)} data-testid="button-close-edit">
+                <Ionicons name="close" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 400 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+              <Text style={styles.paymentMethodLabel}>Pool Name</Text>
+              <TextInput
+                style={[styles.amountInput, { paddingHorizontal: 16, fontSize: 15 }]}
+                placeholder="Pool name"
+                placeholderTextColor="#708090"
+                value={editTitle}
+                onChangeText={setEditTitle}
+                data-testid="input-edit-title"
+              />
+
+              <Text style={[styles.paymentMethodLabel, { marginTop: 16 }]}>Description</Text>
+              <TextInput
+                style={[styles.amountInput, { paddingHorizontal: 16, fontSize: 15, minHeight: 80, textAlignVertical: 'top' }]}
+                placeholder="Pool description"
+                placeholderTextColor="#708090"
+                value={editDescription}
+                onChangeText={setEditDescription}
+                multiline
+                numberOfLines={3}
+                data-testid="input-edit-description"
+              />
+
+              <Text style={[styles.paymentMethodLabel, { marginTop: 16 }]}>Target Amount ($)</Text>
+              <View style={styles.amountInputContainer}>
+                <Text style={styles.dollarPrefix}>$</Text>
+                <TextInput
+                  style={styles.amountInput}
+                  placeholder="0.00"
+                  placeholderTextColor="#708090"
+                  keyboardType="decimal-pad"
+                  value={editTargetAmount}
+                  onChangeText={setEditTargetAmount}
+                  data-testid="input-edit-target"
+                />
+              </View>
+
+              <Text style={[styles.paymentMethodLabel, { marginTop: 16 }]}>Deadline (YYYY-MM-DD)</Text>
+              <TextInput
+                style={[styles.amountInput, { paddingHorizontal: 16, fontSize: 15 }]}
+                placeholder="2025-12-31"
+                placeholderTextColor="#708090"
+                value={editDeadline}
+                onChangeText={setEditDeadline}
+                data-testid="input-edit-deadline"
+              />
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.confirmButton, { marginTop: 16 }, editPoolMutation.isPending && styles.confirmButtonDisabled]}
+              onPress={() => editPoolMutation.mutate()}
+              disabled={editPoolMutation.isPending}
+              activeOpacity={0.8}
+              data-testid="button-confirm-edit"
+            >
+              {editPoolMutation.isPending ? (
+                <ActivityIndicator color="#001F3F" />
+              ) : (
+                <Text style={styles.confirmButtonText}>Save Changes</Text>
               )}
             </TouchableOpacity>
           </View>
