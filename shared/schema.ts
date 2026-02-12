@@ -235,6 +235,8 @@ export const recurringContributions = pgTable("recurring_contributions", {
   userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   frequency: frequencyEnum("frequency").notNull(),
+  paymentMethod: text("payment_method").default('wallet'),
+  bankAccountId: varchar("bank_account_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   stripePriceId: text("stripe_price_id"),
   status: text("status").notNull().default('active'),
