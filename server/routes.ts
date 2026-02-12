@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import session from "express-session";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
-const cookieSignature = require("cookie-signature");
+import cookieSignature from "cookie-signature";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { fileStorageService, isAzureStorage } from "./fileStorage";
 import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, walletDeposits, bankAccounts, merchantPayouts, payMeTransactions, apiAccessRequests, poolActivities } from "@shared/schema";
@@ -159,6 +159,9 @@ export async function registerRoutes(
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
   }));
 
+  // Trust proxy for secure cookies behind Replit's/Azure's reverse proxy
+  app.set('trust proxy', 1);
+
   // Session middleware
   app.use(
     session({
@@ -166,17 +169,14 @@ export async function registerRoutes(
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: process.env.NODE_ENV === "production",
+        secure: true,
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         sameSite: "none",
       },
-      proxy: true, // Trust the reverse proxy
+      proxy: true,
     })
   );
-  
-  // Trust proxy for secure cookies behind Replit's proxy
-  app.set('trust proxy', 1);
 
   // Register object storage routes
   registerObjectStorageRoutes(app);
