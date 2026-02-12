@@ -19,7 +19,7 @@ export default function WalletScreen() {
     queryFn: api.wallet.getTransactions,
   });
 
-  const balance = parseFloat(user?.walletBalance || user?.balance || '0');
+  const balance = parseFloat(user?.walletBalance ?? user?.balance ?? '0') || 0;
 
   const handleRefresh = async () => {
     await refreshUser();
@@ -94,8 +94,12 @@ export default function WalletScreen() {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    try {
+      const date = new Date(dateStr || Date.now());
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return '';
+    }
   };
 
   const renderAmountModal = (visible: boolean, onClose: () => void, onSubmit: () => void, title: string, isPending: boolean) => (
@@ -193,10 +197,10 @@ export default function WalletScreen() {
             <View style={styles.sectionDivider} />
           </View>
 
-          {transactions?.slice(0, 10).map((tx: any) => {
-            const isDeposit = tx.type === 'deposit';
+          {(Array.isArray(transactions) ? transactions : []).slice(0, 10).map((tx: any) => {
+            const isDeposit = tx?.type === 'deposit';
             return (
-              <View key={tx.id} style={styles.transactionRow} data-testid={`row-transaction-${tx.id}`}>
+              <View key={tx?.id ?? Math.random()} style={styles.transactionRow} data-testid={`row-transaction-${tx?.id}`}>
                 <View style={[styles.txIcon, { backgroundColor: isDeposit ? 'rgba(76, 175, 80, 0.15)' : 'rgba(239, 83, 80, 0.15)' }]}>
                   <Ionicons
                     name={isDeposit ? 'arrow-down' : 'arrow-up'}
@@ -205,11 +209,11 @@ export default function WalletScreen() {
                   />
                 </View>
                 <View style={styles.txInfo}>
-                  <Text style={styles.txDescription}>{tx.description || tx.type}</Text>
-                  <Text style={styles.txDate}>{formatDate(tx.createdAt)}</Text>
+                  <Text style={styles.txDescription}>{tx?.description || tx?.type || 'Transaction'}</Text>
+                  <Text style={styles.txDate}>{formatDate(tx?.createdAt ?? '')}</Text>
                 </View>
                 <Text style={[styles.txAmount, { color: isDeposit ? '#4CAF50' : '#fff' }]}>
-                  {isDeposit ? '+' : '-'}${parseFloat(tx.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  {isDeposit ? '+' : '-'}${parseFloat(tx?.amount ?? '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </Text>
               </View>
             );

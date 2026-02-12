@@ -50,26 +50,26 @@ export default function NotificationsScreen() {
     <View
       style={[
         styles.notificationCard,
-        !item.read && styles.unreadCard,
+        !item?.read && styles.unreadCard,
       ]}
-      data-testid={`notification-item-${item.id}`}
+      data-testid={`notification-item-${item?.id}`}
     >
       <View style={styles.iconContainer}>
         <Ionicons
-          name={getNotificationIcon(item.type) as any}
+          name={getNotificationIcon(item?.type ?? '') as any}
           size={22}
           color="#7FFFD4"
         />
       </View>
       <View style={styles.notificationContent}>
-        <Text style={[styles.notificationMessage, !item.read && styles.unreadMessage]}>
-          {item.message}
+        <Text style={[styles.notificationMessage, !item?.read && styles.unreadMessage]}>
+          {item?.message ?? ''}
         </Text>
         <Text style={styles.notificationTime}>
-          {formatTimeAgo(item.createdAt || item.created_at || new Date().toISOString())}
+          {formatTimeAgo(item?.createdAt || item?.created_at || new Date().toISOString())}
         </Text>
       </View>
-      {!item.read && <View style={styles.unreadDot} />}
+      {!item?.read && <View style={styles.unreadDot} />}
     </View>
   );
 

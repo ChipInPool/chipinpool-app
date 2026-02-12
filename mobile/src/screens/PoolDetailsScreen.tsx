@@ -114,10 +114,10 @@ export default function PoolDetailsScreen() {
     );
   }
 
-  const currentAmount = parseFloat(pool.currentAmount) || 0;
-  const targetAmount = parseFloat(pool.targetAmount) || 0;
+  const currentAmount = parseFloat(pool?.currentAmount ?? '0') || 0;
+  const targetAmount = parseFloat(pool?.targetAmount ?? '0') || 0;
   const progress = targetAmount > 0 ? (currentAmount / targetAmount) * 100 : 0;
-  const categoryColor = getCategoryColor(pool.category);
+  const categoryColor = getCategoryColor(pool?.category ?? '');
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -125,8 +125,8 @@ export default function PoolDetailsScreen() {
         <View style={[styles.iconCircle, { backgroundColor: `${categoryColor}20` }]}>
           <Ionicons name={getCategoryIcon(pool.category)} size={36} color={categoryColor} />
         </View>
-        <Text style={styles.title} data-testid="text-pool-title">{pool.title}</Text>
-        {pool.description ? (
+        <Text style={styles.title} data-testid="text-pool-title">{pool?.title ?? 'Untitled Pool'}</Text>
+        {pool?.description ? (
           <Text style={styles.description} data-testid="text-pool-description">{pool.description}</Text>
         ) : null}
       </View>
@@ -137,7 +137,7 @@ export default function PoolDetailsScreen() {
             <Ionicons name="pricetag-outline" size={16} color="#7FFFD4" />
           </View>
           <Text style={styles.infoCardLabel}>Category</Text>
-          <Text style={styles.infoCardValue} data-testid="text-pool-category">{pool.category || 'General'}</Text>
+          <Text style={styles.infoCardValue} data-testid="text-pool-category">{pool?.category || 'General'}</Text>
         </View>
         <View style={styles.infoCard}>
           <View style={[styles.infoIconWrap, { backgroundColor: 'rgba(96,165,250,0.15)' }]}>
@@ -145,17 +145,17 @@ export default function PoolDetailsScreen() {
           </View>
           <Text style={styles.infoCardLabel}>Deadline</Text>
           <Text style={styles.infoCardValue} data-testid="text-pool-deadline">
-            {pool.deadline ? new Date(pool.deadline).toLocaleDateString() : 'None'}
+            {pool?.deadline ? new Date(pool.deadline).toLocaleDateString() : 'None'}
           </Text>
         </View>
         <View style={styles.infoCard}>
-          <View style={[styles.infoIconWrap, { backgroundColor: pool.status === 'active' ? 'rgba(127,255,212,0.15)' : 'rgba(251,191,36,0.15)' }]}>
-            <Ionicons name="flag-outline" size={16} color={pool.status === 'active' ? '#7FFFD4' : '#FBBF24'} />
+          <View style={[styles.infoIconWrap, { backgroundColor: pool?.status === 'active' ? 'rgba(127,255,212,0.15)' : 'rgba(251,191,36,0.15)' }]}>
+            <Ionicons name="flag-outline" size={16} color={pool?.status === 'active' ? '#7FFFD4' : '#FBBF24'} />
           </View>
           <Text style={styles.infoCardLabel}>Status</Text>
-          <View style={[styles.statusBadge, { backgroundColor: pool.status === 'active' ? 'rgba(127,255,212,0.15)' : 'rgba(251,191,36,0.15)' }]}>
-            <Text style={[styles.statusText, { color: pool.status === 'active' ? '#7FFFD4' : '#FBBF24' }]} data-testid="text-pool-status">
-              {pool.status || 'Active'}
+          <View style={[styles.statusBadge, { backgroundColor: pool?.status === 'active' ? 'rgba(127,255,212,0.15)' : 'rgba(251,191,36,0.15)' }]}>
+            <Text style={[styles.statusText, { color: pool?.status === 'active' ? '#7FFFD4' : '#FBBF24' }]} data-testid="text-pool-status">
+              {pool?.status || 'Active'}
             </Text>
           </View>
         </View>
@@ -208,26 +208,26 @@ export default function PoolDetailsScreen() {
         <View style={styles.sectionHeader}>
           <Ionicons name="people-outline" size={20} color="#7FFFD4" />
           <Text style={styles.sectionTitle}>Contributors</Text>
-          {contributions && contributions.length > 0 && (
+          {Array.isArray(contributions) && contributions.length > 0 && (
             <View style={styles.contributorCountBadge}>
               <Text style={styles.contributorCountText}>{contributions.length}</Text>
             </View>
           )}
         </View>
-        {contributions?.map((contribution: any) => (
-          <View key={contribution.id} style={styles.contributorRow} data-testid={`card-contributor-${contribution.id}`}>
+        {(Array.isArray(contributions) ? contributions : []).map((contribution: any, index: number) => (
+          <View key={contribution?.id ?? `contrib-${index}`} style={styles.contributorRow} data-testid={`card-contributor-${contribution?.id}`}>
             <View style={styles.contributorAvatar}>
               <Text style={styles.contributorInitials}>
-                {contribution.user?.firstName?.[0]}{contribution.user?.lastName?.[0]}
+                {contribution?.user?.firstName?.[0] ?? ''}{contribution?.user?.lastName?.[0] ?? ''}
               </Text>
             </View>
             <View style={styles.contributorInfo}>
-              <Text style={styles.contributorName}>{contribution.user?.firstName} {contribution.user?.lastName}</Text>
+              <Text style={styles.contributorName}>{contribution?.user?.firstName ?? ''} {contribution?.user?.lastName ?? ''}</Text>
               <Text style={styles.contributorDate}>
-                {new Date(contribution.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                {new Date(contribution?.createdAt ?? Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </Text>
             </View>
-            <Text style={styles.contributorAmount}>${parseFloat(contribution.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+            <Text style={styles.contributorAmount}>${parseFloat(contribution?.amount ?? '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
           </View>
         ))}
         {(!contributions || contributions.length === 0) && (
@@ -252,7 +252,7 @@ export default function PoolDetailsScreen() {
             <View style={styles.modalHeaderRow}>
               <View>
                 <Text style={styles.modalTitle}>Contribute to Pool</Text>
-                <Text style={styles.modalSubtitle}>{pool.title}</Text>
+                <Text style={styles.modalSubtitle}>{pool?.title ?? ''}</Text>
               </View>
               <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowContribute(false)} data-testid="button-close-modal">
                 <Ionicons name="close" size={22} color="#fff" />

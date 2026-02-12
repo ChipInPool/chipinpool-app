@@ -47,8 +47,9 @@ export default function HomeScreen() {
     queryFn: api.activity.feed,
   });
 
-  const unreadCount = notifications?.filter((n: any) => !n.read)?.length || 0;
-  const balance = parseFloat(user?.walletBalance || user?.balance || '0');
+  const safeNotifications = Array.isArray(notifications) ? notifications : [];
+  const unreadCount = safeNotifications.filter((n: any) => !n?.read)?.length ?? 0;
+  const balance = parseFloat(user?.walletBalance ?? user?.balance ?? '0') || 0;
 
   const quickActions = [
     { icon: 'add-circle-outline', label: 'Create Pool', color: '#7FFFD4', screen: 'PoolsTab', params: { screen: 'CreatePool' } },
@@ -201,7 +202,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
-            {activityFeed && activityFeed.length > 0 && (
+            {Array.isArray(activityFeed) && activityFeed.length > 0 && (
               <TouchableOpacity
                 onPress={() => navigation.navigate('ProfileTab', { screen: 'Activity' })}
                 activeOpacity={0.7}
@@ -210,7 +211,7 @@ export default function HomeScreen() {
               </TouchableOpacity>
             )}
           </View>
-          {activityFeed && activityFeed.length > 0 ? (
+          {Array.isArray(activityFeed) && activityFeed.length > 0 ? (
             activityFeed.slice(0, 3).map((item: any, index: number) => {
               const actIcon = getActivityIcon(item.type);
               return (
@@ -224,25 +225,25 @@ export default function HomeScreen() {
                   </View>
                   <View style={styles.activityInfo}>
                     <Text style={styles.activityDescription} numberOfLines={1}>
-                      {item.description || item.message}
+                      {item?.description || item?.message || 'Activity'}
                     </Text>
                     <Text style={styles.activityDate}>
-                      {new Date(item.createdAt || item.date).toLocaleDateString('en-US', {
+                      {new Date(item?.createdAt || item?.date || Date.now()).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric',
                       })}
                     </Text>
                   </View>
-                  {item.amount && (
+                  {item?.amount && (
                     <Text
                       style={[
                         styles.activityAmount,
-                        { color: item.type === 'withdrawal' ? '#F87171' : '#34D399' },
+                        { color: item?.type === 'withdrawal' ? '#F87171' : '#34D399' },
                       ]}
                     >
-                      {item.type === 'withdrawal' ? '-' : '+'}$
-                      {parseFloat(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      {item?.type === 'withdrawal' ? '-' : '+'}$
+                      {parseFloat(item?.amount ?? '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
                   )}
                 </View>

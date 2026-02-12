@@ -43,61 +43,84 @@ export async function clearSessionCookie() {
 }
 
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  await ensureCookieLoaded();
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
-
-  if (sessionCookie) {
-    (headers as Record<string, string>)['Cookie'] = sessionCookie;
-  }
-
-  const url = `${API_URL}${endpoint}`;
-  console.log('[API] Request:', options.method || 'GET', endpoint);
-
-  const response = await fetch(url, {
-    ...options,
-    headers,
-    credentials: 'include',
-  });
-
-  const setCookie = response.headers.get('set-cookie');
-  if (setCookie) {
-    const sidMatch = setCookie.match(/connect\.sid=([^;]+)/);
-    if (sidMatch) {
-      await saveSessionCookie(`connect.sid=${sidMatch[1]}`);
-    } else {
-      await saveSessionCookie(setCookie.split(';')[0]);
-    }
-  }
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[API] Error:', response.status, endpoint, errorText.substring(0, 200));
-
-    if (response.status === 401) {
-      sessionCookie = null;
-      try { await SecureStore.deleteItemAsync('session_cookie'); } catch {}
-      throw new Error('Unauthorized');
-    }
-
-    let error: any;
-    try {
-      error = JSON.parse(errorText);
-    } catch {
-      error = { message: `Request failed (${response.status})` };
-    }
-    throw new Error(error.message || error.error || `Request failed (${response.status})`);
-  }
-
-  const text = await response.text();
-  if (!text) return {} as T;
   try {
-    return JSON.parse(text);
-  } catch {
-    console.error('[API] Invalid JSON response:', endpoint, text.substring(0, 200));
-    return {} as T;
+    await ensureCookieLoaded();
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    if (sessionCookie) {
+      (headers as Record<string, string>)['Cookie'] = sessionCookie;
+    }
+
+    const url = `${API_URL}${endpoint}`;
+    console.log('[API] Request:', options.method || 'GET', endpoint);
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers,
+        credentials: 'include',
+      });
+    } catch (networkError: any) {
+      console.error('[API] Network error:', endpoint, networkError?.message);
+      throw new Error('Network error. Please check your connection and try again.');
+    }
+
+    const setCookie = response.headers.get('set-cookie');
+    if (setCookie) {
+      const sidMatch = setCookie.match(/connect\.sid=([^;]+)/);
+      if (sidMatch) {
+        await saveSessionCookie(`connect.sid=${sidMatch[1]}`);
+      } else {
+        await saveSessionCookie(setCookie.split(';')[0]);
+      }
+    }
+
+    if (!response.ok) {
+      let errorText = '';
+      try {
+        errorText = await response.text();
+      } catch {}
+      console.error('[API] Error:', response.status, endpoint, errorText.substring(0, 200));
+
+      if (response.status === 401) {
+        sessionCookie = null;
+        try { await SecureStore.deleteItemAsync('session_cookie'); } catch {}
+        throw new Error('Unauthorized');
+      }
+
+      let error: any;
+      try {
+        error = JSON.parse(errorText);
+      } catch {
+        error = { message: `Request failed (${response.status})` };
+      }
+      throw new Error(error.message || error.error || `Request failed (${response.status})`);
+    }
+
+    let text = '';
+    try {
+      text = await response.text();
+    } catch {
+      console.error('[API] Failed to read response body:', endpoint);
+      return {} as T;
+    }
+    if (!text) return {} as T;
+    try {
+      return JSON.parse(text);
+    } catch {
+      console.error('[API] Invalid JSON response:', endpoint, text.substring(0, 200));
+      return {} as T;
+    }
+  } catch (error: any) {
+    if (error?.message === 'Unauthorized' || error?.message?.includes('Network error') || error?.message?.includes('Request failed')) {
+      throw error;
+    }
+    console.error('[API] Unexpected error in fetchApi:', endpoint, error?.message);
+    throw new Error(error?.message || 'An unexpected error occurred');
   }
 }
 

@@ -152,8 +152,8 @@ export default function ActivityScreen() {
         ) : (
           <View style={styles.activityList}>
             {activities.map((item: any, index: number) => {
-              const icon = getActivityIcon(item.type);
-              const amount = formatAmount(item.type, item.amount);
+              const icon = getActivityIcon(item?.type ?? '');
+              const amount = formatAmount(item?.type ?? '', item?.amount ?? '0');
               return (
                 <View
                   key={item.id || index}
@@ -176,10 +176,10 @@ export default function ActivityScreen() {
                   </View>
                   <View style={styles.activityInfo}>
                     <Text style={styles.activityDescription} numberOfLines={1}>
-                      {item.description || item.title || item.type}
+                      {item?.description || item?.title || item?.type || 'Activity'}
                     </Text>
                     <Text style={styles.activityDate}>
-                      {formatDate(item.createdAt || item.date || item.timestamp)}
+                      {formatDate(item?.createdAt || item?.date || item?.timestamp || new Date().toISOString())}
                     </Text>
                   </View>
                   <Text style={[styles.activityAmount, { color: amount.color }]}>

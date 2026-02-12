@@ -53,12 +53,12 @@ export default function RewardsScreen() {
   const totalPoints = pointsData?.totalPoints ?? pointsData?.points ?? 0;
 
   const renderBadge = ({ item }: { item: any }) => {
-    const earned = item.earned || item.unlockedAt;
+    const earned = item?.earned || item?.unlockedAt;
     return (
-      <View style={[styles.badgeCard, !earned && styles.badgeLocked]} data-testid={`badge-item-${item.id}`}>
-        <Text style={styles.badgeEmoji}>{item.icon || item.emoji || '🏆'}</Text>
-        <Text style={[styles.badgeName, !earned && styles.dimmedText]} numberOfLines={1}>{item.name}</Text>
-        <Text style={[styles.badgeDesc, !earned && styles.dimmedText]} numberOfLines={2}>{item.description}</Text>
+      <View style={[styles.badgeCard, !earned && styles.badgeLocked]} data-testid={`badge-item-${item?.id}`}>
+        <Text style={styles.badgeEmoji}>{item?.icon || item?.emoji || '🏆'}</Text>
+        <Text style={[styles.badgeName, !earned && styles.dimmedText]} numberOfLines={1}>{item?.name ?? ''}</Text>
+        <Text style={[styles.badgeDesc, !earned && styles.dimmedText]} numberOfLines={2}>{item?.description ?? ''}</Text>
         {earned ? (
           <View style={styles.earnedBadge}>
             <Ionicons name="checkmark-circle" size={14} color="#7FFFD4" />
@@ -75,9 +75,9 @@ export default function RewardsScreen() {
   };
 
   const renderTransaction = ({ item }: { item: any }) => {
-    const isPositive = (item.points || item.amount || 0) > 0;
+    const isPositive = (item?.points || item?.amount || 0) > 0;
     return (
-      <View style={styles.transactionCard} data-testid={`points-transaction-${item.id}`}>
+      <View style={styles.transactionCard} data-testid={`points-transaction-${item?.id}`}>
         <View style={styles.transactionIcon}>
           <Ionicons
             name={isPositive ? 'arrow-up-circle' : 'arrow-down-circle'}
@@ -86,23 +86,23 @@ export default function RewardsScreen() {
           />
         </View>
         <View style={styles.transactionInfo}>
-          <Text style={styles.transactionDesc}>{item.description || item.reason || 'Points activity'}</Text>
-          <Text style={styles.transactionDate}>{formatDate(item.createdAt || item.created_at || new Date().toISOString())}</Text>
+          <Text style={styles.transactionDesc}>{item?.description || item?.reason || 'Points activity'}</Text>
+          <Text style={styles.transactionDate}>{formatDate(item?.createdAt || item?.created_at || new Date().toISOString())}</Text>
         </View>
         <Text style={[styles.transactionPoints, { color: isPositive ? '#7FFFD4' : '#F87171' }]}>
-          {isPositive ? '+' : ''}{item.points || item.amount || 0}
+          {isPositive ? '+' : ''}{item?.points || item?.amount || 0}
         </Text>
       </View>
     );
   };
 
   const renderLeaderboardEntry = ({ item, index }: { item: any; index: number }) => {
-    const rank = item.rank || index + 1;
-    const isCurrentUser = item.userId === user?.id || item.username === user?.username;
+    const rank = item?.rank || index + 1;
+    const isCurrentUser = item?.userId === user?.id || item?.username === user?.username;
     return (
       <View
         style={[styles.leaderboardRow, isCurrentUser && styles.currentUserRow]}
-        data-testid={`leaderboard-entry-${item.userId || index}`}
+        data-testid={`leaderboard-entry-${item?.userId || index}`}
       >
         <View style={[styles.rankBadge, { backgroundColor: rank <= 3 ? `${getRankColor(rank)}20` : 'rgba(255,255,255,0.05)' }]}>
           <Text style={[styles.rankNumber, { color: getRankColor(rank) }]}>
@@ -111,14 +111,14 @@ export default function RewardsScreen() {
         </View>
         <View style={styles.leaderboardInfo}>
           <Text style={[styles.leaderboardName, isCurrentUser && styles.currentUserName]}>
-            {item.username || item.name || `${item.firstName || ''} ${item.lastName || ''}`.trim()}
+            {item?.username || item?.name || `${item?.firstName || ''} ${item?.lastName || ''}`.trim()}
             {isCurrentUser ? ' (You)' : ''}
           </Text>
         </View>
         {rank <= 3 && (
           <Ionicons name="trophy" size={20} color={getRankColor(rank)} style={{ marginRight: 8 }} />
         )}
-        <Text style={styles.leaderboardPoints}>{item.totalPoints ?? item.points ?? 0}</Text>
+        <Text style={styles.leaderboardPoints}>{item?.totalPoints ?? item?.points ?? 0}</Text>
       </View>
     );
   };
