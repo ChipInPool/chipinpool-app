@@ -66,7 +66,7 @@ export default function PaymentMethodsScreen() {
   const handleLinkBank = () => {
     Alert.alert(
       'Link Bank Account',
-      'Bank linking requires Plaid. Please use the web app to link your bank account.',
+      'To link a bank account, please use the web app. Bank linking uses Stripe Financial Connections for secure verification.',
       [{ text: 'OK' }]
     );
   };
@@ -74,7 +74,7 @@ export default function PaymentMethodsScreen() {
   const handleAddDebitCard = () => {
     Alert.alert(
       'Add Debit Card',
-      'Debit card linking will be available soon. Please use the web app to add a debit card.',
+      'To add a debit card, please use the web app. Card linking uses Stripe Financial Connections for secure verification.',
       [{ text: 'OK' }]
     );
   };

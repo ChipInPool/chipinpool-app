@@ -27,7 +27,7 @@ export default function WalletScreen() {
   };
 
   const depositMutation = useMutation({
-    mutationFn: (depositAmount: number) => api.wallet.depositCheckout(depositAmount),
+    mutationFn: (depositAmount: string) => api.wallet.depositCheckout(depositAmount),
     onSuccess: (response) => {
       setShowDepositModal(false);
       setAmount('');
@@ -46,14 +46,14 @@ export default function WalletScreen() {
   });
 
   const withdrawMutation = useMutation({
-    mutationFn: async (withdrawAmount: number) => {
+    mutationFn: async (withdrawAmount: string) => {
       const bankAccountsData = await api.bankAccounts.list();
       const accounts = bankAccountsData?.accounts || [];
       if (accounts.length === 0) {
         throw new Error('No bank account linked. Please go to Profile > Payment Methods to link a bank account first.');
       }
       const defaultAccount = accounts.find((a: any) => a.isDefault) || accounts[0];
-      return api.wallet.withdraw(withdrawAmount, defaultAccount.id);
+      return api.wallet.withdraw(withdrawAmount, defaultAccount.id.toString());
     },
     onSuccess: () => {
       setShowWithdrawModal(false);
@@ -73,7 +73,7 @@ export default function WalletScreen() {
       Alert.alert('Invalid Amount', 'Please enter a valid amount greater than $0');
       return;
     }
-    depositMutation.mutate(parsedAmount);
+    depositMutation.mutate(parsedAmount.toString());
   };
 
   const handleWithdraw = () => {
@@ -86,7 +86,7 @@ export default function WalletScreen() {
       Alert.alert('Insufficient Balance', 'You cannot withdraw more than your available balance');
       return;
     }
-    withdrawMutation.mutate(parsedAmount);
+    withdrawMutation.mutate(parsedAmount.toString());
   };
 
   const handleComingSoon = () => {

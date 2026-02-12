@@ -203,17 +203,17 @@ export const api = {
       const user = r.user || r;
       return { balance: user.walletBalance || '0.00' };
     }),
-    deposit: (amount: number) =>
+    deposit: (amount: string) =>
       fetchApi<any>('/api/user/deposit', {
         method: 'POST',
         body: JSON.stringify({ amount }),
       }),
-    withdraw: (amount: number, bankAccountId: string) =>
-      fetchApi<any>('/api/user/withdraw', {
+    withdraw: (amount: string, savedMethodId: string) =>
+      fetchApi<any>('/api/wallet/withdraw', {
         method: 'POST',
-        body: JSON.stringify({ amount, bankAccountId }),
+        body: JSON.stringify({ amount, savedMethodId }),
       }),
-    depositCheckout: (amount: number) =>
+    depositCheckout: (amount: string) =>
       fetchApi<any>('/api/user/deposit/checkout', {
         method: 'POST',
         body: JSON.stringify({ amount }),
@@ -225,12 +225,12 @@ export const api = {
   },
   bankAccounts: {
     list: () => fetchApi<any>('/api/bank-accounts'),
-    link: () =>
-      fetchApi<any>('/api/bank-accounts/link', { method: 'POST' }),
-    completeLink: (accountId: string) =>
-      fetchApi<any>('/api/bank-accounts/complete-link', {
+    createLinkSession: () =>
+      fetchApi<{ clientSecret: string; setupIntentId: string }>('/api/stripe/financial-connections/create-session', { method: 'POST' }),
+    completeLink: (accountId: string, setupIntentId: string) =>
+      fetchApi<any>('/api/stripe/financial-connections/complete', {
         method: 'POST',
-        body: JSON.stringify({ accountId }),
+        body: JSON.stringify({ accountId, setupIntentId }),
       }),
     delete: (id: string) =>
       fetchApi<any>(`/api/bank-accounts/${id}`, { method: 'DELETE' }),
@@ -242,6 +242,18 @@ export const api = {
     getConnectStatus: () => fetchApi<any>('/api/stripe/connect/status'),
     createOnboardingLink: () =>
       fetchApi<{ url: string }>('/api/stripe/connect/onboarding-link', { method: 'POST' }),
+    createFinancialConnectionsSession: () =>
+      fetchApi<{ clientSecret: string; setupIntentId: string }>('/api/stripe/financial-connections/create-session', { method: 'POST' }),
+    completeFinancialConnections: (accountId: string, setupIntentId: string) =>
+      fetchApi<any>('/api/stripe/financial-connections/complete', {
+        method: 'POST',
+        body: JSON.stringify({ accountId, setupIntentId }),
+      }),
+  },
+  payoutMethods: {
+    list: () => fetchApi<any>('/api/payout-methods'),
+    delete: (id: string) => fetchApi<any>(`/api/payout-methods/${id}`, { method: 'DELETE' }),
+    setDefault: (id: string) => fetchApi<any>(`/api/payout-methods/${id}/set-default`, { method: 'POST' }),
   },
   security: {
     getStatus: () => fetchApi<any>('/api/security/status'),
