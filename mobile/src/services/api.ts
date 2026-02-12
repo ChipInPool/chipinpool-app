@@ -162,6 +162,12 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+    getNotificationPreferences: () => fetchApi<any>('/api/user/notification-preferences'),
+    updateNotificationPreferences: (data: any) =>
+      fetchApi<any>('/api/user/notification-preferences', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
   },
   pools: {
     list: async () => {
@@ -199,6 +205,16 @@ export const api = {
     }),
     deposit: (amount: number) =>
       fetchApi<any>('/api/user/deposit', {
+        method: 'POST',
+        body: JSON.stringify({ amount }),
+      }),
+    withdraw: (amount: number, bankAccountId: string) =>
+      fetchApi<any>('/api/user/withdraw', {
+        method: 'POST',
+        body: JSON.stringify({ amount, bankAccountId }),
+      }),
+    depositCheckout: (amount: number) =>
+      fetchApi<any>('/api/user/deposit/checkout', {
         method: 'POST',
         body: JSON.stringify({ amount }),
       }),

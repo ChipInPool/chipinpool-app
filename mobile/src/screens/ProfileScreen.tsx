@@ -3,7 +3,9 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 
 const COLORS = {
@@ -26,6 +28,16 @@ export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { user, logout } = useAuth();
 
+  const { data: pools } = useQuery({
+    queryKey: ['pools'],
+    queryFn: api.pools.list,
+  });
+
+  const { data: pointsData } = useQuery({
+    queryKey: ['rewardsPoints'],
+    queryFn: api.rewards.points,
+  });
+
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
@@ -34,6 +46,10 @@ export default function ProfileScreen() {
   };
 
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`;
+  const walletBalance = parseFloat(user?.walletBalance || '0');
+  const formattedBalance = `$${walletBalance.toFixed(2)}`;
+  const poolsCount = String(pools?.length || 0);
+  const rewardsPoints = String(pointsData?.points || 0);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -72,9 +88,9 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.statsRow}>
-          <StatCard icon="people-outline" value="—" label="Pools" />
-          <StatCard icon="wallet-outline" value="—" label="Contributed" />
-          <StatCard icon="star-outline" value="—" label="Rewards" />
+          <StatCard icon="people-outline" value={poolsCount} label="Pools" />
+          <StatCard icon="wallet-outline" value={formattedBalance} label="Contributed" />
+          <StatCard icon="star-outline" value={rewardsPoints} label="Rewards" />
         </View>
 
         <View style={styles.section}>

@@ -1,14 +1,18 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Modal, TextInput, Linking, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function WalletScreen() {
   const { user, refreshUser } = useAuth();
+  const queryClient = useQueryClient();
+  const [showDepositModal, setShowDepositModal] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [amount, setAmount] = useState('');
 
   const { data: transactions, isLoading, refetch } = useQuery({
     queryKey: ['walletTransactions'],
@@ -22,6 +26,69 @@ export default function WalletScreen() {
     await refetch();
   };
 
+  const depositMutation = useMutation({
+    mutationFn: (depositAmount: number) => api.wallet.depositCheckout(depositAmount),
+    onSuccess: (response) => {
+      setShowDepositModal(false);
+      setAmount('');
+      const checkoutUrl = response?.url || response?.checkoutUrl;
+      if (checkoutUrl) {
+        Linking.openURL(checkoutUrl);
+      } else {
+        Alert.alert('Success', 'Deposit initiated successfully');
+        refreshUser();
+        queryClient.invalidateQueries({ queryKey: ['walletTransactions'] });
+      }
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', error.message || 'Failed to process deposit');
+    },
+  });
+
+  const withdrawMutation = useMutation({
+    mutationFn: async (withdrawAmount: number) => {
+      const bankAccountsData = await api.bankAccounts.list();
+      const accounts = bankAccountsData?.accounts || [];
+      if (accounts.length === 0) {
+        throw new Error('No bank account linked. Please go to Profile > Payment Methods to link a bank account first.');
+      }
+      const defaultAccount = accounts.find((a: any) => a.isDefault) || accounts[0];
+      return api.wallet.withdraw(withdrawAmount, defaultAccount.id);
+    },
+    onSuccess: () => {
+      setShowWithdrawModal(false);
+      setAmount('');
+      Alert.alert('Success', 'Withdrawal initiated successfully');
+      refreshUser();
+      queryClient.invalidateQueries({ queryKey: ['walletTransactions'] });
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', error.message || 'Failed to process withdrawal');
+    },
+  });
+
+  const handleDeposit = () => {
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than $0');
+      return;
+    }
+    depositMutation.mutate(parsedAmount);
+  };
+
+  const handleWithdraw = () => {
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than $0');
+      return;
+    }
+    if (parsedAmount > balance) {
+      Alert.alert('Insufficient Balance', 'You cannot withdraw more than your available balance');
+      return;
+    }
+    withdrawMutation.mutate(parsedAmount);
+  };
+
   const handleComingSoon = () => {
     Alert.alert('Coming Soon', 'This feature will be available soon');
   };
@@ -30,6 +97,53 @@ export default function WalletScreen() {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
+
+  const renderAmountModal = (visible: boolean, onClose: () => void, onSubmit: () => void, title: string, isPending: boolean) => (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>{title}</Text>
+          <Text style={styles.modalSubtitle}>
+            {title === 'Add Funds' ? 'Enter the amount to deposit' : 'Enter the amount to withdraw'}
+          </Text>
+          <View style={styles.amountInputContainer}>
+            <Text style={styles.dollarSign}>$</Text>
+            <TextInput
+              style={styles.amountInput}
+              placeholder="0.00"
+              placeholderTextColor="#708090"
+              keyboardType="decimal-pad"
+              value={amount}
+              onChangeText={setAmount}
+              autoFocus
+            />
+          </View>
+          {title === 'Withdraw' && (
+            <Text style={styles.balanceHint}>Available: ${balance.toFixed(2)}</Text>
+          )}
+          <View style={styles.modalButtons}>
+            <TouchableOpacity
+              style={styles.modalCancelButton}
+              onPress={() => { onClose(); setAmount(''); }}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalSubmitButton, isPending && styles.modalButtonDisabled]}
+              onPress={onSubmit}
+              disabled={isPending}
+            >
+              {isPending ? (
+                <ActivityIndicator size="small" color="#001F3F" />
+              ) : (
+                <Text style={styles.modalSubmitText}>{title === 'Add Funds' ? 'Continue' : 'Withdraw'}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -53,13 +167,13 @@ export default function WalletScreen() {
         </LinearGradient>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleComingSoon} data-testid="button-add-funds">
+          <TouchableOpacity style={styles.actionButton} onPress={() => setShowDepositModal(true)} data-testid="button-add-funds">
             <View style={[styles.actionIcon, { backgroundColor: 'rgba(127, 255, 212, 0.15)' }]}>
               <Ionicons name="add" size={26} color="#7FFFD4" />
             </View>
             <Text style={styles.actionLabel}>Add Funds</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={handleComingSoon} data-testid="button-withdraw">
+          <TouchableOpacity style={styles.actionButton} onPress={() => setShowWithdrawModal(true)} data-testid="button-withdraw">
             <View style={[styles.actionIcon, { backgroundColor: 'rgba(96, 165, 250, 0.15)' }]}>
               <Ionicons name="arrow-up" size={26} color="#60A5FA" />
             </View>
@@ -110,6 +224,9 @@ export default function WalletScreen() {
           )}
         </View>
       </ScrollView>
+
+      {renderAmountModal(showDepositModal, () => setShowDepositModal(false), handleDeposit, 'Add Funds', depositMutation.isPending)}
+      {renderAmountModal(showWithdrawModal, () => setShowWithdrawModal(false), handleWithdraw, 'Withdraw', withdrawMutation.isPending)}
     </SafeAreaView>
   );
 }
@@ -257,5 +374,96 @@ const styles = StyleSheet.create({
     color: '#708090',
     fontSize: 14,
     marginTop: 6,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#0D2B4E',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 360,
+    borderWidth: 1,
+    borderColor: 'rgba(127, 255, 212, 0.2)',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#708090',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  amountInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(127, 255, 212, 0.2)',
+  },
+  dollarSign: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#7FFFD4',
+    marginRight: 8,
+  },
+  amountInput: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    paddingVertical: 12,
+  },
+  balanceHint: {
+    fontSize: 13,
+    color: '#708090',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  modalCancelText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  modalSubmitButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#7FFFD4',
+  },
+  modalButtonDisabled: {
+    opacity: 0.6,
+  },
+  modalSubmitText: {
+    color: '#001F3F',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });

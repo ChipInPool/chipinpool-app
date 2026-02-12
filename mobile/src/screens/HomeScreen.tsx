@@ -101,11 +101,11 @@ export default function HomeScreen() {
               ${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </Text>
             <View style={styles.balanceActions}>
-              <TouchableOpacity style={styles.balancePill} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.balancePill} activeOpacity={0.8} onPress={() => navigation.navigate('WalletTab')}>
                 <Ionicons name="add-circle-outline" size={18} color="#7FFFD4" />
                 <Text style={styles.balancePillText}>Add Funds</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.balancePill} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.balancePill} activeOpacity={0.8} onPress={() => navigation.navigate('WalletTab')}>
                 <Ionicons name="arrow-up-circle-outline" size={18} color="#7FFFD4" />
                 <Text style={styles.balancePillText}>Withdraw</Text>
               </TouchableOpacity>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Linking } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,12 +22,33 @@ export default function PaymentMethodsScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bankAccounts'] });
     },
+    onError: (error: any) => {
+      Alert.alert('Error', error.message || 'Failed to remove payment method');
+    },
   });
 
   const setDefaultMutation = useMutation({
     mutationFn: api.bankAccounts.setDefault,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bankAccounts'] });
+      Alert.alert('Success', 'Default payment method updated');
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', error.message || 'Failed to set default payment method');
+    },
+  });
+
+  const onboardingMutation = useMutation({
+    mutationFn: api.stripe.createOnboardingLink,
+    onSuccess: (result) => {
+      if (result?.url) {
+        Linking.openURL(result.url);
+      } else {
+        Alert.alert('Error', 'Could not get verification link. Please try again.');
+      }
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', error.message || 'Failed to start verification');
     },
   });
 
@@ -40,6 +61,22 @@ export default function PaymentMethodsScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: () => deleteMutation.mutate(id) },
     ]);
+  };
+
+  const handleLinkBank = () => {
+    Alert.alert(
+      'Link Bank Account',
+      'Bank linking requires Plaid. Please use the web app to link your bank account.',
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleAddDebitCard = () => {
+    Alert.alert(
+      'Add Debit Card',
+      'Debit card linking will be available soon. Please use the web app to add a debit card.',
+      [{ text: 'OK' }]
+    );
   };
 
   return (
@@ -59,8 +96,14 @@ export default function PaymentMethodsScreen() {
           </View>
         </View>
         {!connectStatus?.payoutsEnabled && (
-          <TouchableOpacity style={styles.verifyButton}>
-            <Text style={styles.verifyButtonText}>Complete Verification</Text>
+          <TouchableOpacity
+            style={styles.verifyButton}
+            onPress={() => onboardingMutation.mutate()}
+            disabled={onboardingMutation.isPending}
+          >
+            <Text style={styles.verifyButtonText}>
+              {onboardingMutation.isPending ? 'Loading...' : 'Complete Verification'}
+            </Text>
             <Ionicons name="arrow-forward" size={16} color="#001F3F" />
           </TouchableOpacity>
         )}
@@ -85,13 +128,27 @@ export default function PaymentMethodsScreen() {
                 {account.isDefault && <Text style={styles.defaultBadge}> (Default)</Text>}
               </Text>
             </View>
+            {!account.isDefault && (
+              <TouchableOpacity
+                onPress={() => setDefaultMutation.mutate(account.id)}
+                style={styles.setDefaultButton}
+                data-testid={`button-set-default-${account.id}`}
+              >
+                <Ionicons name="star-outline" size={18} color="#7FFFD4" />
+              </TouchableOpacity>
+            )}
+            {account.isDefault && (
+              <View style={styles.setDefaultButton}>
+                <Ionicons name="star" size={18} color="#7FFFD4" />
+              </View>
+            )}
             <TouchableOpacity onPress={() => handleDelete(account.id)} style={styles.deleteButton}>
               <Ionicons name="trash-outline" size={18} color="#f87171" />
             </TouchableOpacity>
           </View>
         ))}
         
-        <TouchableOpacity style={styles.addButton}>
+        <TouchableOpacity style={styles.addButton} onPress={handleLinkBank}>
           <Ionicons name="add-circle-outline" size={20} color="#7FFFD4" />
           <Text style={styles.addButtonText}>Link Bank Account</Text>
         </TouchableOpacity>
@@ -120,13 +177,27 @@ export default function PaymentMethodsScreen() {
                 {card.isDefault && <Text style={styles.defaultBadge}> (Default)</Text>}
               </Text>
             </View>
+            {!card.isDefault && (
+              <TouchableOpacity
+                onPress={() => setDefaultMutation.mutate(card.id)}
+                style={styles.setDefaultButton}
+                data-testid={`button-set-default-${card.id}`}
+              >
+                <Ionicons name="star-outline" size={18} color="#7FFFD4" />
+              </TouchableOpacity>
+            )}
+            {card.isDefault && (
+              <View style={styles.setDefaultButton}>
+                <Ionicons name="star" size={18} color="#7FFFD4" />
+              </View>
+            )}
             <TouchableOpacity onPress={() => handleDelete(card.id)} style={styles.deleteButton}>
               <Ionicons name="trash-outline" size={18} color="#f87171" />
             </TouchableOpacity>
           </View>
         ))}
         
-        <TouchableOpacity style={styles.addButton}>
+        <TouchableOpacity style={styles.addButton} onPress={handleAddDebitCard}>
           <Ionicons name="add-circle-outline" size={20} color="#7FFFD4" />
           <Text style={styles.addButtonText}>Add Debit Card</Text>
         </TouchableOpacity>
@@ -156,6 +227,7 @@ const styles = StyleSheet.create({
   pmName: { fontSize: 15, fontWeight: '500', color: '#fff' },
   pmDetails: { fontSize: 13, color: '#708090', marginTop: 2 },
   defaultBadge: { color: '#7FFFD4' },
+  setDefaultButton: { padding: 8 },
   deleteButton: { padding: 8 },
   addButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: 'rgba(127, 255, 212, 0.3)', borderStyle: 'dashed', borderRadius: 12, paddingVertical: 14, marginTop: 4 },
   addButtonText: { color: '#7FFFD4', fontWeight: '500' },
