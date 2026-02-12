@@ -1195,7 +1195,7 @@ export async function registerRoutes(
       const allActivities = [...contributionActivities, ...otherActivities]
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       
-      const raised = parseFloat(pool.currentAmount) + parseFloat(pool.spentAmount);
+      const raised = parseFloat(pool.currentAmount);
       const spent = parseFloat(pool.spentAmount);
       const remaining = parseFloat(pool.currentAmount);
       
@@ -4780,7 +4780,7 @@ export async function registerRoutes(
 
       await db.transaction(async (tx) => {
         const [lockedPool] = await tx.select().from(pools).where(eq(pools.id, poolId)).for('update');
-        const lockedRemainingBalance = parseFloat(lockedPool.currentAmount) - parseFloat(lockedPool.spentAmount);
+        const lockedRemainingBalance = parseFloat(lockedPool.currentAmount);
         if (lockedRemainingBalance <= 0) {
           throw new Error("No remaining balance to refund");
         }
@@ -4836,7 +4836,7 @@ export async function registerRoutes(
         }
 
         await tx.update(pools).set({
-          currentAmount: lockedPool.spentAmount,
+          currentAmount: '0',
           updatedAt: new Date(),
           ...(req.body.closePool ? { status: 'completed' as const } : {}),
         }).where(eq(pools.id, poolId));
@@ -4907,7 +4907,7 @@ export async function registerRoutes(
 
       await db.transaction(async (tx) => {
         const [lockedPool] = await tx.select().from(pools).where(eq(pools.id, poolId)).for('update');
-        const lockedRemainingBalance = parseFloat(lockedPool.currentAmount) - parseFloat(lockedPool.spentAmount);
+        const lockedRemainingBalance = parseFloat(lockedPool.currentAmount);
         const totalDistribution = data.distributions.reduce((sum, d) => sum + parseFloat(d.amount), 0);
 
         if (totalDistribution > lockedRemainingBalance) {

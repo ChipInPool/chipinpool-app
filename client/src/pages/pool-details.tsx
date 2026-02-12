@@ -313,7 +313,7 @@ export default function PoolDetails() {
   const comments = pool.comments || [];
   const creator = pool.creator || { name: 'Unknown', avatar: null };
   const isCreator = pool.creatorId === user?.id;
-  const remainingBalance = parseFloat(pool?.currentAmount || '0') - parseFloat(pool?.spentAmount || '0');
+  const remainingBalance = parseFloat(pool?.currentAmount || '0');
 
   const handleChipIn = async () => {
     setIsChippingIn(true);

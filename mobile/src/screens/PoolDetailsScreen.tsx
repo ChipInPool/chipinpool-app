@@ -864,16 +864,16 @@ export default function PoolDetailsScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                 <Text style={{ color: '#708090', fontSize: 13 }}>Available Balance</Text>
                 <Text style={{ color: '#7FFFD4', fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] as any }}>
-                  ${(parseFloat(pool?.currentAmount || '0') - parseFloat(pool?.spentAmount || '0')).toFixed(2)}
+                  ${parseFloat(pool?.currentAmount || '0').toFixed(2)}
                 </Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={{ color: '#708090', fontSize: 13 }}>Distributing</Text>
-                <Text style={{ color: distributeTotal > (parseFloat(pool?.currentAmount || '0') - parseFloat(pool?.spentAmount || '0')) ? '#f87171' : '#FFFFFF', fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] as any }}>
+                <Text style={{ color: distributeTotal > parseFloat(pool?.currentAmount || '0') ? '#f87171' : '#FFFFFF', fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] as any }}>
                   ${distributeTotal.toFixed(2)}
                 </Text>
               </View>
-              {distributeTotal > (parseFloat(pool?.currentAmount || '0') - parseFloat(pool?.spentAmount || '0')) && (
+              {distributeTotal > parseFloat(pool?.currentAmount || '0') && (
                 <Text style={{ color: '#f87171', fontSize: 12, marginTop: 6 }}>
                   Total exceeds available balance!
                 </Text>
@@ -890,7 +890,7 @@ export default function PoolDetailsScreen() {
                     allRecipients.push({ userId: currentUser.id, firstName: currentUser.firstName, lastName: currentUser.lastName });
                   }
                   if (allRecipients.length === 0) return;
-                  const poolBalance = parseFloat(pool?.currentAmount || '0') - parseFloat(pool?.spentAmount || '0');
+                  const poolBalance = parseFloat(pool?.currentAmount || '0');
                   const perPerson = Math.floor((poolBalance / allRecipients.length) * 100) / 100;
                   const newDistributions = allRecipients.map((c: any) => ({
                     userId: c.userId || c.id,
@@ -1001,9 +1001,9 @@ export default function PoolDetailsScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.confirmButton, { marginTop: 16 }, (distributeMutation.isPending || distributions.length === 0 || distributeTotal <= 0 || distributeTotal > (parseFloat(pool?.currentAmount || '0') - parseFloat(pool?.spentAmount || '0'))) && styles.confirmButtonDisabled]}
+              style={[styles.confirmButton, { marginTop: 16 }, (distributeMutation.isPending || distributions.length === 0 || distributeTotal <= 0 || distributeTotal > parseFloat(pool?.currentAmount || '0')) && styles.confirmButtonDisabled]}
               onPress={() => distributeMutation.mutate()}
-              disabled={distributeMutation.isPending || distributions.length === 0 || distributeTotal <= 0 || distributeTotal > (parseFloat(pool?.currentAmount || '0') - parseFloat(pool?.spentAmount || '0'))}
+              disabled={distributeMutation.isPending || distributions.length === 0 || distributeTotal <= 0 || distributeTotal > parseFloat(pool?.currentAmount || '0')}
               activeOpacity={0.8}
               data-testid="button-confirm-distribute"
             >
