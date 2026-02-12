@@ -56,28 +56,18 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
     }
 
     const url = `${API_URL}${endpoint}`;
-    console.log('[API] Request:', options.method || 'GET', endpoint);
+    console.log('[API] Request:', options.method || 'GET', endpoint, sessionCookie ? '(with session)' : '(no session)');
 
     let response: Response;
     try {
       response = await fetch(url, {
         ...options,
         headers,
-        credentials: 'include',
+        credentials: 'omit',
       });
     } catch (networkError: any) {
       console.error('[API] Network error:', endpoint, networkError?.message);
       throw new Error('Network error. Please check your connection and try again.');
-    }
-
-    const setCookie = response.headers.get('set-cookie');
-    if (setCookie) {
-      const sidMatch = setCookie.match(/connect\.sid=([^;]+)/);
-      if (sidMatch) {
-        await saveSessionCookie(`connect.sid=${sidMatch[1]}`);
-      } else {
-        await saveSessionCookie(setCookie.split(';')[0]);
-      }
     }
 
     if (!response.ok) {
@@ -88,8 +78,10 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
       console.error('[API] Error:', response.status, endpoint, errorText.substring(0, 200));
 
       if (response.status === 401) {
-        sessionCookie = null;
-        try { await SecureStore.deleteItemAsync('session_cookie'); } catch {}
+        if (endpoint === '/api/auth/me') {
+          sessionCookie = null;
+          try { await SecureStore.deleteItemAsync('session_cookie'); } catch {}
+        }
         throw new Error('Unauthorized');
       }
 
