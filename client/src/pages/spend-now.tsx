@@ -107,20 +107,25 @@ export default function SpendNow() {
   const availablePools = useMemo(() => {
     if (!poolsData || !user) return [];
     const pools = Array.isArray(poolsData) ? poolsData : poolsData.pools || [];
-    return pools.filter((p: any) => p.creatorId === user.id && parseFloat(p.currentAmount || p.balance || '0') > 0);
+    return pools.filter((p: any) => parseFloat(p.currentAmount || p.balance || '0') > 0);
   }, [poolsData, user]);
 
   useEffect(() => {
-    if (availablePools.length > 0 && !selectedPoolId && !poolFromUrl) {
-      setSelectedPoolId(String(availablePools[0].id));
+    if (!selectedPoolId && !poolFromUrl) {
+      if (parseFloat(user?.balance || '0') > 0) {
+        setSelectedPoolId('wallet');
+      } else if (availablePools.length > 0) {
+        setSelectedPoolId(String(availablePools[0].id));
+      }
     }
-  }, [availablePools, selectedPoolId, poolFromUrl]);
+  }, [availablePools, selectedPoolId, poolFromUrl, user]);
 
   const partners = Array.isArray(partnersData) ? partnersData : partnersData?.partners || [];
   const categoryCounts = categoriesData?.categories || {};
   const totalPartners = categoriesData?.total || 0;
 
-  const selectedPool = availablePools.find((p: any) => String(p.id) === selectedPoolId);
+  const selectedPool = selectedPoolId === 'wallet' ? null : availablePools.find((p: any) => String(p.id) === selectedPoolId);
+  const isWalletSelected = selectedPoolId === 'wallet';
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -149,7 +154,7 @@ export default function SpendNow() {
             </div>
             <h1 className="text-3xl md:text-4xl font-bold mb-3">Spend Now</h1>
             <p className="text-lg text-muted-foreground">
-              Shop directly with your pool funds at our partnered stores
+              Shop directly with your wallet or pool funds at our partnered stores
             </p>
           </div>
         </div>
@@ -160,23 +165,37 @@ export default function SpendNow() {
               <Wallet className="w-4 h-4 text-primary" />
               <span>Spending from:</span>
             </div>
-            {availablePools.length > 0 ? (
+            {(availablePools.length > 0 || parseFloat(user?.balance || '0') > 0) ? (
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-1">
                 <Select value={selectedPoolId} onValueChange={setSelectedPoolId}>
                   <SelectTrigger className="w-full sm:w-80" data-testid="select-pool-spend">
-                    <SelectValue placeholder="Select a pool">
-                      {selectedPool && (
+                    <SelectValue placeholder="Select a source">
+                      {isWalletSelected ? (
+                        <span className="flex items-center gap-2">
+                          <span className="font-medium">My Wallet</span>
+                          <span className="text-muted-foreground">•</span>
+                          <span className="text-primary font-semibold">${parseFloat(user?.balance || '0').toFixed(2)}</span>
+                        </span>
+                      ) : selectedPool ? (
                         <span className="flex items-center gap-2">
                           <span className="font-medium truncate">{selectedPool.name || selectedPool.title}</span>
                           <span className="text-muted-foreground">•</span>
                           <span className="text-primary font-semibold">${parseFloat(selectedPool.currentAmount || selectedPool.balance || '0').toFixed(2)}</span>
                         </span>
-                      )}
+                      ) : null}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
+                    {parseFloat(user?.balance || '0') > 0 && (
+                      <SelectItem value="wallet" data-testid="select-wallet-spend">
+                        <div className="flex items-center justify-between gap-4 w-full">
+                          <span className="font-medium">My Wallet</span>
+                          <span className="text-primary font-semibold">${parseFloat(user?.balance || '0').toFixed(2)}</span>
+                        </div>
+                      </SelectItem>
+                    )}
                     {availablePools.map((pool: any) => (
-                      <SelectItem key={pool.id} value={String(pool.id)}>
+                      <SelectItem key={pool.id} value={String(pool.id)} data-testid={`select-pool-${pool.id}`}>
                         <div className="flex items-center justify-between gap-4 w-full">
                           <span className="font-medium">{pool.name || pool.title}</span>
                           <span className="text-primary font-semibold">${parseFloat(pool.currentAmount || pool.balance || '0').toFixed(2)}</span>
@@ -185,20 +204,20 @@ export default function SpendNow() {
                     ))}
                   </SelectContent>
                 </Select>
-                {selectedPool && (
-                  <Badge variant="secondary" className="whitespace-nowrap text-sm px-3 py-1">
-                    Available: ${parseFloat(selectedPool.currentAmount || selectedPool.balance || '0').toFixed(2)}
+                {(selectedPool || isWalletSelected) && (
+                  <Badge variant="secondary" className="whitespace-nowrap text-sm px-3 py-1" data-testid="badge-available-balance">
+                    Available: ${isWalletSelected ? parseFloat(user?.balance || '0').toFixed(2) : parseFloat(selectedPool.currentAmount || selectedPool.balance || '0').toFixed(2)}
                   </Badge>
                 )}
               </div>
-            ) : (
+            ) : parseFloat(user?.balance || '0') <= 0 ? (
               <div className="flex items-center gap-3">
-                <p className="text-sm text-muted-foreground">No pools with funds available.</p>
+                <p className="text-sm text-muted-foreground">No funds available.</p>
                 <Button size="sm" variant="outline" asChild>
                   <Link href="/create">Create a Pool</Link>
                 </Button>
               </div>
-            )}
+            ) : null}
           </div>
         )}
 

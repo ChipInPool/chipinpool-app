@@ -74,21 +74,24 @@ export default function SpendNowScreen() {
     if (!poolsData || !user) return [];
     const pools = Array.isArray(poolsData) ? poolsData : poolsData.pools || [];
     return pools.filter(
-      (p: any) =>
-        p.creatorId === user.id &&
-        parseFloat(p.currentAmount || p.balance || '0') > 0,
+      (p: any) => parseFloat(p.currentAmount || p.balance || '0') > 0,
     );
   }, [poolsData, user]);
 
   useEffect(() => {
-    if (availablePools.length > 0 && !selectedPoolId) {
-      setSelectedPoolId(String(availablePools[0].id));
+    if (!selectedPoolId) {
+      if (parseFloat(user?.balance || '0') > 0) {
+        setSelectedPoolId('wallet');
+      } else if (availablePools.length > 0) {
+        setSelectedPoolId(String(availablePools[0].id));
+      }
     }
-  }, [availablePools, selectedPoolId]);
+  }, [availablePools, selectedPoolId, user]);
 
-  const selectedPool = availablePools.find(
+  const selectedPool = selectedPoolId === 'wallet' ? null : availablePools.find(
     (p: any) => String(p.id) === selectedPoolId,
   );
+  const isWalletSelected = selectedPoolId === 'wallet';
 
   useFocusEffect(
     useCallback(() => {
@@ -159,7 +162,7 @@ export default function SpendNowScreen() {
     <>
       <Text style={styles.title}>Spend Now</Text>
       <Text style={styles.subtitle}>
-        Shop directly with your pool funds at partner stores
+        Shop directly with your wallet or pool funds at partner stores
       </Text>
 
       <TouchableOpacity
@@ -170,7 +173,17 @@ export default function SpendNowScreen() {
           <Ionicons name="wallet" size={20} color="#7FFFD4" />
           <Text style={styles.poolSelectorLabel}>Spending from:</Text>
         </View>
-        {selectedPool ? (
+        {isWalletSelected ? (
+          <View style={styles.poolSelectorRight}>
+            <Text style={styles.poolSelectorName} numberOfLines={1}>
+              My Wallet
+            </Text>
+            <Text style={styles.poolSelectorBalance}>
+              ${parseFloat(user?.balance || '0').toFixed(2)}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color="#708090" />
+          </View>
+        ) : selectedPool ? (
           <View style={styles.poolSelectorRight}>
             <Text style={styles.poolSelectorName} numberOfLines={1}>
               {selectedPool.title}
@@ -181,12 +194,29 @@ export default function SpendNowScreen() {
             <Ionicons name="chevron-down" size={16} color="#708090" />
           </View>
         ) : (
-          <Text style={styles.poolSelectorEmpty}>No pools with funds</Text>
+          <Text style={styles.poolSelectorEmpty}>No funds available</Text>
         )}
       </TouchableOpacity>
 
-      {showPoolPicker && availablePools.length > 0 && (
+      {showPoolPicker && (availablePools.length > 0 || parseFloat(user?.balance || '0') > 0) && (
         <View style={styles.poolDropdown}>
+          {parseFloat(user?.balance || '0') > 0 && (
+            <TouchableOpacity
+              style={[
+                styles.poolOption,
+                selectedPoolId === 'wallet' && styles.poolOptionSelected,
+              ]}
+              onPress={() => {
+                setSelectedPoolId('wallet');
+                setShowPoolPicker(false);
+              }}
+            >
+              <Text style={styles.poolOptionName}>My Wallet</Text>
+              <Text style={styles.poolOptionBalance}>
+                ${parseFloat(user?.balance || '0').toFixed(2)}
+              </Text>
+            </TouchableOpacity>
+          )}
           {availablePools.map((pool: any) => (
             <TouchableOpacity
               key={pool.id}
