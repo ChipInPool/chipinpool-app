@@ -7,25 +7,30 @@ import { useAuth } from '@/hooks/useAuth';
 import { Ionicons } from '@expo/vector-icons';
 import { checkBiometricCapability, authenticateWithBiometrics, getBiometricLabel, getBiometricIcon, BiometricCapability } from '@/services/biometricAuth';
 import * as SecureStore from 'expo-secure-store';
+import { useTheme } from '@/theme/ThemeContext';
 
-function MenuItem({ icon, label, onPress, rightElement }: { icon: string; label: string; onPress?: () => void; rightElement?: React.ReactNode }) {
+function MenuItem({ icon, label, onPress, rightElement, colors }: { icon: string; label: string; onPress?: () => void; rightElement?: React.ReactNode; colors: any }) {
   return (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress} disabled={!onPress}>
-      <Ionicons name={icon as any} size={22} color="#708090" />
-      <Text style={styles.menuLabel}>{label}</Text>
-      {rightElement || <Ionicons name="chevron-forward" size={20} color="#708090" />}
+    <TouchableOpacity
+      style={[styles.menuItem, { backgroundColor: colors.inputBg }]}
+      onPress={onPress}
+      disabled={!onPress}
+    >
+      <Ionicons name={icon as any} size={22} color={colors.slate} />
+      <Text style={[styles.menuLabel, { color: colors.text }]}>{label}</Text>
+      {rightElement || <Ionicons name="chevron-forward" size={20} color={colors.slate} />}
     </TouchableOpacity>
   );
 }
 
-function getKycIcon(status: string): { name: string; color: string } {
+function getKycIcon(status: string, colors: any): { name: string; color: string } {
   switch (status) {
     case 'verified':
-      return { name: 'checkmark-circle', color: '#7FFFD4' };
+      return { name: 'checkmark-circle', color: colors.mint };
     case 'pending':
-      return { name: 'time', color: '#FBBF24' };
+      return { name: 'time', color: colors.yellow };
     default:
-      return { name: 'shield', color: '#708090' };
+      return { name: 'shield', color: colors.slate };
   }
 }
 
@@ -42,8 +47,9 @@ function getKycLabel(status: string): string {
 
 export default function SecurityScreen() {
   const { user } = useAuth();
+  const { colors, isDark } = useTheme();
   const kycStatus = user?.kycStatus || 'not_started';
-  const kycIcon = getKycIcon(kycStatus);
+  const kycIcon = getKycIcon(kycStatus, colors);
 
   const [biometricCapability, setBiometricCapability] = useState<BiometricCapability | null>(null);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
@@ -87,30 +93,30 @@ export default function SecurityScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>KYC Verification</Text>
-          <View style={styles.card}>
+          <Text style={[styles.sectionTitle, { color: colors.slate }]}>KYC Verification</Text>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
             <View style={styles.statusRow}>
               <Ionicons name={kycIcon.name as any} size={32} color={kycIcon.color} />
               <View style={styles.statusInfo}>
-                <Text style={styles.statusLabel}>Identity Verification</Text>
+                <Text style={[styles.statusLabel, { color: colors.text }]}>Identity Verification</Text>
                 <Text style={[styles.statusValue, { color: kycIcon.color }]}>{getKycLabel(kycStatus)}</Text>
               </View>
             </View>
             {kycStatus !== 'verified' && (
               <TouchableOpacity
-                style={styles.actionButton}
+                style={[styles.actionButton, { backgroundColor: colors.mint }]}
                 onPress={() => kycMutation.mutate()}
                 disabled={kycMutation.isPending}
               >
                 {kycMutation.isPending ? (
-                  <ActivityIndicator color="#001F3F" />
+                  <ActivityIndicator color={isDark ? '#001F3F' : '#FFFFFF'} />
                 ) : (
                   <>
-                    <Ionicons name="shield-checkmark-outline" size={18} color="#001F3F" />
-                    <Text style={styles.actionButtonText}>Start Verification</Text>
+                    <Ionicons name="shield-checkmark-outline" size={18} color={isDark ? '#001F3F' : '#FFFFFF'} />
+                    <Text style={[styles.actionButtonText, { color: isDark ? '#001F3F' : '#FFFFFF' }]}>Start Verification</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -120,23 +126,23 @@ export default function SecurityScreen() {
 
         {biometricCapability?.isAvailable && biometricCapability.isEnrolled && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Biometric Authentication</Text>
-            <View style={styles.card}>
+            <Text style={[styles.sectionTitle, { color: colors.slate }]}>Biometric Authentication</Text>
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name={getBiometricIcon(biometricCapability.biometricType) as any} size={24} color="#7FFFD4" />
+                <Ionicons name={getBiometricIcon(biometricCapability.biometricType) as any} size={24} color={colors.mint} />
                 <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
+                  <Text style={{ color: colors.text, fontSize: 16, fontWeight: '600' }}>
                     {getBiometricLabel(biometricCapability.biometricType)}
                   </Text>
-                  <Text style={{ color: '#708090', fontSize: 13, marginTop: 2 }}>
+                  <Text style={{ color: colors.slate, fontSize: 13, marginTop: 2 }}>
                     Use {getBiometricLabel(biometricCapability.biometricType).toLowerCase()} to unlock the app
                   </Text>
                 </View>
                 <Switch
                   value={biometricEnabled}
                   onValueChange={toggleBiometric}
-                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(127, 255, 212, 0.4)' }}
-                  thumbColor={biometricEnabled ? '#7FFFD4' : '#708090'}
+                  trackColor={{ false: colors.cardBorder, true: 'rgba(127, 255, 212, 0.4)' }}
+                  thumbColor={biometricEnabled ? colors.mint : colors.slate}
                 />
               </View>
             </View>
@@ -144,22 +150,23 @@ export default function SecurityScreen() {
         )}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Password</Text>
+          <Text style={[styles.sectionTitle, { color: colors.slate }]}>Password</Text>
           <MenuItem
             icon="key-outline"
             label="Change Password"
             onPress={() => Alert.alert('Change Password', 'Use the web app to change your password.')}
+            colors={colors}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Active Sessions</Text>
-          <View style={styles.card}>
+          <Text style={[styles.sectionTitle, { color: colors.slate }]}>Active Sessions</Text>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
             <View style={styles.statusRow}>
-              <Ionicons name="desktop-outline" size={28} color="#708090" />
+              <Ionicons name="desktop-outline" size={28} color={colors.slate} />
               <View style={styles.statusInfo}>
-                <Text style={styles.statusLabel}>Session Management</Text>
-                <Text style={styles.infoText}>Manage active sessions from the web app</Text>
+                <Text style={[styles.statusLabel, { color: colors.text }]}>Session Management</Text>
+                <Text style={[styles.infoText, { color: colors.slate }]}>Manage active sessions from the web app</Text>
               </View>
             </View>
           </View>
@@ -170,18 +177,18 @@ export default function SecurityScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#001F3F' },
+  container: { flex: 1 },
   content: { padding: 20 },
   section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 14, color: '#708090', textTransform: 'uppercase', marginBottom: 12, fontWeight: '600' },
-  card: { backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 16 },
+  sectionTitle: { fontSize: 14, textTransform: 'uppercase', marginBottom: 12, fontWeight: '600' },
+  card: { borderWidth: 1, borderRadius: 12, padding: 16 },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   statusInfo: { flex: 1 },
-  statusLabel: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  statusLabel: { fontSize: 16, fontWeight: '600' },
   statusValue: { fontSize: 14, fontWeight: '500', marginTop: 4 },
-  infoText: { fontSize: 14, color: '#708090', marginTop: 12, lineHeight: 20 },
-  actionButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#7FFFD4', paddingVertical: 14, borderRadius: 12, marginTop: 16 },
-  actionButtonText: { color: '#001F3F', fontSize: 16, fontWeight: '600' },
-  menuItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', padding: 16, borderRadius: 12, marginBottom: 8 },
-  menuLabel: { flex: 1, marginLeft: 12, fontSize: 16, color: '#fff' },
+  infoText: { fontSize: 14, marginTop: 12, lineHeight: 20 },
+  actionButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12, marginTop: 16 },
+  actionButtonText: { fontSize: 16, fontWeight: '600' },
+  menuItem: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12, marginBottom: 8 },
+  menuLabel: { flex: 1, marginLeft: 12, fontSize: 16 },
 });

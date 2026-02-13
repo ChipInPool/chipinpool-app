@@ -4,14 +4,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '@/navigation/AuthStack';
+import { useTheme } from '@/theme/ThemeContext';
 
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Welcome'>;
 
 export default function WelcomeScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const { colors, isDark } = useTheme();
+
+  const buttonTextColor = isDark ? '#001F3F' : '#FFFFFF';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
         <View style={styles.logoContainer}>
           <Image
@@ -19,23 +23,23 @@ export default function WelcomeScreen() {
             style={styles.logoImage}
             resizeMode="contain"
           />
-          <Text style={styles.logo}>ChipInPool</Text>
-          <Text style={styles.tagline}>Pool funds. Share expenses. Pay together.</Text>
+          <Text style={[styles.logo, { color: colors.mint }]}>ChipInPool</Text>
+          <Text style={[styles.tagline, { color: colors.textSecondary }]}>Pool funds. Share expenses. Pay together.</Text>
         </View>
 
         <View style={styles.features}>
-          <FeatureItem icon="💰" title="Pool Funds" description="Collect money from friends for any purpose" />
-          <FeatureItem icon="💳" title="Virtual Cards" description="Spend pooled funds with a virtual Visa card" />
-          <FeatureItem icon="🔒" title="Secure" description="Bank-level security with instant payouts" />
+          <FeatureItem icon="💰" title="Pool Funds" description="Collect money from friends for any purpose" colors={colors} />
+          <FeatureItem icon="💳" title="Virtual Cards" description="Spend pooled funds with a virtual Visa card" colors={colors} />
+          <FeatureItem icon="🔒" title="Secure" description="Bank-level security with instant payouts" colors={colors} />
         </View>
 
         <View style={styles.buttons}>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('Register')} data-testid="button-get-started">
-            <Text style={styles.primaryButtonText}>Get Started</Text>
+          <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.mint }]} onPress={() => navigation.navigate('Register')} data-testid="button-get-started">
+            <Text style={[styles.primaryButtonText, { color: buttonTextColor }]}>Get Started</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('Login')} data-testid="button-login">
-            <Text style={styles.secondaryButtonText}>I already have an account</Text>
+            <Text style={[styles.secondaryButtonText, { color: colors.mint }]}>I already have an account</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -43,13 +47,13 @@ export default function WelcomeScreen() {
   );
 }
 
-function FeatureItem({ icon, title, description }: { icon: string; title: string; description: string }) {
+function FeatureItem({ icon, title, description, colors }: { icon: string; title: string; description: string; colors: any }) {
   return (
     <View style={styles.featureItem}>
       <Text style={styles.featureIcon}>{icon}</Text>
       <View style={styles.featureText}>
-        <Text style={styles.featureTitle}>{title}</Text>
-        <Text style={styles.featureDescription}>{description}</Text>
+        <Text style={[styles.featureTitle, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.featureDescription, { color: colors.textSecondary }]}>{description}</Text>
       </View>
     </View>
   );
@@ -58,7 +62,6 @@ function FeatureItem({ icon, title, description }: { icon: string; title: string
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#001F3F',
   },
   content: {
     flex: 1,
@@ -78,12 +81,10 @@ const styles = StyleSheet.create({
   logo: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#7FFFD4',
     marginBottom: 8,
   },
   tagline: {
     fontSize: 16,
-    color: '#708090',
     textAlign: 'center',
   },
   features: {
@@ -103,25 +104,21 @@ const styles = StyleSheet.create({
   featureTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#fff',
     marginBottom: 4,
   },
   featureDescription: {
     fontSize: 14,
-    color: '#708090',
   },
   buttons: {
     gap: 16,
     marginBottom: 20,
   },
   primaryButton: {
-    backgroundColor: '#7FFFD4',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
   },
   primaryButtonText: {
-    color: '#001F3F',
     fontSize: 18,
     fontWeight: '600',
   },
@@ -130,7 +127,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryButtonText: {
-    color: '#7FFFD4',
     fontSize: 16,
   },
 });

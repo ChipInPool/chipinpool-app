@@ -3,6 +3,7 @@ import { TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/theme/ThemeContext';
 import HomeScreen from '@/screens/HomeScreen';
 import PoolsScreen from '@/screens/PoolsScreen';
 import PoolDetailsScreen from '@/screens/PoolDetailsScreen';
@@ -54,11 +55,12 @@ const SpendNowStackNav = createNativeStackNavigator();
 const RootStack = createNativeStackNavigator();
 
 function PoolsStackNavigator() {
+  const { colors } = useTheme();
   return (
     <PoolsStackNav.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: '#001F3F' },
-        headerTintColor: '#fff',
+        headerStyle: { backgroundColor: colors.navy },
+        headerTintColor: colors.text,
       }}
     >
       <PoolsStackNav.Screen name="PoolsList" component={PoolsScreen} options={{ title: 'Pools' }} />
@@ -70,11 +72,12 @@ function PoolsStackNavigator() {
 }
 
 function ProfileStackNavigator() {
+  const { colors } = useTheme();
   return (
     <ProfileStackNav.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: '#001F3F' },
-        headerTintColor: '#fff',
+        headerStyle: { backgroundColor: colors.navy },
+        headerTintColor: colors.text,
       }}
     >
       <ProfileStackNav.Screen name="ProfileMain" component={ProfileScreen} options={{ title: 'Profile' }} />
@@ -91,11 +94,12 @@ function ProfileStackNavigator() {
 }
 
 function SpendNowStackNavigator() {
+  const { colors } = useTheme();
   return (
     <SpendNowStackNav.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: '#001F3F' },
-        headerTintColor: '#fff',
+        headerStyle: { backgroundColor: colors.navy },
+        headerTintColor: colors.text,
       }}
     >
       <SpendNowStackNav.Screen name="SpendNowMain" component={SpendNowScreen} options={{ title: 'Spend Now' }} />
@@ -104,6 +108,7 @@ function SpendNowStackNavigator() {
 }
 
 function AppTabsContent() {
+  const { colors } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route, navigation }) => ({
@@ -124,20 +129,20 @@ function AppTabsContent() {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#7FFFD4',
-        tabBarInactiveTintColor: '#708090',
+        tabBarActiveTintColor: colors.mint,
+        tabBarInactiveTintColor: colors.slate,
         tabBarStyle: {
-          backgroundColor: '#001F3F',
-          borderTopColor: 'rgba(255,255,255,0.1)',
+          backgroundColor: colors.tabBar,
+          borderTopColor: colors.tabBarBorder,
         },
-        headerStyle: { backgroundColor: '#001F3F' },
-        headerTintColor: '#fff',
+        headerStyle: { backgroundColor: colors.navy },
+        headerTintColor: colors.text,
         headerRight: () => (
           <TouchableOpacity
             onPress={() => navigation.navigate('ProfileModal')}
             style={{ marginRight: 16 }}
           >
-            <Ionicons name="person-circle-outline" size={28} color="#7FFFD4" />
+            <Ionicons name="person-circle-outline" size={28} color={colors.mint} />
           </TouchableOpacity>
         ),
       })}
@@ -152,10 +157,11 @@ function AppTabsContent() {
 }
 
 export default function AppTabs() {
+  const { colors } = useTheme();
   return (
     <RootStack.Navigator screenOptions={{ headerShown: false }}>
       <RootStack.Screen name="MainTabs" component={AppTabsContent} />
-      <RootStack.Group screenOptions={{ presentation: 'modal', headerStyle: { backgroundColor: '#001F3F' }, headerTintColor: '#fff' }}>
+      <RootStack.Group screenOptions={{ presentation: 'modal', headerStyle: { backgroundColor: colors.navy }, headerTintColor: colors.text }}>
         <RootStack.Screen name="ProfileModal" component={ProfileStackNavigator} options={{ headerShown: false }} />
       </RootStack.Group>
     </RootStack.Navigator>

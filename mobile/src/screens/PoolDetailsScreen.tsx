@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '@/theme/ThemeContext';
 
 type PoolsStackParamList = {
   PoolsList: undefined;
@@ -65,13 +66,13 @@ const getActivityIcon = (type: string): keyof typeof Ionicons.glyphMap => {
   }
 };
 
-const getActivityColor = (type: string): string => {
+const getActivityColor = (type: string, colors: any): string => {
   switch (type) {
-    case 'contribution': return '#34D399';
-    case 'transfer': return '#60A5FA';
-    case 'withdrawal': return '#FBBF24';
-    case 'spend': return '#f87171';
-    default: return '#708090';
+    case 'contribution': return colors.green;
+    case 'transfer': return colors.blue;
+    case 'withdrawal': return colors.yellow;
+    case 'spend': return colors.red;
+    default: return colors.textSecondary;
   }
 };
 
@@ -80,6 +81,7 @@ export default function PoolDetailsScreen() {
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
   const { poolId } = route.params;
+  const { colors, isDark } = useTheme();
 
   const [showContribute, setShowContribute] = useState(false);
   const [contributeAmount, setContributeAmount] = useState('');
@@ -321,10 +323,10 @@ export default function PoolDetailsScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <View style={styles.loadingSpinnerWrap}>
-          <ActivityIndicator size="large" color="#7FFFD4" />
-          <Text style={styles.loadingText}>Loading pool details...</Text>
+          <ActivityIndicator size="large" color={colors.mint} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading pool details...</Text>
         </View>
       </View>
     );
@@ -332,13 +334,13 @@ export default function PoolDetailsScreen() {
 
   if (isError || !pool) {
     return (
-      <View style={styles.errorContainer}>
-        <View style={styles.errorCard}>
-          <Ionicons name="alert-circle-outline" size={48} color="#f87171" />
-          <Text style={styles.errorTitle}>Pool Not Found</Text>
-          <Text style={styles.errorSubtitle}>This pool may have been removed or is no longer available.</Text>
-          <TouchableOpacity style={styles.errorButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.errorButtonText}>Go Back</Text>
+      <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
+        <View style={[styles.errorCard, { backgroundColor: colors.card, borderColor: `${colors.red}33` }]}>
+          <Ionicons name="alert-circle-outline" size={48} color={colors.red} />
+          <Text style={[styles.errorTitle, { color: colors.red }]}>Pool Not Found</Text>
+          <Text style={[styles.errorSubtitle, { color: colors.textSecondary }]}>This pool may have been removed or is no longer available.</Text>
+          <TouchableOpacity style={[styles.errorButton, { backgroundColor: `${colors.red}26`, borderColor: `${colors.red}4D` }]} onPress={() => navigation.goBack()}>
+            <Text style={[styles.errorButtonText, { color: colors.red }]}>Go Back</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -351,112 +353,112 @@ export default function PoolDetailsScreen() {
   const categoryColor = getCategoryColor(pool?.category ?? '');
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7FFFD4" />}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.mint} />}>
       <View style={styles.header}>
         <View style={[styles.iconCircle, { backgroundColor: `${categoryColor}20` }]}>
           <Ionicons name={getCategoryIcon(pool.category)} size={36} color={categoryColor} />
         </View>
-        <Text style={styles.title} data-testid="text-pool-title">{pool?.title ?? 'Untitled Pool'}</Text>
+        <Text style={[styles.title, { color: colors.text }]} data-testid="text-pool-title">{pool?.title ?? 'Untitled Pool'}</Text>
         {pool?.description ? (
-          <Text style={styles.description} data-testid="text-pool-description">{pool.description}</Text>
+          <Text style={[styles.description, { color: colors.textSecondary }]} data-testid="text-pool-description">{pool.description}</Text>
         ) : null}
       </View>
 
       <View style={styles.infoCardsRow}>
-        <View style={styles.infoCard}>
-          <View style={[styles.infoIconWrap, { backgroundColor: 'rgba(127,255,212,0.15)' }]}>
-            <Ionicons name="pricetag-outline" size={16} color="#7FFFD4" />
+        <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <View style={[styles.infoIconWrap, { backgroundColor: `${colors.mint}26` }]}>
+            <Ionicons name="pricetag-outline" size={16} color={colors.mint} />
           </View>
-          <Text style={styles.infoCardLabel}>Category</Text>
-          <Text style={styles.infoCardValue} data-testid="text-pool-category">{pool?.category || 'General'}</Text>
+          <Text style={[styles.infoCardLabel, { color: colors.textSecondary }]}>Category</Text>
+          <Text style={[styles.infoCardValue, { color: colors.text }]} data-testid="text-pool-category">{pool?.category || 'General'}</Text>
         </View>
-        <View style={styles.infoCard}>
-          <View style={[styles.infoIconWrap, { backgroundColor: 'rgba(96,165,250,0.15)' }]}>
-            <Ionicons name="calendar-outline" size={16} color="#60A5FA" />
+        <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <View style={[styles.infoIconWrap, { backgroundColor: `${colors.blue}26` }]}>
+            <Ionicons name="calendar-outline" size={16} color={colors.blue} />
           </View>
-          <Text style={styles.infoCardLabel}>Deadline</Text>
-          <Text style={styles.infoCardValue} data-testid="text-pool-deadline">
+          <Text style={[styles.infoCardLabel, { color: colors.textSecondary }]}>Deadline</Text>
+          <Text style={[styles.infoCardValue, { color: colors.text }]} data-testid="text-pool-deadline">
             {pool?.deadline ? new Date(pool.deadline).toLocaleDateString() : 'None'}
           </Text>
         </View>
-        <View style={styles.infoCard}>
-          <View style={[styles.infoIconWrap, { backgroundColor: pool?.status === 'active' ? 'rgba(127,255,212,0.15)' : 'rgba(251,191,36,0.15)' }]}>
-            <Ionicons name="flag-outline" size={16} color={pool?.status === 'active' ? '#7FFFD4' : '#FBBF24'} />
+        <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <View style={[styles.infoIconWrap, { backgroundColor: pool?.status === 'active' ? `${colors.mint}26` : `${colors.yellow}26` }]}>
+            <Ionicons name="flag-outline" size={16} color={pool?.status === 'active' ? colors.mint : colors.yellow} />
           </View>
-          <Text style={styles.infoCardLabel}>Status</Text>
-          <View style={[styles.statusBadge, { backgroundColor: pool?.status === 'active' ? 'rgba(127,255,212,0.15)' : 'rgba(251,191,36,0.15)' }]}>
-            <Text style={[styles.statusText, { color: pool?.status === 'active' ? '#7FFFD4' : '#FBBF24' }]} data-testid="text-pool-status">
+          <Text style={[styles.infoCardLabel, { color: colors.textSecondary }]}>Status</Text>
+          <View style={[styles.statusBadge, { backgroundColor: pool?.status === 'active' ? `${colors.mint}26` : `${colors.yellow}26` }]}>
+            <Text style={[styles.statusText, { color: pool?.status === 'active' ? colors.mint : colors.yellow }]} data-testid="text-pool-status">
               {pool?.status || 'Active'}
             </Text>
           </View>
         </View>
       </View>
 
-      <LinearGradient colors={['#0D2B4E', '#1A3A5C']} style={styles.progressCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+      <LinearGradient colors={isDark ? ['#0D2B4E', '#1A3A5C'] : [colors.navyLight, colors.navyLight]} style={[styles.progressCard, { borderColor: `${colors.mint}26` }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
         <View style={styles.progressHeader}>
-          <Ionicons name="wallet-outline" size={20} color="#7FFFD4" />
-          <Text style={styles.progressLabel}>Pool Progress</Text>
+          <Ionicons name="wallet-outline" size={20} color={colors.mint} />
+          <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>Pool Progress</Text>
         </View>
         <View style={styles.amountRow}>
-          <Text style={styles.currentAmount} data-testid="text-current-amount">${currentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-          <Text style={styles.targetAmount} data-testid="text-target-amount">of ${targetAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+          <Text style={[styles.currentAmount, { color: colors.mint }]} data-testid="text-current-amount">${currentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+          <Text style={[styles.targetAmount, { color: colors.textSecondary }]} data-testid="text-target-amount">of ${targetAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
         </View>
         <View style={styles.progressBarContainer}>
-          <View style={styles.progressBarBg}>
-            <View style={[styles.progressBarFill, { width: `${Math.min(progress, 100)}%` }]} />
+          <View style={[styles.progressBarBg, { backgroundColor: colors.cardBorder }]}>
+            <View style={[styles.progressBarFill, { width: `${Math.min(progress, 100)}%`, backgroundColor: colors.mint }]} />
           </View>
         </View>
-        <Text style={styles.progressPercent} data-testid="text-progress-percent">{progress.toFixed(1)}% funded</Text>
+        <Text style={[styles.progressPercent, { color: colors.mint }]} data-testid="text-progress-percent">{progress.toFixed(1)}% funded</Text>
       </LinearGradient>
 
       <TouchableOpacity
-        style={styles.primaryButton}
+        style={[styles.primaryButton, { backgroundColor: colors.mint }]}
         onPress={() => navigation.navigate('SpendNow')}
         activeOpacity={0.8}
         data-testid="button-spend-now"
       >
-        <Ionicons name="bag-handle" size={22} color="#001F3F" />
-        <Text style={styles.primaryButtonText}>Spend Now</Text>
+        <Ionicons name="bag-handle" size={22} color={isDark ? colors.navy : '#FFFFFF'} />
+        <Text style={[styles.primaryButtonText, { color: isDark ? colors.navy : '#FFFFFF' }]}>Spend Now</Text>
       </TouchableOpacity>
 
       <View style={styles.secondaryButtonsRow}>
         <TouchableOpacity
-          style={[styles.secondaryButton, pool?.status !== 'active' && { opacity: 0.5 }]}
+          style={[styles.secondaryButton, { backgroundColor: colors.card, borderColor: `${colors.mint}40` }, pool?.status !== 'active' && { opacity: 0.5 }]}
           onPress={pool?.status === 'active' ? openContributeModal : undefined}
           activeOpacity={0.7}
           disabled={pool?.status !== 'active'}
           data-testid="button-contribute"
         >
-          <Ionicons name="add-circle-outline" size={20} color="#7FFFD4" />
-          <Text style={styles.secondaryButtonText}>{pool?.status === 'active' ? 'Contribute' : 'Pool Closed'}</Text>
+          <Ionicons name="add-circle-outline" size={20} color={colors.mint} />
+          <Text style={[styles.secondaryButtonText, { color: colors.mint }]}>{pool?.status === 'active' ? 'Contribute' : 'Pool Closed'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryButton} onPress={handleShare} activeOpacity={0.7} data-testid="button-share">
-          <Ionicons name="share-outline" size={20} color="#7FFFD4" />
-          <Text style={styles.secondaryButtonText}>Share</Text>
+        <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: colors.card, borderColor: `${colors.mint}40` }]} onPress={handleShare} activeOpacity={0.7} data-testid="button-share">
+          <Ionicons name="share-outline" size={20} color={colors.mint} />
+          <Text style={[styles.secondaryButtonText, { color: colors.mint }]}>Share</Text>
         </TouchableOpacity>
       </View>
 
       {pool?.status === 'active' && (
         <TouchableOpacity
-          style={[styles.secondaryButton, { marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' }]}
+          style={[styles.secondaryButton, { marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch', backgroundColor: colors.card, borderColor: `${colors.mint}40` }]}
           onPress={() => setShowAutoContribute(true)}
           activeOpacity={0.7}
           data-testid="button-auto-contribute"
         >
-          <Ionicons name="repeat-outline" size={20} color="#7FFFD4" />
-          <Text style={styles.secondaryButtonText}>Set Up Auto-Contribute</Text>
+          <Ionicons name="repeat-outline" size={20} color={colors.mint} />
+          <Text style={[styles.secondaryButtonText, { color: colors.mint }]}>Set Up Auto-Contribute</Text>
         </TouchableOpacity>
       )}
 
       {isCreator && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="settings-outline" size={20} color="#7FFFD4" />
-            <Text style={styles.sectionTitle}>Pool Actions</Text>
+            <Ionicons name="settings-outline" size={20} color={colors.mint} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Pool Actions</Text>
           </View>
           <View style={styles.actionsRow}>
             <TouchableOpacity
-              style={styles.actionButton}
+              style={[styles.actionButton, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
               onPress={() => {
                 setDistributions([]);
                 setClosePoolAfterDistribute(false);
@@ -465,13 +467,13 @@ export default function PoolDetailsScreen() {
               activeOpacity={0.7}
               data-testid="button-distribute"
             >
-              <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(96,165,250,0.15)' }]}>
-                <Ionicons name="send-outline" size={20} color="#60A5FA" />
+              <View style={[styles.actionIconWrap, { backgroundColor: `${colors.blue}26` }]}>
+                <Ionicons name="send-outline" size={20} color={colors.blue} />
               </View>
-              <Text style={styles.actionButtonText}>Send</Text>
+              <Text style={[styles.actionButtonText, { color: colors.text }]}>Send</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.actionButton}
+              style={[styles.actionButton, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
               onPress={() => {
                 setEditTitle(pool?.title || '');
                 setEditDescription(pool?.description || '');
@@ -483,10 +485,10 @@ export default function PoolDetailsScreen() {
               activeOpacity={0.7}
               data-testid="button-edit-pool"
             >
-              <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(251,191,36,0.15)' }]}>
-                <Ionicons name="create-outline" size={20} color="#FBBF24" />
+              <View style={[styles.actionIconWrap, { backgroundColor: `${colors.yellow}26` }]}>
+                <Ionicons name="create-outline" size={20} color={colors.yellow} />
               </View>
-              <Text style={styles.actionButtonText}>Edit Pool</Text>
+              <Text style={[styles.actionButtonText, { color: colors.text }]}>Edit Pool</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -494,70 +496,70 @@ export default function PoolDetailsScreen() {
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Ionicons name="people-outline" size={20} color="#7FFFD4" />
-          <Text style={styles.sectionTitle}>Contributors</Text>
+          <Ionicons name="people-outline" size={20} color={colors.mint} />
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Contributors</Text>
           {contributorsList.length > 0 && (
-            <View style={styles.contributorCountBadge}>
-              <Text style={styles.contributorCountText}>{contributorsList.length}</Text>
+            <View style={[styles.contributorCountBadge, { backgroundColor: `${colors.mint}26` }]}>
+              <Text style={[styles.contributorCountText, { color: colors.mint }]}>{contributorsList.length}</Text>
             </View>
           )}
         </View>
         {contributorsList.map((contribution: any, index: number) => (
-          <View key={contribution?.id ?? `contrib-${index}`} style={styles.contributorRow} data-testid={`card-contributor-${contribution?.id}`}>
-            <View style={styles.contributorAvatar}>
-              <Text style={styles.contributorInitials}>
+          <View key={contribution?.id ?? `contrib-${index}`} style={[styles.contributorRow, { backgroundColor: colors.card, borderColor: colors.cardBorder }]} data-testid={`card-contributor-${contribution?.id}`}>
+            <View style={[styles.contributorAvatar, { backgroundColor: `${colors.mint}26`, borderColor: `${colors.mint}40` }]}>
+              <Text style={[styles.contributorInitials, { color: colors.mint }]}>
                 {contribution?.firstName?.[0] ?? ''}{contribution?.lastName?.[0] ?? ''}
               </Text>
             </View>
             <View style={styles.contributorInfo}>
-              <Text style={styles.contributorName}>{contribution?.firstName ?? ''} {contribution?.lastName ?? ''}</Text>
-              <Text style={styles.contributorDate}>
+              <Text style={[styles.contributorName, { color: colors.text }]}>{contribution?.firstName ?? ''} {contribution?.lastName ?? ''}</Text>
+              <Text style={[styles.contributorDate, { color: colors.textSecondary }]}>
                 {new Date(contribution?.date ?? contribution?.createdAt ?? Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </Text>
             </View>
-            <Text style={styles.contributorAmount}>${parseFloat(contribution?.totalContributed || contribution?.amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+            <Text style={[styles.contributorAmount, { color: colors.mint }]}>${parseFloat(contribution?.totalContributed || contribution?.amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
           </View>
         ))}
         {contributorsList.length === 0 && (
-          <View style={styles.emptyContributors}>
-            <Ionicons name="people-outline" size={32} color="#708090" />
-            <Text style={styles.emptyText}>No contributions yet</Text>
-            <Text style={styles.emptySubtext}>Be the first to contribute!</Text>
+          <View style={[styles.emptyContributors, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+            <Ionicons name="people-outline" size={32} color={colors.textSecondary} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No contributions yet</Text>
+            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>Be the first to contribute!</Text>
           </View>
         )}
       </View>
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Ionicons name="pulse-outline" size={20} color="#7FFFD4" />
-          <Text style={styles.sectionTitle}>Activity</Text>
+          <Ionicons name="pulse-outline" size={20} color={colors.mint} />
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Activity</Text>
         </View>
 
         <View style={styles.activitySummaryRow}>
-          <View style={[styles.activitySummaryCard, { borderColor: 'rgba(52,211,153,0.2)' }]}>
-            <Text style={[styles.activitySummaryLabel, { color: '#34D399' }]}>Raised</Text>
-            <Text style={[styles.activitySummaryValue, { color: '#34D399' }]}>${parseFloat(activitySummary.raised || '0').toFixed(2)}</Text>
+          <View style={[styles.activitySummaryCard, { backgroundColor: colors.card, borderColor: `${colors.green}33` }]}>
+            <Text style={[styles.activitySummaryLabel, { color: colors.green }]}>Raised</Text>
+            <Text style={[styles.activitySummaryValue, { color: colors.green }]}>${parseFloat(activitySummary.raised || '0').toFixed(2)}</Text>
           </View>
-          <View style={[styles.activitySummaryCard, { borderColor: 'rgba(248,113,113,0.2)' }]}>
-            <Text style={[styles.activitySummaryLabel, { color: '#f87171' }]}>Spent</Text>
-            <Text style={[styles.activitySummaryValue, { color: '#f87171' }]}>${parseFloat(activitySummary.spent || '0').toFixed(2)}</Text>
+          <View style={[styles.activitySummaryCard, { backgroundColor: colors.card, borderColor: `${colors.red}33` }]}>
+            <Text style={[styles.activitySummaryLabel, { color: colors.red }]}>Spent</Text>
+            <Text style={[styles.activitySummaryValue, { color: colors.red }]}>${parseFloat(activitySummary.spent || '0').toFixed(2)}</Text>
           </View>
-          <View style={[styles.activitySummaryCard, { borderColor: 'rgba(96,165,250,0.2)' }]}>
-            <Text style={[styles.activitySummaryLabel, { color: '#60A5FA' }]}>Remaining</Text>
-            <Text style={[styles.activitySummaryValue, { color: '#60A5FA' }]}>${parseFloat(activitySummary.remaining || '0').toFixed(2)}</Text>
+          <View style={[styles.activitySummaryCard, { backgroundColor: colors.card, borderColor: `${colors.blue}33` }]}>
+            <Text style={[styles.activitySummaryLabel, { color: colors.blue }]}>Remaining</Text>
+            <Text style={[styles.activitySummaryValue, { color: colors.blue }]}>${parseFloat(activitySummary.remaining || '0').toFixed(2)}</Text>
           </View>
         </View>
 
         {activityList.length > 0 ? activityList.map((activity: any, index: number) => {
-          const actColor = getActivityColor(activity.type);
+          const actColor = getActivityColor(activity.type, colors);
           return (
-            <View key={activity.id ?? `activity-${index}`} style={styles.activityRow} data-testid={`card-activity-${activity.id || index}`}>
+            <View key={activity.id ?? `activity-${index}`} style={[styles.activityRow, { backgroundColor: colors.card, borderColor: colors.cardBorder }]} data-testid={`card-activity-${activity.id || index}`}>
               <View style={[styles.activityIconWrap, { backgroundColor: `${actColor}20` }]}>
                 <Ionicons name={getActivityIcon(activity.type)} size={16} color={actColor} />
               </View>
               <View style={styles.activityInfo}>
-                <Text style={styles.activityDesc} numberOfLines={2}>{activity.description}</Text>
-                <Text style={styles.activityTime}>{formatTimeAgo(activity.createdAt || activity.date || new Date().toISOString())}</Text>
+                <Text style={[styles.activityDesc, { color: colors.text }]} numberOfLines={2}>{activity.description}</Text>
+                <Text style={[styles.activityTime, { color: colors.textSecondary }]}>{formatTimeAgo(activity.createdAt || activity.date || new Date().toISOString())}</Text>
               </View>
               {activity.amount && (
                 <Text style={[styles.activityAmount, { color: actColor }]}>
@@ -567,9 +569,9 @@ export default function PoolDetailsScreen() {
             </View>
           );
         }) : (
-          <View style={styles.emptyContributors}>
-            <Ionicons name="pulse-outline" size={32} color="#708090" />
-            <Text style={styles.emptyText}>No activity yet</Text>
+          <View style={[styles.emptyContributors, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+            <Ionicons name="pulse-outline" size={32} color={colors.textSecondary} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No activity yet</Text>
           </View>
         )}
       </View>
@@ -583,18 +585,18 @@ export default function PoolDetailsScreen() {
       >
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={closeContributeModal} />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHandle} />
+          <View style={[styles.modalContent, { backgroundColor: isDark ? '#0A1929' : colors.navyLight, borderColor: `${colors.mint}1A` }]}>
+            <View style={[styles.modalHandle, { backgroundColor: colors.cardBorder }]} />
 
             {contributeStep === 1 ? (
               <>
                 <View style={styles.modalHeaderRow}>
                   <View>
-                    <Text style={styles.modalTitle}>Contribute to Pool</Text>
-                    <Text style={styles.modalSubtitle}>{pool?.title ?? ''}</Text>
+                    <Text style={[styles.modalTitle, { color: colors.text }]}>Contribute to Pool</Text>
+                    <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>{pool?.title ?? ''}</Text>
                   </View>
-                  <TouchableOpacity style={styles.modalCloseBtn} onPress={closeContributeModal} data-testid="button-close-modal">
-                    <Ionicons name="close" size={22} color="#fff" />
+                  <TouchableOpacity style={[styles.modalCloseBtn, { backgroundColor: colors.cardBorder }]} onPress={closeContributeModal} data-testid="button-close-modal">
+                    <Ionicons name="close" size={22} color={colors.text} />
                   </TouchableOpacity>
                 </View>
 
@@ -602,22 +604,22 @@ export default function PoolDetailsScreen() {
                   {['25', '50', '100'].map((amt) => (
                     <TouchableOpacity
                       key={amt}
-                      style={[styles.quickAmountBtn, contributeAmount === amt && styles.quickAmountBtnSelected]}
+                      style={[styles.quickAmountBtn, { backgroundColor: colors.inputBg, borderColor: colors.cardBorder }, contributeAmount === amt && { borderColor: colors.mint, backgroundColor: `${colors.mint}14` }]}
                       onPress={() => setContributeAmount(amt)}
                       activeOpacity={0.7}
                       data-testid={`button-quick-amount-${amt}`}
                     >
-                      <Text style={[styles.quickAmountText, contributeAmount === amt && styles.quickAmountTextSelected]}>${amt}</Text>
+                      <Text style={[styles.quickAmountText, { color: colors.text }, contributeAmount === amt && { color: colors.mint }]}>${amt}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
 
-                <View style={styles.amountInputContainer}>
-                  <Text style={styles.dollarPrefix}>$</Text>
+                <View style={[styles.amountInputContainer, { backgroundColor: colors.inputBg, borderColor: `${colors.mint}33` }]}>
+                  <Text style={[styles.dollarPrefix, { color: colors.mint }]}>$</Text>
                   <TextInput
-                    style={styles.amountInput}
+                    style={[styles.amountInput, { color: colors.text }]}
                     placeholder="0.00"
-                    placeholderTextColor="#708090"
+                    placeholderTextColor={colors.textSecondary}
                     keyboardType="decimal-pad"
                     value={contributeAmount}
                     onChangeText={setContributeAmount}
@@ -626,7 +628,7 @@ export default function PoolDetailsScreen() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.confirmButton, { marginTop: 8 }, (!contributeAmount || parseFloat(contributeAmount) <= 0) && styles.confirmButtonDisabled]}
+                  style={[styles.confirmButton, { marginTop: 8, backgroundColor: colors.mint }, (!contributeAmount || parseFloat(contributeAmount) <= 0) && styles.confirmButtonDisabled]}
                   onPress={() => {
                     const amount = parseFloat(contributeAmount);
                     if (isNaN(amount) || amount <= 0) {
@@ -639,12 +641,12 @@ export default function PoolDetailsScreen() {
                   activeOpacity={0.8}
                   data-testid="button-continue-step2"
                 >
-                  <Text style={styles.confirmButtonText}>Continue</Text>
+                  <Text style={[styles.confirmButtonText, { color: isDark ? colors.navy : '#FFFFFF' }]}>Continue</Text>
                 </TouchableOpacity>
 
                 <View style={styles.walletBalanceRow}>
-                  <Ionicons name="wallet-outline" size={16} color="#708090" />
-                  <Text style={styles.walletBalanceText}>Wallet Balance: ${parseFloat(walletBalance).toFixed(2)}</Text>
+                  <Ionicons name="wallet-outline" size={16} color={colors.textSecondary} />
+                  <Text style={[styles.walletBalanceText, { color: colors.textSecondary }]}>Wallet Balance: ${parseFloat(walletBalance).toFixed(2)}</Text>
                 </View>
               </>
             ) : (
@@ -652,42 +654,43 @@ export default function PoolDetailsScreen() {
                 <View style={styles.modalHeaderRow}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                     <TouchableOpacity onPress={() => setContributeStep(1)} data-testid="button-back-step1">
-                      <Ionicons name="arrow-back" size={24} color="#fff" />
+                      <Ionicons name="arrow-back" size={24} color={colors.text} />
                     </TouchableOpacity>
                     <View>
-                      <Text style={styles.modalTitle}>Payment Method</Text>
-                      <Text style={styles.modalSubtitle}>Amount: ${parseFloat(contributeAmount).toFixed(2)}</Text>
+                      <Text style={[styles.modalTitle, { color: colors.text }]}>Payment Method</Text>
+                      <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>Amount: ${parseFloat(contributeAmount).toFixed(2)}</Text>
                     </View>
                   </View>
-                  <TouchableOpacity style={styles.modalCloseBtn} onPress={closeContributeModal} data-testid="button-close-modal-step2">
-                    <Ionicons name="close" size={22} color="#fff" />
+                  <TouchableOpacity style={[styles.modalCloseBtn, { backgroundColor: colors.cardBorder }]} onPress={closeContributeModal} data-testid="button-close-modal-step2">
+                    <Ionicons name="close" size={22} color={colors.text} />
                   </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity
                   style={[
                     styles.paymentMethodCard,
-                    paymentMethod === 'stripe' && styles.paymentMethodCardSelected,
+                    { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                    paymentMethod === 'stripe' && { borderColor: colors.mint, backgroundColor: `${colors.mint}14` },
                   ]}
                   onPress={() => setPaymentMethod('stripe')}
                   activeOpacity={0.7}
                   data-testid="button-payment-stripe"
                 >
-                  <View style={styles.paymentMethodIconWrap}>
-                    <Ionicons name="card-outline" size={24} color={paymentMethod === 'stripe' ? '#7FFFD4' : '#708090'} />
+                  <View style={[styles.paymentMethodIconWrap, { backgroundColor: colors.inputBg }]}>
+                    <Ionicons name="card-outline" size={24} color={paymentMethod === 'stripe' ? colors.mint : colors.textSecondary} />
                   </View>
                   <View style={styles.paymentMethodInfo}>
-                    <Text style={[styles.paymentMethodName, paymentMethod === 'stripe' && styles.paymentMethodNameSelected]}>Pay with Card</Text>
-                    <Text style={styles.paymentMethodDesc}>Secure checkout via Stripe</Text>
+                    <Text style={[styles.paymentMethodName, { color: colors.text }, paymentMethod === 'stripe' && { color: colors.mint }]}>Pay with Card</Text>
+                    <Text style={[styles.paymentMethodDesc, { color: colors.textSecondary }]}>Secure checkout via Stripe</Text>
                   </View>
-                  <View style={[styles.paymentMethodRadio, paymentMethod === 'stripe' && styles.paymentMethodRadioSelected]}>
-                    {paymentMethod === 'stripe' && <View style={styles.paymentMethodRadioDot} />}
+                  <View style={[styles.paymentMethodRadio, { borderColor: colors.cardBorder }, paymentMethod === 'stripe' && { borderColor: colors.mint }]}>
+                    {paymentMethod === 'stripe' && <View style={[styles.paymentMethodRadioDot, { backgroundColor: colors.mint }]} />}
                   </View>
                 </TouchableOpacity>
 
                 {bankAccounts.length > 0 && (
                   <>
-                    <Text style={styles.paymentMethodLabel}>Linked Bank Accounts</Text>
+                    <Text style={[styles.paymentMethodLabel, { color: colors.text }]}>Linked Bank Accounts</Text>
                     {bankAccounts.map((account: any) => {
                       const methodKey = `bank_${account.id}`;
                       return (
@@ -695,25 +698,26 @@ export default function PoolDetailsScreen() {
                           key={account.id}
                           style={[
                             styles.paymentMethodCard,
-                            paymentMethod === methodKey && styles.paymentMethodCardSelected,
+                            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                            paymentMethod === methodKey && { borderColor: colors.mint, backgroundColor: `${colors.mint}14` },
                           ]}
                           onPress={() => setPaymentMethod(methodKey)}
                           activeOpacity={0.7}
                           data-testid={`button-payment-bank-${account.id}`}
                         >
-                          <View style={styles.paymentMethodIconWrap}>
-                            <Ionicons name="business-outline" size={24} color={paymentMethod === methodKey ? '#7FFFD4' : '#708090'} />
+                          <View style={[styles.paymentMethodIconWrap, { backgroundColor: colors.inputBg }]}>
+                            <Ionicons name="business-outline" size={24} color={paymentMethod === methodKey ? colors.mint : colors.textSecondary} />
                           </View>
                           <View style={styles.paymentMethodInfo}>
-                            <Text style={[styles.paymentMethodName, paymentMethod === methodKey && styles.paymentMethodNameSelected]}>
+                            <Text style={[styles.paymentMethodName, { color: colors.text }, paymentMethod === methodKey && { color: colors.mint }]}>
                               {account.bankName || account.institutionName || 'Bank Account'}
                             </Text>
-                            <Text style={styles.paymentMethodDesc}>
+                            <Text style={[styles.paymentMethodDesc, { color: colors.textSecondary }]}>
                               ••••{account.last4 || account.mask || '****'}
                             </Text>
                           </View>
-                          <View style={[styles.paymentMethodRadio, paymentMethod === methodKey && styles.paymentMethodRadioSelected]}>
-                            {paymentMethod === methodKey && <View style={styles.paymentMethodRadioDot} />}
+                          <View style={[styles.paymentMethodRadio, { borderColor: colors.cardBorder }, paymentMethod === methodKey && { borderColor: colors.mint }]}>
+                            {paymentMethod === methodKey && <View style={[styles.paymentMethodRadioDot, { backgroundColor: colors.mint }]} />}
                           </View>
                         </TouchableOpacity>
                       );
@@ -724,35 +728,36 @@ export default function PoolDetailsScreen() {
                 <TouchableOpacity
                   style={[
                     styles.paymentMethodCard,
-                    paymentMethod === 'balance' && styles.paymentMethodCardSelected,
+                    { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                    paymentMethod === 'balance' && { borderColor: colors.mint, backgroundColor: `${colors.mint}14` },
                   ]}
                   onPress={() => setPaymentMethod('balance')}
                   activeOpacity={0.7}
                   data-testid="button-payment-balance"
                 >
-                  <View style={styles.paymentMethodIconWrap}>
-                    <Ionicons name="wallet-outline" size={24} color={paymentMethod === 'balance' ? '#7FFFD4' : '#708090'} />
+                  <View style={[styles.paymentMethodIconWrap, { backgroundColor: colors.inputBg }]}>
+                    <Ionicons name="wallet-outline" size={24} color={paymentMethod === 'balance' ? colors.mint : colors.textSecondary} />
                   </View>
                   <View style={styles.paymentMethodInfo}>
-                    <Text style={[styles.paymentMethodName, paymentMethod === 'balance' && styles.paymentMethodNameSelected]}>Wallet Balance</Text>
-                    <Text style={styles.paymentMethodDesc}>${parseFloat(walletBalance).toFixed(2)} available</Text>
+                    <Text style={[styles.paymentMethodName, { color: colors.text }, paymentMethod === 'balance' && { color: colors.mint }]}>Wallet Balance</Text>
+                    <Text style={[styles.paymentMethodDesc, { color: colors.textSecondary }]}>${parseFloat(walletBalance).toFixed(2)} available</Text>
                   </View>
-                  <View style={[styles.paymentMethodRadio, paymentMethod === 'balance' && styles.paymentMethodRadioSelected]}>
-                    {paymentMethod === 'balance' && <View style={styles.paymentMethodRadioDot} />}
+                  <View style={[styles.paymentMethodRadio, { borderColor: colors.cardBorder }, paymentMethod === 'balance' && { borderColor: colors.mint }]}>
+                    {paymentMethod === 'balance' && <View style={[styles.paymentMethodRadioDot, { backgroundColor: colors.mint }]} />}
                   </View>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.confirmButton, { marginTop: 16 }, contributeMutation.isPending && styles.confirmButtonDisabled]}
+                  style={[styles.confirmButton, { marginTop: 16, backgroundColor: colors.mint }, contributeMutation.isPending && styles.confirmButtonDisabled]}
                   onPress={handleContribute}
                   disabled={contributeMutation.isPending}
                   activeOpacity={0.8}
                   data-testid="button-confirm-contribute"
                 >
                   {contributeMutation.isPending ? (
-                    <ActivityIndicator color="#001F3F" />
+                    <ActivityIndicator color={isDark ? colors.navy : '#FFFFFF'} />
                   ) : (
-                    <Text style={styles.confirmButtonText}>Confirm Payment</Text>
+                    <Text style={[styles.confirmButtonText, { color: isDark ? colors.navy : '#FFFFFF' }]}>Confirm Payment</Text>
                   )}
                 </TouchableOpacity>
               </>
@@ -770,51 +775,51 @@ export default function PoolDetailsScreen() {
       >
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowTransfer(false)} />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHandle} />
+          <View style={[styles.modalContent, { backgroundColor: isDark ? '#0A1929' : colors.navyLight, borderColor: `${colors.mint}1A` }]}>
+            <View style={[styles.modalHandle, { backgroundColor: colors.cardBorder }]} />
             <View style={styles.modalHeaderRow}>
               <View>
-                <Text style={styles.modalTitle}>Send to Contributor</Text>
-                <Text style={styles.modalSubtitle}>{pool?.title ?? ''}</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Send to Contributor</Text>
+                <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>{pool?.title ?? ''}</Text>
               </View>
-              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowTransfer(false)} data-testid="button-close-transfer">
-                <Ionicons name="close" size={22} color="#fff" />
+              <TouchableOpacity style={[styles.modalCloseBtn, { backgroundColor: colors.cardBorder }]} onPress={() => setShowTransfer(false)} data-testid="button-close-transfer">
+                <Ionicons name="close" size={22} color={colors.text} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.paymentMethodLabel}>Select Recipient</Text>
-            <Text style={{ color: '#708090', fontSize: 12, marginBottom: 8 }}>Funds will be sent to the recipient's wallet</Text>
+            <Text style={[styles.paymentMethodLabel, { color: colors.text }]}>Select Recipient</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>Funds will be sent to the recipient's wallet</Text>
             <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled>
               {contributorsList.filter((c: any) => c?.userId !== currentUser?.id).map((c: any, i: number) => (
                 <TouchableOpacity
                   key={c?.userId || i}
-                  style={[styles.paymentMethodCard, transferRecipient === c?.userId && styles.paymentMethodCardSelected]}
+                  style={[styles.paymentMethodCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }, transferRecipient === c?.userId && { borderColor: colors.mint, backgroundColor: `${colors.mint}14` }]}
                   onPress={() => setTransferRecipient(c?.userId)}
                   activeOpacity={0.7}
                   data-testid={`button-transfer-user-${c?.userId}`}
                 >
-                  <View style={styles.contributorAvatar}>
-                    <Text style={styles.contributorInitials}>{c?.firstName?.[0]}{c?.lastName?.[0]}</Text>
+                  <View style={[styles.contributorAvatar, { backgroundColor: `${colors.mint}26`, borderColor: `${colors.mint}40` }]}>
+                    <Text style={[styles.contributorInitials, { color: colors.mint }]}>{c?.firstName?.[0]}{c?.lastName?.[0]}</Text>
                   </View>
                   <View style={styles.paymentMethodInfo}>
-                    <Text style={[styles.paymentMethodName, transferRecipient === c?.userId && styles.paymentMethodNameSelected]}>
+                    <Text style={[styles.paymentMethodName, { color: colors.text }, transferRecipient === c?.userId && { color: colors.mint }]}>
                       {c?.firstName} {c?.lastName}
                     </Text>
-                    <Text style={styles.paymentMethodDesc}>Funds sent to wallet</Text>
+                    <Text style={[styles.paymentMethodDesc, { color: colors.textSecondary }]}>Funds sent to wallet</Text>
                   </View>
-                  <View style={[styles.paymentMethodRadio, transferRecipient === c?.userId && styles.paymentMethodRadioSelected]}>
-                    {transferRecipient === c?.userId && <View style={styles.paymentMethodRadioDot} />}
+                  <View style={[styles.paymentMethodRadio, { borderColor: colors.cardBorder }, transferRecipient === c?.userId && { borderColor: colors.mint }]}>
+                    {transferRecipient === c?.userId && <View style={[styles.paymentMethodRadioDot, { backgroundColor: colors.mint }]} />}
                   </View>
                 </TouchableOpacity>
               ))}
             </ScrollView>
 
-            <View style={[styles.amountInputContainer, { marginTop: 16 }]}>
-              <Text style={styles.dollarPrefix}>$</Text>
+            <View style={[styles.amountInputContainer, { marginTop: 16, backgroundColor: colors.inputBg, borderColor: `${colors.mint}33` }]}>
+              <Text style={[styles.dollarPrefix, { color: colors.mint }]}>$</Text>
               <TextInput
-                style={styles.amountInput}
+                style={[styles.amountInput, { color: colors.text }]}
                 placeholder="0.00"
-                placeholderTextColor="#708090"
+                placeholderTextColor={colors.textSecondary}
                 keyboardType="decimal-pad"
                 value={transferAmount}
                 onChangeText={setTransferAmount}
@@ -823,16 +828,16 @@ export default function PoolDetailsScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.confirmButton, { marginTop: 16 }, (transferMutation.isPending || !transferRecipient || !transferAmount) && styles.confirmButtonDisabled]}
+              style={[styles.confirmButton, { marginTop: 16, backgroundColor: colors.mint }, (transferMutation.isPending || !transferRecipient || !transferAmount) && styles.confirmButtonDisabled]}
               onPress={() => transferMutation.mutate()}
               disabled={transferMutation.isPending || !transferRecipient || !transferAmount}
               activeOpacity={0.8}
               data-testid="button-confirm-transfer"
             >
               {transferMutation.isPending ? (
-                <ActivityIndicator color="#001F3F" />
+                <ActivityIndicator color={isDark ? colors.navy : '#FFFFFF'} />
               ) : (
-                <Text style={styles.confirmButtonText}>Send Transfer</Text>
+                <Text style={[styles.confirmButtonText, { color: isDark ? colors.navy : '#FFFFFF' }]}>Send Transfer</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -848,33 +853,33 @@ export default function PoolDetailsScreen() {
       >
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowDistribute(false)} />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHandle} />
+          <View style={[styles.modalContent, { backgroundColor: isDark ? '#0A1929' : colors.navyLight, borderColor: `${colors.mint}1A` }]}>
+            <View style={[styles.modalHandle, { backgroundColor: colors.cardBorder }]} />
             <View style={styles.modalHeaderRow}>
               <View>
-                <Text style={styles.modalTitle}>Distribute Funds</Text>
-                <Text style={styles.modalSubtitle}>{pool?.title ?? ''}</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Distribute Funds</Text>
+                <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>{pool?.title ?? ''}</Text>
               </View>
-              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowDistribute(false)} data-testid="button-close-distribute">
-                <Ionicons name="close" size={22} color="#fff" />
+              <TouchableOpacity style={[styles.modalCloseBtn, { backgroundColor: colors.cardBorder }]} onPress={() => setShowDistribute(false)} data-testid="button-close-distribute">
+                <Ionicons name="close" size={22} color={colors.text} />
               </TouchableOpacity>
             </View>
 
-            <View style={{ padding: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', marginBottom: 16 }}>
+            <View style={{ padding: 12, backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.cardBorder, marginBottom: 16 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text style={{ color: '#708090', fontSize: 13 }}>Available Balance</Text>
-                <Text style={{ color: '#7FFFD4', fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] as any }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Available Balance</Text>
+                <Text style={{ color: colors.mint, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] as any }}>
                   ${parseFloat(pool?.currentAmount || '0').toFixed(2)}
                 </Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ color: '#708090', fontSize: 13 }}>Distributing</Text>
-                <Text style={{ color: distributeTotal > parseFloat(pool?.currentAmount || '0') ? '#f87171' : '#FFFFFF', fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] as any }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Distributing</Text>
+                <Text style={{ color: distributeTotal > parseFloat(pool?.currentAmount || '0') ? colors.red : colors.text, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] as any }}>
                   ${distributeTotal.toFixed(2)}
                 </Text>
               </View>
               {distributeTotal > parseFloat(pool?.currentAmount || '0') && (
-                <Text style={{ color: '#f87171', fontSize: 12, marginTop: 6 }}>
+                <Text style={{ color: colors.red, fontSize: 12, marginTop: 6 }}>
                   Total exceeds available balance!
                 </Text>
               )}
@@ -882,7 +887,7 @@ export default function PoolDetailsScreen() {
 
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
               <TouchableOpacity
-                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, backgroundColor: 'rgba(127,255,212,0.08)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(127,255,212,0.2)' }}
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, backgroundColor: `${colors.mint}14`, borderRadius: 12, borderWidth: 1, borderColor: `${colors.mint}33` }}
                 onPress={() => {
                   const validContributors = contributorsList.filter((c: any) => c?.userId);
                   const allRecipients = [...validContributors];
@@ -901,17 +906,17 @@ export default function PoolDetailsScreen() {
                 activeOpacity={0.7}
                 data-testid="button-split-equally"
               >
-                <Ionicons name="git-compare-outline" size={18} color="#7FFFD4" />
-                <Text style={{ color: '#7FFFD4', fontSize: 14, fontWeight: '600', marginLeft: 8 }}>Split Equally</Text>
+                <Ionicons name="git-compare-outline" size={18} color={colors.mint} />
+                <Text style={{ color: colors.mint, fontSize: 14, fontWeight: '600', marginLeft: 8 }}>Split Equally</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, backgroundColor: 'rgba(248,113,113,0.08)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(248,113,113,0.2)' }}
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, backgroundColor: `${colors.red}14`, borderRadius: 12, borderWidth: 1, borderColor: `${colors.red}33` }}
                 onPress={() => setDistributions([])}
                 activeOpacity={0.7}
                 data-testid="button-clear-distribute"
               >
-                <Ionicons name="close-circle-outline" size={18} color="#f87171" />
-                <Text style={{ color: '#f87171', fontSize: 14, fontWeight: '600', marginLeft: 8 }}>Clear All</Text>
+                <Ionicons name="close-circle-outline" size={18} color={colors.red} />
+                <Text style={{ color: colors.red, fontSize: 14, fontWeight: '600', marginLeft: 8 }}>Clear All</Text>
               </TouchableOpacity>
             </View>
 
@@ -919,20 +924,20 @@ export default function PoolDetailsScreen() {
               {currentUser && !contributorsList.some((c: any) => c?.userId === currentUser.id) && (() => {
                 const existing = distributions.find(d => d.userId === currentUser.id);
                 return (
-                  <View key={`owner-${currentUser.id}`} style={styles.distributeRow} data-testid={`distribute-row-owner`}>
-                    <View style={[styles.contributorAvatar, { borderWidth: 1, borderColor: '#7FFFD4' }]}>
-                      <Text style={styles.contributorInitials}>{currentUser.firstName?.[0]}{currentUser.lastName?.[0]}</Text>
+                  <View key={`owner-${currentUser.id}`} style={[styles.distributeRow, { backgroundColor: colors.card, borderColor: colors.cardBorder }]} data-testid={`distribute-row-owner`}>
+                    <View style={[styles.contributorAvatar, { borderWidth: 1, borderColor: colors.mint, backgroundColor: `${colors.mint}26` }]}>
+                      <Text style={[styles.contributorInitials, { color: colors.mint }]}>{currentUser.firstName?.[0]}{currentUser.lastName?.[0]}</Text>
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.contributorName}>{currentUser.firstName} {currentUser.lastName}</Text>
-                      <Text style={{ color: '#7FFFD4', fontSize: 11 }}>Pool Owner</Text>
+                      <Text style={[styles.contributorName, { color: colors.text }]}>{currentUser.firstName} {currentUser.lastName}</Text>
+                      <Text style={{ color: colors.mint, fontSize: 11 }}>Pool Owner</Text>
                     </View>
-                    <View style={styles.distributeAmountWrap}>
-                      <Text style={styles.dollarPrefix}>$</Text>
+                    <View style={[styles.distributeAmountWrap, { backgroundColor: colors.inputBg, borderColor: `${colors.mint}33` }]}>
+                      <Text style={[styles.dollarPrefix, { color: colors.mint }]}>$</Text>
                       <TextInput
-                        style={styles.distributeAmountInput}
+                        style={[styles.distributeAmountInput, { color: colors.text }]}
                         placeholder="0"
-                        placeholderTextColor="#708090"
+                        placeholderTextColor={colors.textSecondary}
                         keyboardType="decimal-pad"
                         value={existing?.amount || ''}
                         onChangeText={(text) => {
@@ -953,19 +958,19 @@ export default function PoolDetailsScreen() {
               {contributorsList.map((c: any, i: number) => {
                 const existing = distributions.find(d => d.userId === c?.userId);
                 return (
-                  <View key={c?.userId || i} style={styles.distributeRow} data-testid={`distribute-row-${c?.userId || i}`}>
-                    <View style={styles.contributorAvatar}>
-                      <Text style={styles.contributorInitials}>{c?.firstName?.[0]}{c?.lastName?.[0]}</Text>
+                  <View key={c?.userId || i} style={[styles.distributeRow, { backgroundColor: colors.card, borderColor: colors.cardBorder }]} data-testid={`distribute-row-${c?.userId || i}`}>
+                    <View style={[styles.contributorAvatar, { backgroundColor: `${colors.mint}26`, borderColor: `${colors.mint}40` }]}>
+                      <Text style={[styles.contributorInitials, { color: colors.mint }]}>{c?.firstName?.[0]}{c?.lastName?.[0]}</Text>
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.contributorName}>{c?.firstName} {c?.lastName}</Text>
+                      <Text style={[styles.contributorName, { color: colors.text }]}>{c?.firstName} {c?.lastName}</Text>
                     </View>
-                    <View style={styles.distributeAmountWrap}>
-                      <Text style={styles.dollarPrefix}>$</Text>
+                    <View style={[styles.distributeAmountWrap, { backgroundColor: colors.inputBg, borderColor: `${colors.mint}33` }]}>
+                      <Text style={[styles.dollarPrefix, { color: colors.mint }]}>$</Text>
                       <TextInput
-                        style={styles.distributeAmountInput}
+                        style={[styles.distributeAmountInput, { color: colors.text }]}
                         placeholder="0"
-                        placeholderTextColor="#708090"
+                        placeholderTextColor={colors.textSecondary}
                         keyboardType="decimal-pad"
                         value={existing?.amount || ''}
                         onChangeText={(text) => {
@@ -984,33 +989,33 @@ export default function PoolDetailsScreen() {
                 );
               })}
               {contributorsList.length === 0 && (
-                <View style={styles.emptyContributors}>
-                  <Text style={styles.emptyText}>No contributors to distribute to</Text>
+                <View style={[styles.emptyContributors, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No contributors to distribute to</Text>
                 </View>
               )}
             </ScrollView>
 
             <View style={styles.closePoolRow}>
-              <Text style={styles.closePoolText}>Close pool after distribution</Text>
+              <Text style={[styles.closePoolText, { color: colors.text }]}>Close pool after distribution</Text>
               <Switch
                 value={closePoolAfterDistribute}
                 onValueChange={setClosePoolAfterDistribute}
-                trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(127,255,212,0.3)' }}
-                thumbColor={closePoolAfterDistribute ? '#7FFFD4' : '#708090'}
+                trackColor={{ false: colors.inputBorder, true: `${colors.mint}4D` }}
+                thumbColor={closePoolAfterDistribute ? colors.mint : colors.textSecondary}
               />
             </View>
 
             <TouchableOpacity
-              style={[styles.confirmButton, { marginTop: 16 }, (distributeMutation.isPending || distributions.length === 0 || distributeTotal <= 0 || distributeTotal > parseFloat(pool?.currentAmount || '0')) && styles.confirmButtonDisabled]}
+              style={[styles.confirmButton, { marginTop: 16, backgroundColor: colors.mint }, (distributeMutation.isPending || distributions.length === 0 || distributeTotal <= 0 || distributeTotal > parseFloat(pool?.currentAmount || '0')) && styles.confirmButtonDisabled]}
               onPress={() => distributeMutation.mutate()}
               disabled={distributeMutation.isPending || distributions.length === 0 || distributeTotal <= 0 || distributeTotal > parseFloat(pool?.currentAmount || '0')}
               activeOpacity={0.8}
               data-testid="button-confirm-distribute"
             >
               {distributeMutation.isPending ? (
-                <ActivityIndicator color="#001F3F" />
+                <ActivityIndicator color={isDark ? colors.navy : '#FFFFFF'} />
               ) : (
-                <Text style={styles.confirmButtonText}>Confirm Distribution</Text>
+                <Text style={[styles.confirmButtonText, { color: isDark ? colors.navy : '#FFFFFF' }]}>Confirm Distribution</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -1025,34 +1030,34 @@ export default function PoolDetailsScreen() {
       >
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowEditPool(false)} />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHandle} />
+          <View style={[styles.modalContent, { backgroundColor: isDark ? '#0A1929' : colors.navyLight, borderColor: `${colors.mint}1A` }]}>
+            <View style={[styles.modalHandle, { backgroundColor: colors.cardBorder }]} />
             <View style={styles.modalHeaderRow}>
               <View>
-                <Text style={styles.modalTitle}>Edit Pool</Text>
-                <Text style={styles.modalSubtitle}>Update pool details</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Pool</Text>
+                <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>Update pool details</Text>
               </View>
-              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowEditPool(false)} data-testid="button-close-edit">
-                <Ionicons name="close" size={22} color="#fff" />
+              <TouchableOpacity style={[styles.modalCloseBtn, { backgroundColor: colors.cardBorder }]} onPress={() => setShowEditPool(false)} data-testid="button-close-edit">
+                <Ionicons name="close" size={22} color={colors.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={{ maxHeight: 400 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-              <Text style={styles.paymentMethodLabel}>Pool Name</Text>
+              <Text style={[styles.paymentMethodLabel, { color: colors.text }]}>Pool Name</Text>
               <TextInput
-                style={[styles.amountInput, { paddingHorizontal: 16, fontSize: 15 }]}
+                style={[styles.amountInput, { paddingHorizontal: 16, fontSize: 15, backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 14, color: colors.text }]}
                 placeholder="Pool name"
-                placeholderTextColor="#708090"
+                placeholderTextColor={colors.textSecondary}
                 value={editTitle}
                 onChangeText={setEditTitle}
                 data-testid="input-edit-title"
               />
 
-              <Text style={[styles.paymentMethodLabel, { marginTop: 16 }]}>Description</Text>
+              <Text style={[styles.paymentMethodLabel, { marginTop: 16, color: colors.text }]}>Description</Text>
               <TextInput
-                style={[styles.amountInput, { paddingHorizontal: 16, fontSize: 15, minHeight: 80, textAlignVertical: 'top' }]}
+                style={[styles.amountInput, { paddingHorizontal: 16, fontSize: 15, minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 14, color: colors.text }]}
                 placeholder="Pool description"
-                placeholderTextColor="#708090"
+                placeholderTextColor={colors.textSecondary}
                 value={editDescription}
                 onChangeText={setEditDescription}
                 multiline
@@ -1060,13 +1065,13 @@ export default function PoolDetailsScreen() {
                 data-testid="input-edit-description"
               />
 
-              <Text style={[styles.paymentMethodLabel, { marginTop: 16 }]}>Target Amount ($)</Text>
-              <View style={styles.amountInputContainer}>
-                <Text style={styles.dollarPrefix}>$</Text>
+              <Text style={[styles.paymentMethodLabel, { marginTop: 16, color: colors.text }]}>Target Amount ($)</Text>
+              <View style={[styles.amountInputContainer, { backgroundColor: colors.inputBg, borderColor: `${colors.mint}33` }]}>
+                <Text style={[styles.dollarPrefix, { color: colors.mint }]}>$</Text>
                 <TextInput
-                  style={styles.amountInput}
+                  style={[styles.amountInput, { color: colors.text }]}
                   placeholder="0.00"
-                  placeholderTextColor="#708090"
+                  placeholderTextColor={colors.textSecondary}
                   keyboardType="decimal-pad"
                   value={editTargetAmount}
                   onChangeText={setEditTargetAmount}
@@ -1074,24 +1079,24 @@ export default function PoolDetailsScreen() {
                 />
               </View>
 
-              <Text style={[styles.paymentMethodLabel, { marginTop: 16 }]}>Deadline (YYYY-MM-DD)</Text>
+              <Text style={[styles.paymentMethodLabel, { marginTop: 16, color: colors.text }]}>Deadline (YYYY-MM-DD)</Text>
               <TextInput
-                style={[styles.amountInput, { paddingHorizontal: 16, fontSize: 15 }]}
+                style={[styles.amountInput, { paddingHorizontal: 16, fontSize: 15, backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 14, color: colors.text }]}
                 placeholder="2025-12-31"
-                placeholderTextColor="#708090"
+                placeholderTextColor={colors.textSecondary}
                 value={editDeadline}
                 onChangeText={setEditDeadline}
                 data-testid="input-edit-deadline"
               />
 
-              <Text style={{ fontSize: 14, fontWeight: '600', color: '#8E8E93', marginTop: 16, marginBottom: 8 }}>Status</Text>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginTop: 16, marginBottom: 8 }}>Status</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {[
-                  { value: 'active', label: 'Active', color: '#7FFFD4' },
-                  { value: 'paused', label: 'Paused', color: '#FFD700' },
-                  { value: 'closed', label: 'Closed', color: '#FF6B6B' },
-                  { value: 'completed', label: 'Completed', color: '#4CAF50' },
-                  { value: 'expired', label: 'Expired', color: '#999' },
+                  { value: 'active', label: 'Active', color: colors.mint },
+                  { value: 'paused', label: 'Paused', color: colors.yellow },
+                  { value: 'closed', label: 'Closed', color: colors.red },
+                  { value: 'completed', label: 'Completed', color: colors.green },
+                  { value: 'expired', label: 'Expired', color: colors.textSecondary },
                 ].map((option) => (
                   <TouchableOpacity
                     key={option.value}
@@ -1101,22 +1106,22 @@ export default function PoolDetailsScreen() {
                       paddingVertical: 10,
                       borderRadius: 8,
                       borderWidth: 2,
-                      borderColor: editStatus === option.value ? option.color : 'rgba(255,255,255,0.1)',
-                      backgroundColor: editStatus === option.value ? `${option.color}20` : 'rgba(255,255,255,0.05)',
+                      borderColor: editStatus === option.value ? option.color : colors.inputBorder,
+                      backgroundColor: editStatus === option.value ? `${option.color}20` : colors.inputBg,
                     }}
                     data-testid={`button-status-${option.value}`}
                   >
                     <Text style={{
                       fontSize: 13,
                       fontWeight: editStatus === option.value ? '700' : '500',
-                      color: editStatus === option.value ? option.color : '#8E8E93',
+                      color: editStatus === option.value ? option.color : colors.textSecondary,
                     }}>
                       {option.label}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
-              <Text style={{ fontSize: 12, color: '#8E8E93', marginTop: 4 }}>
+              <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
                 {editStatus === 'paused' ? 'Contributions temporarily suspended' :
                  editStatus === 'closed' ? 'Pool closed. Can be reopened later.' :
                  editStatus === 'completed' ? 'Pool goal has been reached' :
@@ -1126,16 +1131,16 @@ export default function PoolDetailsScreen() {
             </ScrollView>
 
             <TouchableOpacity
-              style={[styles.confirmButton, { marginTop: 16 }, editPoolMutation.isPending && styles.confirmButtonDisabled]}
+              style={[styles.confirmButton, { marginTop: 16, backgroundColor: colors.mint }, editPoolMutation.isPending && styles.confirmButtonDisabled]}
               onPress={() => editPoolMutation.mutate()}
               disabled={editPoolMutation.isPending}
               activeOpacity={0.8}
               data-testid="button-confirm-edit"
             >
               {editPoolMutation.isPending ? (
-                <ActivityIndicator color="#001F3F" />
+                <ActivityIndicator color={isDark ? colors.navy : '#FFFFFF'} />
               ) : (
-                <Text style={styles.confirmButtonText}>Save Changes</Text>
+                <Text style={[styles.confirmButtonText, { color: isDark ? colors.navy : '#FFFFFF' }]}>Save Changes</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -1144,34 +1149,34 @@ export default function PoolDetailsScreen() {
 
       <Modal visible={showAutoContribute} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: isDark ? '#0A1929' : colors.navyLight, borderColor: `${colors.mint}1A` }]}>
             <View style={styles.modalHeaderRow}>
               <View>
-                <Text style={styles.modalTitle}>Set Up Auto-Contribute</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Set Up Auto-Contribute</Text>
               </View>
-              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowAutoContribute(false)} data-testid="button-close-auto-contribute">
-                <Ionicons name="close" size={24} color="#fff" />
+              <TouchableOpacity style={[styles.modalCloseBtn, { backgroundColor: colors.cardBorder }]} onPress={() => setShowAutoContribute(false)} data-testid="button-close-auto-contribute">
+                <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
-            <Text style={{ color: '#708090', fontSize: 13, marginBottom: 16 }}>
+            <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 16 }}>
               Automatically contribute to this pool on a recurring schedule using your wallet or linked bank account.
             </Text>
 
-            <Text style={styles.paymentMethodLabel}>Amount ($)</Text>
-            <View style={styles.amountInputContainer}>
-              <Text style={styles.dollarPrefix}>$</Text>
+            <Text style={[styles.paymentMethodLabel, { color: colors.text }]}>Amount ($)</Text>
+            <View style={[styles.amountInputContainer, { backgroundColor: colors.inputBg, borderColor: `${colors.mint}33` }]}>
+              <Text style={[styles.dollarPrefix, { color: colors.mint }]}>$</Text>
               <TextInput
-                style={styles.amountInput}
+                style={[styles.amountInput, { color: colors.text }]}
                 value={autoContributeAmount}
                 onChangeText={setAutoContributeAmount}
                 placeholder="0.00"
-                placeholderTextColor="#708090"
+                placeholderTextColor={colors.textSecondary}
                 keyboardType="decimal-pad"
                 data-testid="input-auto-contribute-amount"
               />
             </View>
 
-            <Text style={styles.paymentMethodLabel}>Frequency</Text>
+            <Text style={[styles.paymentMethodLabel, { color: colors.text }]}>Frequency</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
               {(['weekly', 'monthly', 'quarterly'] as const).map((freq) => (
                 <TouchableOpacity
@@ -1181,15 +1186,15 @@ export default function PoolDetailsScreen() {
                     paddingVertical: 10,
                     borderRadius: 8,
                     borderWidth: 1,
-                    borderColor: autoContributeFrequency === freq ? '#7FFFD4' : 'rgba(255,255,255,0.1)',
-                    backgroundColor: autoContributeFrequency === freq ? 'rgba(127,255,212,0.15)' : 'rgba(255,255,255,0.05)',
+                    borderColor: autoContributeFrequency === freq ? colors.mint : colors.inputBorder,
+                    backgroundColor: autoContributeFrequency === freq ? `${colors.mint}26` : colors.inputBg,
                     alignItems: 'center',
                   }}
                   onPress={() => setAutoContributeFrequency(freq)}
                   data-testid={`button-freq-${freq}`}
                 >
                   <Text style={{
-                    color: autoContributeFrequency === freq ? '#7FFFD4' : '#708090',
+                    color: autoContributeFrequency === freq ? colors.mint : colors.textSecondary,
                     fontSize: 13,
                     fontWeight: '600',
                     textTransform: 'capitalize',
@@ -1200,7 +1205,7 @@ export default function PoolDetailsScreen() {
               ))}
             </View>
 
-            <Text style={styles.paymentMethodLabel}>Payment Method</Text>
+            <Text style={[styles.paymentMethodLabel, { color: colors.text }]}>Payment Method</Text>
             <View style={{ gap: 8, marginBottom: 16 }}>
               <TouchableOpacity
                 style={{
@@ -1210,20 +1215,20 @@ export default function PoolDetailsScreen() {
                   padding: 12,
                   borderRadius: 10,
                   borderWidth: 1,
-                  borderColor: autoPaymentMethod === 'wallet' ? '#7FFFD4' : 'rgba(255,255,255,0.1)',
-                  backgroundColor: autoPaymentMethod === 'wallet' ? 'rgba(127,255,212,0.1)' : 'rgba(255,255,255,0.05)',
+                  borderColor: autoPaymentMethod === 'wallet' ? colors.mint : colors.inputBorder,
+                  backgroundColor: autoPaymentMethod === 'wallet' ? `${colors.mint}1A` : colors.inputBg,
                 }}
                 onPress={() => setAutoPaymentMethod('wallet')}
                 data-testid="auto-payment-wallet"
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <Ionicons name="wallet-outline" size={20} color={autoPaymentMethod === 'wallet' ? '#7FFFD4' : '#708090'} />
+                  <Ionicons name="wallet-outline" size={20} color={autoPaymentMethod === 'wallet' ? colors.mint : colors.textSecondary} />
                   <View>
-                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>Wallet Balance</Text>
-                    <Text style={{ color: '#708090', fontSize: 12 }}>${walletData?.balance ? parseFloat(walletData.balance).toLocaleString() : '0'} available</Text>
+                    <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600' }}>Wallet Balance</Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12 }}>${walletData?.balance ? parseFloat(walletData.balance).toLocaleString() : '0'} available</Text>
                   </View>
                 </View>
-                {autoPaymentMethod === 'wallet' && <Ionicons name="checkmark-circle" size={20} color="#7FFFD4" />}
+                {autoPaymentMethod === 'wallet' && <Ionicons name="checkmark-circle" size={20} color={colors.mint} />}
               </TouchableOpacity>
               {bankAccounts.map((account: any) => (
                 <TouchableOpacity
@@ -1235,45 +1240,45 @@ export default function PoolDetailsScreen() {
                     padding: 12,
                     borderRadius: 10,
                     borderWidth: 1,
-                    borderColor: autoPaymentMethod === `bank_${account.id}` ? '#7FFFD4' : 'rgba(255,255,255,0.1)',
-                    backgroundColor: autoPaymentMethod === `bank_${account.id}` ? 'rgba(127,255,212,0.1)' : 'rgba(255,255,255,0.05)',
+                    borderColor: autoPaymentMethod === `bank_${account.id}` ? colors.mint : colors.inputBorder,
+                    backgroundColor: autoPaymentMethod === `bank_${account.id}` ? `${colors.mint}1A` : colors.inputBg,
                   }}
                   onPress={() => setAutoPaymentMethod(`bank_${account.id}`)}
                   data-testid={`auto-payment-bank-${account.id}`}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <Ionicons name="business-outline" size={20} color={autoPaymentMethod === `bank_${account.id}` ? '#7FFFD4' : '#708090'} />
+                    <Ionicons name="business-outline" size={20} color={autoPaymentMethod === `bank_${account.id}` ? colors.mint : colors.textSecondary} />
                     <View>
-                      <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>{account.bankName || 'Bank Account'}</Text>
-                      <Text style={{ color: '#708090', fontSize: 12 }}>••••{account.accountMask}</Text>
+                      <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600' }}>{account.bankName || 'Bank Account'}</Text>
+                      <Text style={{ color: colors.textSecondary, fontSize: 12 }}>••••{account.accountMask}</Text>
                     </View>
                   </View>
-                  {autoPaymentMethod === `bank_${account.id}` && <Ionicons name="checkmark-circle" size={20} color="#7FFFD4" />}
+                  {autoPaymentMethod === `bank_${account.id}` && <Ionicons name="checkmark-circle" size={20} color={colors.mint} />}
                 </TouchableOpacity>
               ))}
             </View>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingVertical: 8 }}>
-              <Text style={{ color: '#fff', fontSize: 14 }}>Start first payment now</Text>
+              <Text style={{ color: colors.text, fontSize: 14 }}>Start first payment now</Text>
               <Switch
                 value={startImmediately}
                 onValueChange={setStartImmediately}
-                trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(127,255,212,0.3)' }}
-                thumbColor={startImmediately ? '#7FFFD4' : '#708090'}
+                trackColor={{ false: colors.inputBorder, true: `${colors.mint}4D` }}
+                thumbColor={startImmediately ? colors.mint : colors.textSecondary}
                 data-testid="switch-start-immediately"
               />
             </View>
 
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <TouchableOpacity
-                style={[styles.confirmButton, { backgroundColor: 'rgba(255,255,255,0.1)', flex: 1 }]}
+                style={[styles.confirmButton, { backgroundColor: colors.inputBorder, flex: 1 }]}
                 onPress={() => setShowAutoContribute(false)}
               >
-                <Text style={{ color: '#fff', fontWeight: '600', textAlign: 'center' }}>Cancel</Text>
+                <Text style={{ color: colors.text, fontWeight: '600', textAlign: 'center' }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.confirmButton, {
-                  backgroundColor: '#7FFFD4',
+                  backgroundColor: colors.mint,
                   flex: 1,
                   opacity: (!autoContributeAmount || parseFloat(autoContributeAmount) <= 0 || autoContributeMutation.isPending) ? 0.5 : 1,
                 }]}
@@ -1281,7 +1286,7 @@ export default function PoolDetailsScreen() {
                 disabled={!autoContributeAmount || parseFloat(autoContributeAmount) <= 0 || autoContributeMutation.isPending}
                 data-testid="button-confirm-auto-contribute"
               >
-                <Text style={{ color: '#001F3F', fontWeight: '700', textAlign: 'center' }}>
+                <Text style={{ color: isDark ? colors.navy : '#FFFFFF', fontWeight: '700', textAlign: 'center' }}>
                   {autoContributeMutation.isPending ? 'Setting up...' : 'Set Up Auto-Contribute'}
                 </Text>
               </TouchableOpacity>
@@ -1296,7 +1301,6 @@ export default function PoolDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#001F3F',
   },
   content: {
     padding: 20,
@@ -1306,14 +1310,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#001F3F',
   },
   loadingSpinnerWrap: {
     alignItems: 'center',
     gap: 16,
   },
   loadingText: {
-    color: '#708090',
     fontSize: 14,
     marginTop: 8,
   },
@@ -1321,26 +1323,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#001F3F',
     padding: 24,
   },
   errorCard: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 20,
     padding: 32,
     width: '100%',
     borderWidth: 1,
-    borderColor: 'rgba(248,113,113,0.2)',
   },
   errorTitle: {
-    color: '#f87171',
     fontSize: 20,
     fontWeight: '700',
     marginTop: 16,
   },
   errorSubtitle: {
-    color: '#708090',
     fontSize: 14,
     textAlign: 'center',
     marginTop: 8,
@@ -1348,15 +1345,12 @@ const styles = StyleSheet.create({
   },
   errorButton: {
     marginTop: 24,
-    backgroundColor: 'rgba(248,113,113,0.15)',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(248,113,113,0.3)',
   },
   errorButtonText: {
-    color: '#f87171',
     fontWeight: '600',
     fontSize: 15,
   },
@@ -1376,13 +1370,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#FFFFFF',
     textAlign: 'center',
     letterSpacing: 0.3,
   },
   description: {
     fontSize: 15,
-    color: '#708090',
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 22,
@@ -1395,12 +1387,10 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 14,
     padding: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
   },
   infoIconWrap: {
     width: 32,
@@ -1411,14 +1401,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   infoCardLabel: {
-    color: '#708090',
     fontSize: 11,
     fontWeight: '500',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   infoCardValue: {
-    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
     marginTop: 3,
@@ -1441,7 +1429,6 @@ const styles = StyleSheet.create({
     padding: 24,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: 'rgba(127,255,212,0.15)',
   },
   progressHeader: {
     flexDirection: 'row',
@@ -1450,7 +1437,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   progressLabel: {
-    color: '#708090',
     fontSize: 13,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -1464,12 +1450,10 @@ const styles = StyleSheet.create({
   currentAmount: {
     fontSize: 34,
     fontWeight: '800',
-    color: '#7FFFD4',
     letterSpacing: -0.5,
   },
   targetAmount: {
     fontSize: 16,
-    color: '#708090',
     marginLeft: 8,
     fontWeight: '500',
   },
@@ -1478,18 +1462,15 @@ const styles = StyleSheet.create({
   },
   progressBarBg: {
     height: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 5,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#7FFFD4',
     borderRadius: 5,
   },
   progressPercent: {
     fontSize: 14,
-    color: '#7FFFD4',
     fontWeight: '600',
   },
   primaryButton: {
@@ -1497,13 +1478,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: '#7FFFD4',
     paddingVertical: 16,
     borderRadius: 14,
     marginBottom: 12,
   },
   primaryButtonText: {
-    color: '#001F3F',
     fontSize: 17,
     fontWeight: '700',
   },
@@ -1518,14 +1497,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.04)',
     paddingVertical: 14,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: 'rgba(127,255,212,0.25)',
   },
   secondaryButtonText: {
-    color: '#7FFFD4',
     fontSize: 15,
     fontWeight: '600',
   },
@@ -1541,42 +1517,34 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFFFFF',
     flex: 1,
   },
   contributorCountBadge: {
-    backgroundColor: 'rgba(127,255,212,0.15)',
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 10,
   },
   contributorCountText: {
-    color: '#7FFFD4',
     fontSize: 13,
     fontWeight: '700',
   },
   contributorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
     padding: 14,
     borderRadius: 14,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
   },
   contributorAvatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(127,255,212,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(127,255,212,0.25)',
   },
   contributorInitials: {
-    color: '#7FFFD4',
     fontWeight: '700',
     fontSize: 15,
   },
@@ -1585,36 +1553,29 @@ const styles = StyleSheet.create({
     marginLeft: 14,
   },
   contributorName: {
-    color: '#FFFFFF',
     fontWeight: '600',
     fontSize: 15,
   },
   contributorDate: {
-    color: '#708090',
     fontSize: 12,
     marginTop: 3,
   },
   contributorAmount: {
-    color: '#7FFFD4',
     fontWeight: '700',
     fontSize: 16,
   },
   emptyContributors: {
     alignItems: 'center',
     paddingVertical: 32,
-    backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
   },
   emptyText: {
-    color: '#708090',
     fontSize: 15,
     fontWeight: '600',
     marginTop: 12,
   },
   emptySubtext: {
-    color: '#708090',
     fontSize: 13,
     marginTop: 4,
   },
@@ -1627,18 +1588,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   modalContent: {
-    backgroundColor: '#0A1929',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 24,
     paddingBottom: 40,
     borderTopWidth: 1,
-    borderColor: 'rgba(127,255,212,0.1)',
   },
   modalHandle: {
     width: 40,
     height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 20,
@@ -1652,33 +1610,27 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
   modalSubtitle: {
     fontSize: 14,
-    color: '#708090',
     marginTop: 4,
   },
   modalCloseBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   amountInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: 'rgba(127,255,212,0.2)',
     marginBottom: 20,
     paddingHorizontal: 16,
   },
   dollarPrefix: {
-    color: '#7FFFD4',
     fontSize: 22,
     fontWeight: '700',
     marginRight: 4,
@@ -1686,12 +1638,10 @@ const styles = StyleSheet.create({
   amountInput: {
     flex: 1,
     fontSize: 22,
-    color: '#FFFFFF',
     fontWeight: '600',
     paddingVertical: 16,
   },
   confirmButton: {
-    backgroundColor: '#7FFFD4',
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
@@ -1700,12 +1650,10 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   confirmButtonText: {
-    color: '#001F3F',
     fontSize: 17,
     fontWeight: '700',
   },
   paymentMethodLabel: {
-    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 12,
@@ -1713,22 +1661,15 @@ const styles = StyleSheet.create({
   paymentMethodCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 14,
     padding: 16,
     marginBottom: 10,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  paymentMethodCardSelected: {
-    borderColor: '#7FFFD4',
-    backgroundColor: 'rgba(127,255,212,0.08)',
   },
   paymentMethodIconWrap: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1737,15 +1678,10 @@ const styles = StyleSheet.create({
     marginLeft: 14,
   },
   paymentMethodName: {
-    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '600',
   },
-  paymentMethodNameSelected: {
-    color: '#7FFFD4',
-  },
   paymentMethodDesc: {
-    color: '#708090',
     fontSize: 12,
     marginTop: 2,
   },
@@ -1754,18 +1690,13 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  paymentMethodRadioSelected: {
-    borderColor: '#7FFFD4',
   },
   paymentMethodRadioDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#7FFFD4',
   },
   quickAmountsRow: {
     flexDirection: 'row',
@@ -1777,21 +1708,11 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  quickAmountBtnSelected: {
-    borderColor: '#7FFFD4',
-    backgroundColor: 'rgba(127,255,212,0.08)',
   },
   quickAmountText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-  },
-  quickAmountTextSelected: {
-    color: '#7FFFD4',
   },
   walletBalanceRow: {
     flexDirection: 'row',
@@ -1801,7 +1722,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   walletBalanceText: {
-    color: '#708090',
     fontSize: 13,
   },
   actionsRow: {
@@ -1812,11 +1732,9 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
   },
   actionIconWrap: {
     width: 44,
@@ -1827,7 +1745,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   actionButtonText: {
-    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
@@ -1839,7 +1756,6 @@ const styles = StyleSheet.create({
   },
   activitySummaryCard: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
     padding: 12,
     alignItems: 'center',
@@ -1859,12 +1775,10 @@ const styles = StyleSheet.create({
   activityRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
     padding: 14,
     borderRadius: 14,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
   },
   activityIconWrap: {
     width: 36,
@@ -1878,12 +1792,10 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   activityDesc: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '500',
   },
   activityTime: {
-    color: '#708090',
     fontSize: 12,
     marginTop: 2,
   },
@@ -1894,27 +1806,22 @@ const styles = StyleSheet.create({
   distributeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
     padding: 12,
     borderRadius: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
   },
   distributeAmountWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 10,
     paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: 'rgba(127,255,212,0.2)',
     width: 100,
   },
   distributeAmountInput: {
     flex: 1,
     fontSize: 16,
-    color: '#FFFFFF',
     fontWeight: '600',
     paddingVertical: 10,
   },
@@ -1926,7 +1833,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   closePoolText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -1935,24 +1841,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  payoutSpeedBtnSelected: {
-    borderColor: '#7FFFD4',
-    backgroundColor: 'rgba(127,255,212,0.08)',
-  },
-  payoutSpeedText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  payoutSpeedTextSelected: {
-    color: '#7FFFD4',
   },
   payoutSpeedSubtext: {
-    color: '#708090',
     fontSize: 11,
     marginTop: 2,
   },

@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/theme/ThemeContext';
 
 const CATEGORIES: { label: string; value: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { label: 'Gift', value: 'Gift', icon: 'gift-outline' },
@@ -32,6 +33,7 @@ const TEMPLATES = [
 export default function CreatePoolScreen() {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
+  const { colors, isDark } = useTheme();
 
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
@@ -105,71 +107,68 @@ export default function CreatePoolScreen() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
         {error ? (
-          <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle" size={18} color="#f87171" />
-            <Text style={styles.errorText}>{error}</Text>
+          <View style={[styles.errorContainer, { borderColor: `${colors.red}30` }]}>
+            <Ionicons name="alert-circle" size={18} color={colors.red} />
+            <Text style={[styles.errorText, { color: colors.red }]}>{error}</Text>
           </View>
         ) : null}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Templates</Text>
+          <Text style={[styles.sectionTitle, { color: colors.mint }]}>Quick Templates</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templatesRow}>
             {TEMPLATES.map((t) => (
-              <TouchableOpacity key={t.label} style={styles.templateCard} onPress={() => applyTemplate(t)} activeOpacity={0.7}>
-                <View style={styles.templateEmojiContainer}>
+              <TouchableOpacity key={t.label} style={[styles.templateCard, { backgroundColor: `${colors.mint}10`, borderColor: `${colors.mint}4D`, shadowColor: colors.mint }]} onPress={() => applyTemplate(t)} activeOpacity={0.7}>
+                <View style={[styles.templateEmojiContainer, { backgroundColor: `${colors.mint}1A` }]}>
                   <Text style={styles.templateEmoji}>{t.label.split(' ')[0]}</Text>
                 </View>
-                <Text style={styles.templateLabel} numberOfLines={1}>{t.label.split(' ').slice(1).join(' ')}</Text>
-                <Text style={styles.templateAmount}>${t.amount}</Text>
+                <Text style={[styles.templateLabel, { color: colors.text }]} numberOfLines={1}>{t.label.split(' ').slice(1).join(' ')}</Text>
+                <Text style={[styles.templateAmount, { color: colors.mint }]}>${t.amount}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
 
-        {/* For focus-state styling in React Native, use onFocus/onBlur callbacks
-            to toggle a state variable and conditionally apply a highlighted border style,
-            e.g.: borderColor: '#7FFFD4', borderWidth: 1.5 */}
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Title *</Text>
+          <Text style={[styles.label, { color: colors.mint }]}>Title *</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
             placeholder="e.g., Birthday Gift for Sarah"
-            placeholderTextColor="#708090"
+            placeholderTextColor={colors.textSecondary}
             value={title}
             onChangeText={(t) => { setTitle(t); setError(''); }}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>Category *</Text>
+          <Text style={[styles.label, { color: colors.mint }]}>Category *</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
             {CATEGORIES.map((cat) => (
               <TouchableOpacity
                 key={cat.value}
-                style={[styles.categoryButton, category === cat.value && styles.categoryButtonSelected]}
+                style={[styles.categoryButton, { backgroundColor: colors.inputBg, borderColor: `${colors.mint}33` }, category === cat.value && { backgroundColor: colors.mint, borderColor: colors.mint, shadowColor: colors.mint, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 6 }]}
                 onPress={() => { setCategory(cat.value); setError(''); }}
                 activeOpacity={0.7}
               >
-                <View style={[styles.categoryIconWrap, category === cat.value && styles.categoryIconWrapSelected]}>
-                  <Ionicons name={cat.icon} size={18} color={category === cat.value ? '#001F3F' : '#7FFFD4'} />
+                <View style={[styles.categoryIconWrap, { backgroundColor: `${colors.mint}1F` }, category === cat.value && { backgroundColor: `${colors.navy}26` }]}>
+                  <Ionicons name={cat.icon} size={18} color={category === cat.value ? (isDark ? colors.navy : '#FFFFFF') : colors.mint} />
                 </View>
-                <Text style={[styles.categoryLabel, category === cat.value && styles.categoryLabelSelected]}>{cat.label}</Text>
+                <Text style={[styles.categoryLabel, { color: colors.text }, category === cat.value && { color: isDark ? colors.navy : '#FFFFFF', fontWeight: '700' }]}>{cat.label}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Target Amount *</Text>
-          <View style={styles.amountInput}>
-            <Text style={styles.currencySymbol}>$</Text>
+          <Text style={[styles.label, { color: colors.mint }]}>Target Amount *</Text>
+          <View style={[styles.amountInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+            <Text style={[styles.currencySymbol, { color: colors.mint }]}>$</Text>
             <TextInput
-              style={styles.amountField}
+              style={[styles.amountField, { color: colors.text }]}
               placeholder="0.00"
-              placeholderTextColor="#708090"
+              placeholderTextColor={colors.textSecondary}
               value={targetAmount}
               onChangeText={(t) => { setTargetAmount(t); setError(''); }}
               keyboardType="decimal-pad"
@@ -178,11 +177,11 @@ export default function CreatePoolScreen() {
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Description</Text>
+          <Text style={[styles.label, { color: colors.mint }]}>Description</Text>
           <TextInput
-            style={[styles.input, styles.textArea]}
+            style={[styles.input, styles.textArea, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
             placeholder="What's this pool for?"
-            placeholderTextColor="#708090"
+            placeholderTextColor={colors.textSecondary}
             value={description}
             onChangeText={setDescription}
             multiline
@@ -191,15 +190,15 @@ export default function CreatePoolScreen() {
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Deadline *</Text>
-          <View style={styles.deadlineRow}>
-            <View style={styles.calendarIconWrap}>
-              <Ionicons name="calendar-outline" size={20} color="#7FFFD4" />
+          <Text style={[styles.label, { color: colors.mint }]}>Deadline *</Text>
+          <View style={[styles.deadlineRow, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+            <View style={[styles.calendarIconWrap, { backgroundColor: `${colors.mint}1F` }]}>
+              <Ionicons name="calendar-outline" size={20} color={colors.mint} />
             </View>
             <TextInput
-              style={styles.deadlineInput}
+              style={[styles.deadlineInput, { color: colors.text }]}
               placeholder="YYYY-MM-DD"
-              placeholderTextColor="#708090"
+              placeholderTextColor={colors.textSecondary}
               value={deadline}
               onChangeText={(t) => { setDeadline(t); setError(''); }}
               keyboardType="default"
@@ -210,16 +209,16 @@ export default function CreatePoolScreen() {
 
         {category === 'Recurring' && (
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Frequency</Text>
+            <Text style={[styles.label, { color: colors.mint }]}>Frequency</Text>
             <View style={styles.frequencyRow}>
               {(['weekly', 'monthly', 'quarterly'] as const).map((f) => (
                 <TouchableOpacity
                   key={f}
-                  style={[styles.frequencyButton, frequency === f && styles.frequencyButtonSelected]}
+                  style={[styles.frequencyButton, { backgroundColor: colors.inputBg, borderColor: `${colors.mint}33` }, frequency === f && { backgroundColor: colors.mint, borderColor: colors.mint, shadowColor: colors.mint, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }]}
                   onPress={() => { setFrequency(f); setIsRecurring(true); }}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.frequencyLabel, frequency === f && styles.frequencyLabelSelected]}>
+                  <Text style={[styles.frequencyLabel, { color: colors.text }, frequency === f && { color: isDark ? colors.navy : '#FFFFFF', fontWeight: '700' }]}>
                     {f.charAt(0).toUpperCase() + f.slice(1)}
                   </Text>
                 </TouchableOpacity>
@@ -229,17 +228,17 @@ export default function CreatePoolScreen() {
         )}
 
         <TouchableOpacity
-          style={[styles.createButton, createMutation.isPending && styles.createButtonDisabled]}
+          style={[styles.createButton, { backgroundColor: colors.mint, shadowColor: colors.mint }, createMutation.isPending && styles.createButtonDisabled]}
           onPress={handleCreate}
           disabled={createMutation.isPending}
           activeOpacity={0.8}
         >
           {createMutation.isPending ? (
-            <ActivityIndicator color="#001F3F" />
+            <ActivityIndicator color={isDark ? colors.navy : '#FFFFFF'} />
           ) : (
             <>
-              <Ionicons name="add-circle" size={24} color="#001F3F" />
-              <Text style={styles.createButtonText}>Create Pool</Text>
+              <Ionicons name="add-circle" size={24} color={isDark ? colors.navy : '#FFFFFF'} />
+              <Text style={[styles.createButtonText, { color: isDark ? colors.navy : '#FFFFFF' }]}>Create Pool</Text>
             </>
           )}
         </TouchableOpacity>
@@ -253,7 +252,6 @@ export default function CreatePoolScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#001F3F',
   },
   content: {
     padding: 20,
@@ -267,11 +265,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(248, 113, 113, 0.3)',
     gap: 8,
   },
   errorText: {
-    color: '#f87171',
     fontSize: 14,
     flex: 1,
   },
@@ -279,7 +275,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    color: '#7FFFD4',
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 12,
@@ -292,15 +287,12 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   templateCard: {
-    backgroundColor: 'rgba(127, 255, 212, 0.06)',
     borderWidth: 1.5,
-    borderColor: 'rgba(127, 255, 212, 0.3)',
     borderRadius: 16,
     paddingVertical: 18,
     paddingHorizontal: 18,
     alignItems: 'center',
     minWidth: 110,
-    shadowColor: '#7FFFD4',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -310,7 +302,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(127, 255, 212, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
@@ -319,20 +310,17 @@ const styles = StyleSheet.create({
     fontSize: 26,
   },
   templateLabel: {
-    color: '#fff',
     fontSize: 13,
     fontWeight: '600',
     marginBottom: 6,
     letterSpacing: 0.3,
   },
   templateAmount: {
-    color: '#7FFFD4',
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
   label: {
-    color: '#7FFFD4',
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 10,
@@ -348,53 +336,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1.5,
-    borderColor: 'rgba(127, 255, 212, 0.2)',
     borderRadius: 28,
     paddingVertical: 10,
     paddingHorizontal: 16,
-  },
-  categoryButtonSelected: {
-    backgroundColor: '#7FFFD4',
-    borderColor: '#7FFFD4',
-    shadowColor: '#7FFFD4',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
   },
   categoryIconWrap: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: 'rgba(127, 255, 212, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  categoryIconWrapSelected: {
-    backgroundColor: 'rgba(0, 31, 63, 0.15)',
-  },
   categoryLabel: {
-    color: '#fff',
     fontSize: 13,
     fontWeight: '600',
-  },
-  categoryLabelSelected: {
-    color: '#001F3F',
-    fontWeight: '700',
   },
   inputContainer: {
     marginBottom: 16,
   },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 14,
     paddingVertical: 16,
     paddingHorizontal: 16,
-    color: '#fff',
     fontSize: 16,
   },
   textArea: {
@@ -405,14 +370,11 @@ const styles = StyleSheet.create({
   amountInput: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 14,
     paddingHorizontal: 16,
   },
   currencySymbol: {
-    color: '#7FFFD4',
     fontSize: 24,
     fontWeight: '700',
     marginRight: 4,
@@ -421,16 +383,13 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 16,
     paddingHorizontal: 8,
-    color: '#fff',
     fontSize: 24,
     fontWeight: '600',
   },
   deadlineRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 14,
     paddingHorizontal: 16,
   },
@@ -438,7 +397,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: 'rgba(127, 255, 212, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -446,7 +404,6 @@ const styles = StyleSheet.create({
   deadlineInput: {
     flex: 1,
     paddingVertical: 16,
-    color: '#fff',
     fontSize: 16,
   },
   frequencyRow: {
@@ -458,38 +415,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1.5,
-    borderColor: 'rgba(127, 255, 212, 0.2)',
-  },
-  frequencyButtonSelected: {
-    backgroundColor: '#7FFFD4',
-    borderColor: '#7FFFD4',
-    shadowColor: '#7FFFD4',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
   },
   frequencyLabel: {
-    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
-  },
-  frequencyLabelSelected: {
-    color: '#001F3F',
-    fontWeight: '700',
   },
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: '#7FFFD4',
     height: 56,
     borderRadius: 16,
     marginTop: 12,
-    shadowColor: '#7FFFD4',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
     shadowRadius: 14,
@@ -499,7 +438,6 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   createButtonText: {
-    color: '#001F3F',
     fontSize: 18,
     fontWeight: '800',
     letterSpacing: 0.5,

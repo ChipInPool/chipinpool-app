@@ -7,26 +7,12 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
-
-const COLORS = {
-  navy: '#001F3F',
-  navyLight: '#002A54',
-  mint: '#7FFFD4',
-  mintDark: '#5ECFA0',
-  slate: '#708090',
-  white: '#FFFFFF',
-  blue: '#4A90D9',
-  yellow: '#FBBF24',
-  purple: '#A78BFA',
-  amber: '#F59E0B',
-  red: '#f87171',
-  cardBg: 'rgba(255,255,255,0.06)',
-  cardBorder: 'rgba(255,255,255,0.08)',
-};
+import { useTheme } from '@/theme/ThemeContext';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { user, logout } = useAuth();
+  const { colors, isDark } = useTheme();
 
   const { data: pools } = useQuery({
     queryKey: ['pools'],
@@ -52,35 +38,35 @@ export default function ProfileScreen() {
   const rewardsPoints = String(pointsData?.points || 0);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.profileHeader}>
           <LinearGradient
-            colors={[COLORS.mint, COLORS.mintDark]}
+            colors={[colors.mint, colors.mintDark]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.avatar}
+            style={[styles.avatar, { shadowColor: colors.mint }]}
           >
-            <Text style={styles.avatarText}>{initials}</Text>
+            <Text style={[styles.avatarText, { color: isDark ? '#001F3F' : '#FFFFFF' }]}>{initials}</Text>
           </LinearGradient>
 
-          <Text style={styles.name} data-testid="text-user-fullname">
+          <Text style={[styles.name, { color: colors.text }]} data-testid="text-user-fullname">
             {user?.firstName} {user?.lastName}
           </Text>
-          <Text style={styles.username} data-testid="text-username">@{user?.username}</Text>
+          <Text style={[styles.username, { color: colors.textSecondary }]} data-testid="text-username">@{user?.username}</Text>
 
           <View style={[
             styles.kycBadge,
-            { backgroundColor: user?.kycStatus === 'verified' ? 'rgba(127,255,212,0.12)' : 'rgba(251,191,36,0.12)' }
+            { backgroundColor: user?.kycStatus === 'verified' ? `${colors.mint}20` : `${colors.yellow}20` }
           ]}>
             <Ionicons
               name={user?.kycStatus === 'verified' ? 'checkmark-circle' : 'alert-circle'}
               size={16}
-              color={user?.kycStatus === 'verified' ? COLORS.mint : COLORS.yellow}
+              color={user?.kycStatus === 'verified' ? colors.mint : colors.yellow}
             />
             <Text style={[
               styles.kycText,
-              { color: user?.kycStatus === 'verified' ? COLORS.mint : COLORS.yellow }
+              { color: user?.kycStatus === 'verified' ? colors.mint : colors.yellow }
             ]} data-testid="text-kyc-status">
               {user?.kycStatus === 'verified' ? 'Verified' : 'Verification Pending'}
             </Text>
@@ -88,110 +74,120 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.statsRow}>
-          <StatCard icon="people-outline" value={poolsCount} label="Pools" />
-          <StatCard icon="wallet-outline" value={formattedBalance} label="Contributed" />
-          <StatCard icon="star-outline" value={rewardsPoints} label="Rewards" />
+          <StatCard icon="people-outline" value={poolsCount} label="Pools" colors={colors} />
+          <StatCard icon="wallet-outline" value={formattedBalance} label="Contributed" colors={colors} />
+          <StatCard icon="star-outline" value={rewardsPoints} label="Rewards" colors={colors} />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Account</Text>
           <MenuItem
             icon="card-outline"
-            iconColor={COLORS.mint}
-            iconBg="rgba(127,255,212,0.15)"
+            iconColor={colors.mint}
+            iconBg={`${colors.mint}26`}
             label="Payment Methods"
             onPress={() => navigation.navigate('PaymentMethods')}
+            colors={colors}
           />
           <MenuItem
             icon="shield-checkmark-outline"
-            iconColor={COLORS.blue}
-            iconBg="rgba(74,144,217,0.15)"
+            iconColor={colors.blue}
+            iconBg={`${colors.blue}26`}
             label="Security"
             onPress={() => navigation.navigate('Security')}
+            colors={colors}
           />
           <MenuItem
             icon="notifications-outline"
-            iconColor={COLORS.yellow}
-            iconBg="rgba(251,191,36,0.15)"
+            iconColor={colors.yellow}
+            iconBg={`${colors.yellow}26`}
             label="Notifications"
             onPress={() => navigation.navigate('NotificationSettings')}
+            colors={colors}
           />
           <MenuItem
             icon="time-outline"
-            iconColor={COLORS.purple}
-            iconBg="rgba(167,139,250,0.15)"
+            iconColor={colors.purple}
+            iconBg={`${colors.purple}26`}
             label="Activity"
             onPress={() => navigation.navigate('Activity')}
+            colors={colors}
           />
           <MenuItem
             icon="repeat-outline"
-            iconColor="#34D399"
-            iconBg="rgba(52,211,153,0.15)"
+            iconColor={colors.green}
+            iconBg={`${colors.green}26`}
             label="Recurring Payments"
             onPress={() => navigation.navigate('Recurring')}
+            colors={colors}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>More</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>More</Text>
           <MenuItem
             icon="trophy-outline"
-            iconColor={COLORS.amber}
-            iconBg="rgba(245,158,11,0.15)"
+            iconColor={colors.amber}
+            iconBg={`${colors.amber}26`}
             label="Rewards & Badges"
             onPress={() => navigation.navigate('Rewards')}
+            colors={colors}
           />
           <MenuItem
             icon="settings-outline"
-            iconColor={COLORS.slate}
-            iconBg="rgba(112,128,144,0.15)"
+            iconColor={colors.textSecondary}
+            iconBg={`${colors.textSecondary}26`}
             label="Settings"
             onPress={() => navigation.navigate('Settings')}
+            colors={colors}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Support</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Support</Text>
           <MenuItem
             icon="help-circle-outline"
-            iconColor={COLORS.mint}
-            iconBg="rgba(127,255,212,0.10)"
+            iconColor={colors.mint}
+            iconBg={`${colors.mint}1A`}
             label="Help Center"
             onPress={() => {}}
+            colors={colors}
           />
           <MenuItem
             icon="chatbubble-outline"
-            iconColor={COLORS.blue}
-            iconBg="rgba(74,144,217,0.10)"
+            iconColor={colors.blue}
+            iconBg={`${colors.blue}1A`}
             label="Contact Us"
             onPress={() => {}}
+            colors={colors}
           />
           <MenuItem
             icon="information-circle-outline"
-            iconColor={COLORS.slate}
-            iconBg="rgba(112,128,144,0.10)"
+            iconColor={colors.textSecondary}
+            iconBg={`${colors.textSecondary}1A`}
             label="About"
             onPress={() => {}}
+            colors={colors}
           />
         </View>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} data-testid="button-logout">
-          <Ionicons name="log-out-outline" size={20} color={COLORS.red} />
-          <Text style={styles.logoutText}>Logout</Text>
+        <TouchableOpacity style={[styles.logoutButton, { backgroundColor: `${colors.red}1A`, borderColor: `${colors.red}33` }]} onPress={handleLogout} data-testid="button-logout">
+          <Ionicons name="log-out-outline" size={20} color={colors.red} />
+          <Text style={[styles.logoutText, { color: colors.red }]}>Logout</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version} data-testid="text-version">ChipInPool v2.0.1 (Build 12)</Text>
+        <Text style={[styles.version, { color: colors.textSecondary }]} data-testid="text-version">ChipInPool v2.0.1 (Build 12)</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function StatCard({ icon, value, label }: { icon: string; value: string; label: string }) {
+function StatCard({ icon, value, label, colors }: { icon: string; value: string; label: string; colors: any }) {
   return (
-    <View style={styles.statCard} data-testid={`stat-${label.toLowerCase()}`}>
-      <Ionicons name={icon as any} size={22} color={COLORS.mint} style={{ marginBottom: 8 }} />
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+    <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]} data-testid={`stat-${label.toLowerCase()}`}>
+      <Ionicons name={icon as any} size={22} color={colors.mint} style={{ marginBottom: 8 }} />
+      <Text style={[styles.statValue, { color: colors.mint }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
     </View>
   );
 }
@@ -202,16 +198,18 @@ function MenuItem({
   iconBg,
   label,
   onPress,
+  colors,
 }: {
   icon: string;
   iconColor: string;
   iconBg: string;
   label: string;
   onPress: () => void;
+  colors: any;
 }) {
   return (
     <TouchableOpacity
-      style={styles.menuItem}
+      style={[styles.menuItem, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
       onPress={onPress}
       activeOpacity={0.7}
       data-testid={`button-menu-${label.toLowerCase().replace(/\s+/g, '-')}`}
@@ -219,8 +217,8 @@ function MenuItem({
       <View style={[styles.iconCircle, { backgroundColor: iconBg }]}>
         <Ionicons name={icon as any} size={20} color={iconColor} />
       </View>
-      <Text style={styles.menuLabel}>{label}</Text>
-      <Ionicons name="chevron-forward" size={18} color={COLORS.slate} />
+      <Text style={[styles.menuLabel, { color: colors.text }]}>{label}</Text>
+      <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
     </TouchableOpacity>
   );
 }
@@ -228,7 +226,6 @@ function MenuItem({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.navy,
   },
   content: {
     paddingHorizontal: 20,
@@ -246,7 +243,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
-    shadowColor: COLORS.mint,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -255,17 +251,14 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 34,
     fontWeight: '700',
-    color: COLORS.navy,
   },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.white,
     marginBottom: 4,
   },
   username: {
     fontSize: 15,
-    color: COLORS.slate,
     marginBottom: 12,
   },
   kycBadge: {
@@ -288,22 +281,18 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: COLORS.cardBg,
     borderRadius: 16,
     paddingVertical: 18,
     paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
   },
   statValue: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.mint,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: COLORS.slate,
     fontWeight: '500',
   },
   section: {
@@ -311,7 +300,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 13,
-    color: COLORS.slate,
     textTransform: 'uppercase',
     marginBottom: 10,
     fontWeight: '700',
@@ -320,13 +308,11 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.cardBg,
     paddingVertical: 14,
     paddingHorizontal: 14,
     borderRadius: 14,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
   },
   iconCircle: {
     width: 38,
@@ -339,7 +325,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 14,
     fontSize: 15,
-    color: COLORS.white,
     fontWeight: '500',
   },
   logoutButton: {
@@ -347,21 +332,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: 'rgba(248,113,113,0.1)',
     paddingVertical: 16,
     borderRadius: 14,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: 'rgba(248,113,113,0.2)',
   },
   logoutText: {
-    color: COLORS.red,
     fontSize: 16,
     fontWeight: '600',
   },
   version: {
     textAlign: 'center',
-    color: COLORS.slate,
     fontSize: 12,
     marginTop: 24,
   },

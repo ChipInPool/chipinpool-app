@@ -18,22 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/services/api';
-
-const COLORS = {
-  navy: '#001F3F',
-  navyLight: '#002A54',
-  mint: '#7FFFD4',
-  mintDark: '#5ECFA0',
-  slate: '#708090',
-  white: '#FFFFFF',
-  blue: '#4A90D9',
-  green: '#34D399',
-  yellow: '#FBBF24',
-  purple: '#A78BFA',
-  red: '#f87171',
-  cardBg: 'rgba(255,255,255,0.06)',
-  cardBorder: 'rgba(255,255,255,0.08)',
-};
+import { useTheme } from '@/theme/ThemeContext';
 
 interface RecurringContribution {
   id: string;
@@ -54,18 +39,6 @@ interface RecurringContribution {
   };
 }
 
-const frequencyColors: Record<string, { bg: string; text: string }> = {
-  weekly: { bg: 'rgba(74,144,217,0.15)', text: COLORS.blue },
-  monthly: { bg: 'rgba(52,211,153,0.15)', text: COLORS.green },
-  quarterly: { bg: 'rgba(167,139,250,0.15)', text: COLORS.purple },
-};
-
-const statusColors: Record<string, { bg: string; text: string }> = {
-  active: { bg: 'rgba(52,211,153,0.15)', text: COLORS.green },
-  paused: { bg: 'rgba(251,191,36,0.15)', text: COLORS.yellow },
-  cancelled: { bg: 'rgba(248,113,113,0.15)', text: COLORS.red },
-};
-
 function formatDate(dateStr: string): string {
   try {
     const d = new Date(dateStr);
@@ -80,6 +53,7 @@ export default function RecurringScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { colors, isDark } = useTheme();
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedContribution, setSelectedContribution] = useState<RecurringContribution | null>(null);
@@ -87,6 +61,18 @@ export default function RecurringScreen() {
   const [editFrequency, setEditFrequency] = useState<'weekly' | 'monthly' | 'quarterly'>('monthly');
 
   const walletBalance = parseFloat(user?.walletBalance || user?.balance || '0');
+
+  const frequencyColors: Record<string, { bg: string; text: string }> = {
+    weekly: { bg: 'rgba(74,144,217,0.15)', text: colors.blue },
+    monthly: { bg: 'rgba(52,211,153,0.15)', text: colors.green },
+    quarterly: { bg: 'rgba(167,139,250,0.15)', text: colors.purple },
+  };
+
+  const statusColors: Record<string, { bg: string; text: string }> = {
+    active: { bg: 'rgba(52,211,153,0.15)', text: colors.green },
+    paused: { bg: 'rgba(251,191,36,0.15)', text: colors.yellow },
+    cancelled: { bg: 'rgba(248,113,113,0.15)', text: colors.red },
+  };
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['userRecurring'],
@@ -165,79 +151,79 @@ export default function RecurringScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.mint} />
-          <Text style={styles.loadingText}>Loading...</Text>
+          <ActivityIndicator size="large" color={colors.mint} />
+          <Text style={[styles.loadingText, { color: colors.slate }]}>Loading...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} data-testid="button-back">
-          <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Recurring Contributions</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Recurring Contributions</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} tintColor={COLORS.mint} />}
+        refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} tintColor={colors.mint} />}
       >
         <View style={styles.statsGrid}>
-          <View style={styles.statCard} data-testid="card-wallet-balance">
+          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]} data-testid="card-wallet-balance">
             <View style={[styles.statIconWrap, { backgroundColor: 'rgba(74,144,217,0.15)' }]}>
-              <Ionicons name="wallet-outline" size={20} color={COLORS.blue} />
+              <Ionicons name="wallet-outline" size={20} color={colors.blue} />
             </View>
-            <Text style={styles.statLabel}>Wallet Balance</Text>
-            <Text style={styles.statValue} data-testid="text-wallet-balance">
+            <Text style={[styles.statLabel, { color: colors.slate }]}>Wallet Balance</Text>
+            <Text style={[styles.statValue, { color: colors.text }]} data-testid="text-wallet-balance">
               ${walletBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
           </View>
 
-          <View style={styles.statCard} data-testid="card-active-count">
+          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]} data-testid="card-active-count">
             <View style={[styles.statIconWrap, { backgroundColor: 'rgba(52,211,153,0.15)' }]}>
-              <Ionicons name="play-outline" size={20} color={COLORS.green} />
+              <Ionicons name="play-outline" size={20} color={colors.green} />
             </View>
-            <Text style={styles.statLabel}>Active</Text>
-            <Text style={styles.statValue} data-testid="text-active-count">{activeContributions.length}</Text>
+            <Text style={[styles.statLabel, { color: colors.slate }]}>Active</Text>
+            <Text style={[styles.statValue, { color: colors.text }]} data-testid="text-active-count">{activeContributions.length}</Text>
           </View>
 
-          <View style={styles.statCard} data-testid="card-monthly-total">
+          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]} data-testid="card-monthly-total">
             <View style={[styles.statIconWrap, { backgroundColor: 'rgba(127,255,212,0.15)' }]}>
-              <Ionicons name="trending-up-outline" size={20} color={COLORS.mint} />
+              <Ionicons name="trending-up-outline" size={20} color={colors.mint} />
             </View>
-            <Text style={styles.statLabel}>Monthly Total</Text>
-            <Text style={styles.statValue} data-testid="text-monthly-total">
+            <Text style={[styles.statLabel, { color: colors.slate }]}>Monthly Total</Text>
+            <Text style={[styles.statValue, { color: colors.text }]} data-testid="text-monthly-total">
               ${totalMonthlyAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
           </View>
 
-          <View style={styles.statCard} data-testid="card-total-setups">
+          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]} data-testid="card-total-setups">
             <View style={[styles.statIconWrap, { backgroundColor: 'rgba(167,139,250,0.15)' }]}>
-              <Ionicons name="repeat-outline" size={20} color={COLORS.purple} />
+              <Ionicons name="repeat-outline" size={20} color={colors.purple} />
             </View>
-            <Text style={styles.statLabel}>Total Setups</Text>
-            <Text style={styles.statValue} data-testid="text-total-setups">{contributions.length}</Text>
+            <Text style={[styles.statLabel, { color: colors.slate }]}>Total Setups</Text>
+            <Text style={[styles.statValue, { color: colors.text }]} data-testid="text-total-setups">{contributions.length}</Text>
           </View>
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Your Recurring Payments</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Recurring Payments</Text>
         </View>
 
         {contributions.length === 0 ? (
           <View style={styles.emptyState} data-testid="text-empty-state">
-            <View style={styles.emptyIconWrap}>
-              <Ionicons name="repeat-outline" size={40} color={COLORS.slate} />
+            <View style={[styles.emptyIconWrap, { backgroundColor: colors.card }]}>
+              <Ionicons name="repeat-outline" size={40} color={colors.slate} />
             </View>
-            <Text style={styles.emptyTitle}>No Recurring Contributions</Text>
-            <Text style={styles.emptyDescription}>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>No Recurring Contributions</Text>
+            <Text style={[styles.emptyDescription, { color: colors.slate }]}>
               Set up automatic contributions to pools you care about. Visit any pool to enable recurring payments.
             </Text>
           </View>
@@ -245,62 +231,62 @@ export default function RecurringScreen() {
           contributions.map((contribution) => (
             <View
               key={contribution.id}
-              style={styles.contributionCard}
+              style={[styles.contributionCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
               data-testid={`card-recurring-${contribution.id}`}
             >
               <View style={styles.contributionTop}>
                 <LinearGradient
-                  colors={[COLORS.mint + '33', COLORS.mint + '1A']}
+                  colors={[colors.mint + '33', colors.mint + '1A']}
                   style={styles.contributionIcon}
                 >
-                  <Ionicons name="repeat-outline" size={20} color={COLORS.mint} />
+                  <Ionicons name="repeat-outline" size={20} color={colors.mint} />
                 </LinearGradient>
                 <View style={styles.contributionInfo}>
-                  <Text style={styles.poolTitle} data-testid={`text-pool-title-${contribution.id}`} numberOfLines={1}>
+                  <Text style={[styles.poolTitle, { color: colors.text }]} data-testid={`text-pool-title-${contribution.id}`} numberOfLines={1}>
                     {contribution.pool?.title || 'Pool'}
                   </Text>
                   <View style={styles.badgeRow}>
-                    <View style={[styles.badge, { backgroundColor: frequencyColors[contribution.frequency]?.bg || COLORS.cardBg }]}>
-                      <Text style={[styles.badgeText, { color: frequencyColors[contribution.frequency]?.text || COLORS.slate }]}>
+                    <View style={[styles.badge, { backgroundColor: frequencyColors[contribution.frequency]?.bg || colors.card }]}>
+                      <Text style={[styles.badgeText, { color: frequencyColors[contribution.frequency]?.text || colors.slate }]}>
                         {contribution.frequency === 'weekly' ? 'Weekly' : contribution.frequency === 'monthly' ? 'Monthly' : 'Quarterly'}
                       </Text>
                     </View>
-                    <View style={[styles.badge, { backgroundColor: statusColors[contribution.status]?.bg || COLORS.cardBg }]}>
-                      <Text style={[styles.badgeText, { color: statusColors[contribution.status]?.text || COLORS.slate }]}>
+                    <View style={[styles.badge, { backgroundColor: statusColors[contribution.status]?.bg || colors.card }]}>
+                      <Text style={[styles.badgeText, { color: statusColors[contribution.status]?.text || colors.slate }]}>
                         {contribution.status}
                       </Text>
                     </View>
                     {contribution.paymentMethod && contribution.paymentMethod !== 'wallet' && (
                       <View style={[styles.badge, { backgroundColor: 'rgba(74,144,217,0.15)' }]}>
-                        <Ionicons name="business-outline" size={10} color={COLORS.blue} style={{ marginRight: 3 }} />
-                        <Text style={[styles.badgeText, { color: COLORS.blue }]}>Bank</Text>
+                        <Ionicons name="business-outline" size={10} color={colors.blue} style={{ marginRight: 3 }} />
+                        <Text style={[styles.badgeText, { color: colors.blue }]}>Bank</Text>
                       </View>
                     )}
                   </View>
                 </View>
                 <View style={styles.amountSection}>
-                  <Text style={styles.amount} data-testid={`text-amount-${contribution.id}`}>
+                  <Text style={[styles.amount, { color: colors.text }]} data-testid={`text-amount-${contribution.id}`}>
                     ${parseFloat(contribution.amount).toFixed(2)}
                   </Text>
                   {contribution.status === 'active' && contribution.nextPaymentDate && (
                     <View style={styles.nextPayment}>
-                      <Ionicons name="time-outline" size={12} color={COLORS.slate} />
-                      <Text style={styles.nextPaymentText} data-testid={`text-next-payment-${contribution.id}`}>
+                      <Ionicons name="time-outline" size={12} color={colors.slate} />
+                      <Text style={[styles.nextPaymentText, { color: colors.slate }]} data-testid={`text-next-payment-${contribution.id}`}>
                         Next: {formatDate(contribution.nextPaymentDate)}
                       </Text>
                     </View>
                   )}
                   {contribution.status === 'paused' && (
                     <View style={styles.nextPayment}>
-                      <Ionicons name="pause" size={12} color={COLORS.yellow} />
-                      <Text style={[styles.nextPaymentText, { color: COLORS.yellow }]}>Paused</Text>
+                      <Ionicons name="pause" size={12} color={colors.yellow} />
+                      <Text style={[styles.nextPaymentText, { color: colors.yellow }]}>Paused</Text>
                     </View>
                   )}
                 </View>
               </View>
 
               {contribution.status !== 'cancelled' && (
-                <View style={styles.actionRow}>
+                <View style={[styles.actionRow, { borderTopColor: colors.cardBorder }]}>
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => handleToggleStatus(contribution)}
@@ -310,9 +296,9 @@ export default function RecurringScreen() {
                     <Ionicons
                       name={contribution.status === 'active' ? 'pause' : 'play'}
                       size={18}
-                      color={COLORS.mint}
+                      color={colors.mint}
                     />
-                    <Text style={styles.actionText}>
+                    <Text style={[styles.actionText, { color: colors.mint }]}>
                       {contribution.status === 'active' ? 'Pause' : 'Resume'}
                     </Text>
                   </TouchableOpacity>
@@ -322,8 +308,8 @@ export default function RecurringScreen() {
                     onPress={() => handleEditPress(contribution)}
                     data-testid={`button-edit-${contribution.id}`}
                   >
-                    <Ionicons name="pencil" size={18} color={COLORS.blue} />
-                    <Text style={[styles.actionText, { color: COLORS.blue }]}>Edit</Text>
+                    <Ionicons name="pencil" size={18} color={colors.blue} />
+                    <Text style={[styles.actionText, { color: colors.blue }]}>Edit</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -332,8 +318,8 @@ export default function RecurringScreen() {
                     disabled={deleteMutation.isPending}
                     data-testid={`button-cancel-${contribution.id}`}
                   >
-                    <Ionicons name="trash-outline" size={18} color={COLORS.red} />
-                    <Text style={[styles.actionText, { color: COLORS.red }]}>Cancel</Text>
+                    <Ionicons name="trash-outline" size={18} color={colors.red} />
+                    <Text style={[styles.actionText, { color: colors.red }]}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -349,31 +335,32 @@ export default function RecurringScreen() {
         onRequestClose={() => setEditModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Edit Recurring Contribution</Text>
-            <Text style={styles.modalDescription}>
+          <View style={[styles.modalContent, { backgroundColor: colors.navyLight }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Recurring Contribution</Text>
+            <Text style={[styles.modalDescription, { color: colors.slate }]}>
               Update the amount or frequency of this recurring contribution.
             </Text>
 
-            <Text style={styles.inputLabel}>Amount ($)</Text>
+            <Text style={[styles.inputLabel, { color: colors.slate }]}>Amount ($)</Text>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.cardBorder, color: colors.text }]}
               value={editAmount}
               onChangeText={setEditAmount}
               placeholder="0.00"
-              placeholderTextColor={COLORS.slate}
+              placeholderTextColor={colors.slate}
               keyboardType="decimal-pad"
               data-testid="input-edit-amount"
             />
 
-            <Text style={styles.inputLabel}>Frequency</Text>
+            <Text style={[styles.inputLabel, { color: colors.slate }]}>Frequency</Text>
             <View style={styles.frequencyPicker}>
               {(['weekly', 'monthly', 'quarterly'] as const).map((freq) => (
                 <TouchableOpacity
                   key={freq}
                   style={[
                     styles.frequencyOption,
-                    editFrequency === freq && styles.frequencyOptionActive,
+                    { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                    editFrequency === freq && { backgroundColor: 'rgba(127,255,212,0.15)', borderColor: colors.mint },
                   ]}
                   onPress={() => setEditFrequency(freq)}
                   data-testid={`button-frequency-${freq}`}
@@ -381,7 +368,8 @@ export default function RecurringScreen() {
                   <Text
                     style={[
                       styles.frequencyOptionText,
-                      editFrequency === freq && styles.frequencyOptionTextActive,
+                      { color: colors.slate },
+                      editFrequency === freq && { color: colors.mint },
                     ]}
                   >
                     {freq === 'weekly' ? 'Weekly' : freq === 'monthly' ? 'Monthly' : 'Quarterly'}
@@ -392,15 +380,16 @@ export default function RecurringScreen() {
 
             <View style={styles.modalActions}>
               <TouchableOpacity
-                style={styles.modalCancelButton}
+                style={[styles.modalCancelButton, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
                 onPress={() => setEditModalVisible(false)}
                 data-testid="button-cancel-edit"
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={[styles.modalCancelText, { color: colors.text }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.modalSaveButton,
+                  { backgroundColor: colors.mint },
                   (!editAmount || parseFloat(editAmount) <= 0 || updateMutation.isPending) && styles.modalSaveButtonDisabled,
                 ]}
                 onPress={handleSaveEdit}
@@ -408,9 +397,9 @@ export default function RecurringScreen() {
                 data-testid="button-save-edit"
               >
                 {updateMutation.isPending ? (
-                  <ActivityIndicator size="small" color={COLORS.navy} />
+                  <ActivityIndicator size="small" color={isDark ? '#001F3F' : '#FFFFFF'} />
                 ) : (
-                  <Text style={styles.modalSaveText}>Save Changes</Text>
+                  <Text style={[styles.modalSaveText, { color: isDark ? '#001F3F' : '#FFFFFF' }]}>Save Changes</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -424,7 +413,6 @@ export default function RecurringScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.navy,
   },
   loadingContainer: {
     flex: 1,
@@ -432,7 +420,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: COLORS.slate,
     marginTop: 12,
     fontSize: 14,
   },
@@ -446,7 +433,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.white,
   },
   content: {
     paddingHorizontal: 20,
@@ -461,11 +447,9 @@ const styles = StyleSheet.create({
   statCard: {
     width: '48%' as any,
     flexBasis: '48%',
-    backgroundColor: COLORS.cardBg,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
   },
   statIconWrap: {
     width: 36,
@@ -477,14 +461,12 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    color: COLORS.slate,
     marginBottom: 4,
     fontWeight: '500',
   },
   statValue: {
     fontSize: 22,
     fontWeight: '700',
-    color: COLORS.white,
   },
   sectionHeader: {
     marginBottom: 14,
@@ -492,7 +474,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.white,
   },
   emptyState: {
     alignItems: 'center',
@@ -503,7 +484,6 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: COLORS.cardBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -511,22 +491,18 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.white,
     marginBottom: 8,
   },
   emptyDescription: {
     fontSize: 14,
-    color: COLORS.slate,
     textAlign: 'center',
     lineHeight: 20,
   },
   contributionCard: {
-    backgroundColor: COLORS.cardBg,
     borderRadius: 16,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
   },
   contributionTop: {
     flexDirection: 'row',
@@ -547,7 +523,6 @@ const styles = StyleSheet.create({
   poolTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: COLORS.white,
     marginBottom: 6,
   },
   badgeRow: {
@@ -570,7 +545,6 @@ const styles = StyleSheet.create({
   amount: {
     fontSize: 17,
     fontWeight: '700',
-    color: COLORS.white,
     marginBottom: 4,
   },
   nextPayment: {
@@ -580,7 +554,6 @@ const styles = StyleSheet.create({
   },
   nextPaymentText: {
     fontSize: 11,
-    color: COLORS.slate,
   },
   actionRow: {
     flexDirection: 'row',
@@ -588,7 +561,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: COLORS.cardBorder,
   },
   actionButton: {
     flexDirection: 'row',
@@ -600,7 +572,6 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.mint,
   },
   modalOverlay: {
     flex: 1,
@@ -608,7 +579,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: COLORS.navyLight,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -617,31 +587,25 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.white,
     marginBottom: 6,
   },
   modalDescription: {
     fontSize: 14,
-    color: COLORS.slate,
     marginBottom: 20,
     lineHeight: 20,
   },
   inputLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.slate,
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   textInput: {
-    backgroundColor: COLORS.cardBg,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
     borderRadius: 12,
     padding: 14,
     fontSize: 16,
-    color: COLORS.white,
     marginBottom: 18,
   },
   frequencyPicker: {
@@ -654,21 +618,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
-    backgroundColor: COLORS.cardBg,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
-  frequencyOptionActive: {
-    backgroundColor: 'rgba(127,255,212,0.15)',
-    borderColor: COLORS.mint,
   },
   frequencyOptionText: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.slate,
-  },
-  frequencyOptionTextActive: {
-    color: COLORS.mint,
   },
   modalActions: {
     flexDirection: 'row',
@@ -679,21 +633,17 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
-    backgroundColor: COLORS.cardBg,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
   },
   modalCancelText: {
     fontSize: 15,
     fontWeight: '600',
-    color: COLORS.white,
   },
   modalSaveButton: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
-    backgroundColor: COLORS.mint,
   },
   modalSaveButtonDisabled: {
     opacity: 0.5,
@@ -701,6 +651,5 @@ const styles = StyleSheet.create({
   modalSaveText: {
     fontSize: 15,
     fontWeight: '700',
-    color: COLORS.navy,
   },
 });

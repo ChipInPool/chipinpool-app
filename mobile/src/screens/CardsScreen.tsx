@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/theme/ThemeContext';
 
 const FEATURES = [
   {
@@ -28,6 +29,8 @@ const FEATURES = [
 ];
 
 export default function CardsScreen() {
+  const { colors, isDark } = useTheme();
+
   const handleNotifyMe = () => {
     Alert.alert(
       'You\'re on the list! 🎉',
@@ -37,43 +40,43 @@ export default function CardsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.comingSoonBanner}>
-          <View style={styles.bannerIconContainer}>
-            <Ionicons name="card" size={32} color="#7FFFD4" />
+        <View style={[styles.comingSoonBanner, { backgroundColor: `${colors.mint}10`, borderColor: `${colors.mint}26` }]}>
+          <View style={[styles.bannerIconContainer, { backgroundColor: `${colors.mint}1F` }]}>
+            <Ionicons name="card" size={32} color={colors.mint} />
           </View>
-          <Text style={styles.comingSoonLabel}>COMING SOON</Text>
-          <Text style={styles.bannerTitle}>Virtual Visa Debit Cards</Text>
-          <Text style={styles.bannerSubtitle}>
+          <Text style={[styles.comingSoonLabel, { color: colors.mint }]}>COMING SOON</Text>
+          <Text style={[styles.bannerTitle, { color: colors.text }]}>Virtual Visa Debit Cards</Text>
+          <Text style={[styles.bannerSubtitle, { color: colors.textSecondary }]}>
             Spend directly from your pools with virtual Visa cards — online, in-store, and everywhere Visa is accepted.
           </Text>
         </View>
 
-        <Text style={styles.sectionTitle}>What's Coming</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>What's Coming</Text>
 
         <View style={styles.featuresGrid}>
           {FEATURES.map((feature, index) => (
-            <View key={index} style={styles.featureCard}>
-              <View style={styles.featureIconContainer}>
-                <Ionicons name={feature.icon} size={24} color="#7FFFD4" />
+            <View key={index} style={[styles.featureCard, { backgroundColor: colors.card, borderColor: `${colors.mint}1A` }]}>
+              <View style={[styles.featureIconContainer, { backgroundColor: `${colors.mint}1A` }]}>
+                <Ionicons name={feature.icon} size={24} color={colors.mint} />
               </View>
-              <Text style={styles.featureTitle}>{feature.title}</Text>
-              <Text style={styles.featureDescription}>{feature.description}</Text>
+              <Text style={[styles.featureTitle, { color: colors.text }]}>{feature.title}</Text>
+              <Text style={[styles.featureDescription, { color: colors.textSecondary }]}>{feature.description}</Text>
             </View>
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>Card Preview</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Card Preview</Text>
 
         <LinearGradient
-          colors={['#001F3F', '#003366', '#7FFFD4']}
+          colors={[colors.navy, isDark ? '#003366' : '#E2E8F0', colors.mint]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.cardMockup}
+          style={[styles.cardMockup, { shadowColor: colors.mint }]}
         >
           <View style={styles.cardHeader}>
-            <Text style={styles.cardBrand}>ChipInPool</Text>
+            <Text style={[styles.cardBrand, { color: '#FFFFFF' }]}>ChipInPool</Text>
             <View style={styles.contactlessIcon}>
               <Ionicons name="wifi" size={20} color="rgba(255,255,255,0.8)" style={{ transform: [{ rotate: '90deg' }] }} />
             </View>
@@ -83,16 +86,16 @@ export default function CardsScreen() {
             <View style={styles.cardChip} />
           </View>
 
-          <Text style={styles.cardNumber}>•••• •••• •••• 4821</Text>
+          <Text style={[styles.cardNumber, { color: '#FFFFFF' }]}>•••• •••• •••• 4821</Text>
 
           <View style={styles.cardFooter}>
             <View>
               <Text style={styles.cardLabel}>CARD HOLDER</Text>
-              <Text style={styles.cardValue}>YOUR NAME</Text>
+              <Text style={[styles.cardValue, { color: '#FFFFFF' }]}>YOUR NAME</Text>
             </View>
             <View>
               <Text style={styles.cardLabel}>EXPIRES</Text>
-              <Text style={styles.cardValue}>••/••</Text>
+              <Text style={[styles.cardValue, { color: '#FFFFFF' }]}>••/••</Text>
             </View>
             <View style={styles.visaLogo}>
               <Text style={styles.visaText}>VISA</Text>
@@ -101,13 +104,13 @@ export default function CardsScreen() {
         </LinearGradient>
 
         <TouchableOpacity
-          style={styles.notifyButton}
+          style={[styles.notifyButton, { backgroundColor: colors.mint, shadowColor: colors.mint }]}
           activeOpacity={0.8}
           onPress={handleNotifyMe}
           data-testid="button-notify-me"
         >
-          <Ionicons name="notifications" size={20} color="#001F3F" style={{ marginRight: 8 }} />
-          <Text style={styles.notifyButtonText}>Notify Me When Available</Text>
+          <Ionicons name="notifications" size={20} color={isDark ? '#001F3F' : '#FFFFFF'} style={{ marginRight: 8 }} />
+          <Text style={[styles.notifyButtonText, { color: isDark ? '#001F3F' : '#FFFFFF' }]}>Notify Me When Available</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
@@ -119,7 +122,6 @@ export default function CardsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#001F3F',
   },
   content: {
     padding: 20,
@@ -130,15 +132,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 28,
     borderRadius: 20,
-    backgroundColor: 'rgba(127, 255, 212, 0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(127, 255, 212, 0.15)',
   },
   bannerIconContainer: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: 'rgba(127, 255, 212, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -146,20 +145,17 @@ const styles = StyleSheet.create({
   comingSoonLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#7FFFD4',
     letterSpacing: 3,
     marginBottom: 8,
   },
   bannerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 8,
   },
   bannerSubtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.6)',
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: 8,
@@ -167,7 +163,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFFFFF',
     marginBottom: 16,
   },
   featuresGrid: {
@@ -178,18 +173,15 @@ const styles = StyleSheet.create({
   },
   featureCard: {
     width: '48%',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(127, 255, 212, 0.1)',
   },
   featureIconContainer: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: 'rgba(127, 255, 212, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -197,12 +189,10 @@ const styles = StyleSheet.create({
   featureTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFFFFF',
     marginBottom: 4,
   },
   featureDescription: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.5)',
     lineHeight: 16,
   },
   cardMockup: {
@@ -211,7 +201,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     aspectRatio: 1.586,
     justifyContent: 'space-between',
-    shadowColor: '#7FFFD4',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 16,
@@ -225,7 +214,6 @@ const styles = StyleSheet.create({
   cardBrand: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     letterSpacing: 1,
   },
   contactlessIcon: {
@@ -243,7 +231,6 @@ const styles = StyleSheet.create({
   cardNumber: {
     fontSize: 22,
     fontWeight: '600',
-    color: '#FFFFFF',
     letterSpacing: 3,
   },
   cardFooter: {
@@ -259,7 +246,6 @@ const styles = StyleSheet.create({
   },
   cardValue: {
     fontSize: 13,
-    color: '#FFFFFF',
     fontWeight: '600',
   },
   visaLogo: {
@@ -279,10 +265,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#7FFFD4',
     paddingVertical: 16,
     borderRadius: 14,
-    shadowColor: '#7FFFD4',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -291,6 +275,5 @@ const styles = StyleSheet.create({
   notifyButtonText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#001F3F',
   },
 });

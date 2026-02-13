@@ -7,6 +7,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/theme/ThemeContext';
 
 const getCategoryIcon = (category: string): string => {
   switch (category?.toLowerCase()) {
@@ -32,6 +33,7 @@ export default function HomeScreen() {
   const { user, refreshUser } = useAuth();
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
+  const { colors, isDark } = useTheme();
 
   const { data: pools, refetch, isLoading } = useQuery({
     queryKey: ['pools'],
@@ -69,24 +71,24 @@ export default function HomeScreen() {
   );
 
   const quickActions = [
-    { icon: 'add-circle-outline', label: 'Create Pool', color: '#7FFFD4', screen: 'PoolsTab', params: { screen: 'CreatePool' } },
+    { icon: 'add-circle-outline', label: 'Create Pool', color: colors.mint, screen: 'PoolsTab', params: { screen: 'CreatePool' } },
     { icon: 'people-outline', label: 'Join Pool', color: '#60A5FA', screen: 'PoolsTab' },
-    { icon: 'bag-handle-outline', label: 'Spend Now', color: '#7FFFD4', screen: 'SpendNowTab' },
+    { icon: 'bag-handle-outline', label: 'Spend Now', color: colors.mint, screen: 'SpendNowTab' },
     { icon: 'time-outline', label: 'Activity', color: '#60A5FA', screen: 'ProfileModal', params: { screen: 'Activity' } },
   ];
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={handleRefresh} tintColor="#7FFFD4" />}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={handleRefresh} tintColor={colors.mint} />}
       >
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.appBrand}>CHIPINPOOL</Text>
-            <Text style={styles.greeting}>Hello, {user?.firstName} 👋</Text>
-            <Text style={styles.subGreeting}>Here's your overview</Text>
+            <Text style={[styles.appBrand, { color: colors.mint }]}>CHIPINPOOL</Text>
+            <Text style={[styles.greeting, { color: colors.text }]}>Hello, {user?.firstName} 👋</Text>
+            <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>Here's your overview</Text>
           </View>
           <TouchableOpacity
             style={styles.bellContainer}
@@ -94,11 +96,11 @@ export default function HomeScreen() {
             data-testid="button-notifications"
             activeOpacity={0.7}
           >
-            <View style={styles.bellCircle}>
-              <Ionicons name="notifications-outline" size={22} color="#fff" />
+            <View style={[styles.bellCircle, { backgroundColor: colors.cardBorder, borderColor: colors.cardBorder }]}>
+              <Ionicons name="notifications-outline" size={22} color={colors.text} />
             </View>
             {unreadCount > 0 && (
-              <View style={styles.badge}>
+              <View style={[styles.badge, { borderColor: colors.background }]}>
                 <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
               </View>
             )}
@@ -106,24 +108,24 @@ export default function HomeScreen() {
         </View>
 
         <LinearGradient
-          colors={['#0D2B4E', '#1A3A5C']}
+          colors={isDark ? ['#0D2B4E', '#1A3A5C'] : [colors.navyLight, colors.navyLight]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.balanceCard}
+          style={[styles.balanceCard, !isDark && { borderWidth: 1, borderColor: colors.cardBorder }]}
         >
           <View style={styles.balanceCardInner}>
-            <Text style={styles.balanceLabel}>Available Balance</Text>
-            <Text style={styles.balanceAmount}>
+            <Text style={[styles.balanceLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : colors.textSecondary }]}>Available Balance</Text>
+            <Text style={[styles.balanceAmount, { color: colors.text }]}>
               ${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </Text>
             <View style={styles.balanceActions}>
-              <TouchableOpacity style={styles.balancePill} activeOpacity={0.8} onPress={() => navigation.navigate('WalletTab')}>
-                <Ionicons name="add-circle-outline" size={18} color="#7FFFD4" />
-                <Text style={styles.balancePillText}>Add Funds</Text>
+              <TouchableOpacity style={[styles.balancePill, { backgroundColor: `${colors.mint}20`, borderColor: `${colors.mint}40` }]} activeOpacity={0.8} onPress={() => navigation.navigate('WalletTab')}>
+                <Ionicons name="add-circle-outline" size={18} color={colors.mint} />
+                <Text style={[styles.balancePillText, { color: colors.mint }]}>Add Funds</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.balancePill} activeOpacity={0.8} onPress={() => navigation.navigate('WalletTab')}>
-                <Ionicons name="arrow-up-circle-outline" size={18} color="#7FFFD4" />
-                <Text style={styles.balancePillText}>Withdraw</Text>
+              <TouchableOpacity style={[styles.balancePill, { backgroundColor: `${colors.mint}20`, borderColor: `${colors.mint}40` }]} activeOpacity={0.8} onPress={() => navigation.navigate('WalletTab')}>
+                <Ionicons name="arrow-up-circle-outline" size={18} color={colors.mint} />
+                <Text style={[styles.balancePillText, { color: colors.mint }]}>Withdraw</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -132,12 +134,12 @@ export default function HomeScreen() {
         </LinearGradient>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Actions</Text>
           <View style={styles.quickActionsGrid}>
             {quickActions.map((action) => (
               <TouchableOpacity
                 key={action.label}
-                style={styles.quickActionCard}
+                style={[styles.quickActionCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
                 activeOpacity={0.7}
                 onPress={() => {
                   if (action.params) {
@@ -151,7 +153,7 @@ export default function HomeScreen() {
                 <View style={[styles.quickActionIconBg, { backgroundColor: `${action.color}20` }]}>
                   <Ionicons name={action.icon as any} size={24} color={action.color} />
                 </View>
-                <Text style={styles.quickActionLabel}>{action.label}</Text>
+                <Text style={[styles.quickActionLabel, { color: colors.text }]}>{action.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -159,10 +161,10 @@ export default function HomeScreen() {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Pools</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Pools</Text>
             {pools && pools.length > 0 && (
               <TouchableOpacity onPress={() => navigation.navigate('PoolsTab')} activeOpacity={0.7}>
-                <Text style={styles.seeAll}>See All</Text>
+                <Text style={[styles.seeAll, { color: colors.mint }]}>See All</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -175,27 +177,27 @@ export default function HomeScreen() {
               return (
                 <TouchableOpacity
                   key={pool.id}
-                  style={styles.poolCard}
+                  style={[styles.poolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
                   activeOpacity={0.7}
                   onPress={() => navigation.navigate('PoolsTab', { screen: 'PoolDetails', params: { poolId: pool.id } })}
                   data-testid={`card-pool-${pool.id}`}
                 >
-                  <View style={styles.poolCategoryIcon}>
-                    <Ionicons name={catIcon as any} size={20} color="#7FFFD4" />
+                  <View style={[styles.poolCategoryIcon, { backgroundColor: `${colors.mint}20` }]}>
+                    <Ionicons name={catIcon as any} size={20} color={colors.mint} />
                   </View>
                   <View style={styles.poolContent}>
                     <View style={styles.poolTopRow}>
-                      <Text style={styles.poolName} numberOfLines={1}>{pool.title}</Text>
-                      <Text style={styles.poolPercent}>{percent}%</Text>
+                      <Text style={[styles.poolName, { color: colors.text }]} numberOfLines={1}>{pool.title}</Text>
+                      <Text style={[styles.poolPercent, { color: colors.mint }]}>{percent}%</Text>
                     </View>
-                    <View style={styles.poolProgressBarBg}>
-                      <View style={[styles.poolProgressBarFill, { width: `${percent}%` }]} />
+                    <View style={[styles.poolProgressBarBg, { backgroundColor: colors.cardBorder }]}>
+                      <View style={[styles.poolProgressBarFill, { width: `${percent}%`, backgroundColor: colors.mint }]} />
                     </View>
                     <View style={styles.poolBottomRow}>
-                      <Text style={styles.poolAmountText}>
+                      <Text style={[styles.poolAmountText, { color: isDark ? 'rgba(255,255,255,0.8)' : colors.text }]}>
                         ${current.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </Text>
-                      <Text style={styles.poolTargetText}>
+                      <Text style={[styles.poolTargetText, { color: colors.textSecondary }]}>
                         of ${target.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </Text>
                     </View>
@@ -204,25 +206,25 @@ export default function HomeScreen() {
               );
             })
           ) : (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIconBg}>
-                <Ionicons name="layers-outline" size={32} color="#708090" />
+            <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              <View style={[styles.emptyIconBg, { backgroundColor: `${colors.textSecondary}20` }]}>
+                <Ionicons name="layers-outline" size={32} color={colors.textSecondary} />
               </View>
-              <Text style={styles.emptyTitle}>No Pools Yet</Text>
-              <Text style={styles.emptySubtitle}>Create your first pool and start saving together!</Text>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>No Pools Yet</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>Create your first pool and start saving together!</Text>
             </View>
           )}
         </View>
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
             {Array.isArray(activityFeed) && activityFeed.length > 0 && (
               <TouchableOpacity
                 onPress={() => navigation.navigate('ProfileModal', { screen: 'Activity' })}
                 activeOpacity={0.7}
               >
-                <Text style={styles.seeAll}>See All</Text>
+                <Text style={[styles.seeAll, { color: colors.mint }]}>See All</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -232,17 +234,17 @@ export default function HomeScreen() {
               return (
                 <View
                   key={item.id || index}
-                  style={styles.activityCard}
+                  style={[styles.activityCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
                   data-testid={`card-activity-${item.id || index}`}
                 >
                   <View style={[styles.activityIconCircle, { backgroundColor: actIcon.bg }]}>
                     <Ionicons name={actIcon.name as any} size={22} color={actIcon.color} />
                   </View>
                   <View style={styles.activityInfo}>
-                    <Text style={styles.activityDescription} numberOfLines={1}>
+                    <Text style={[styles.activityDescription, { color: colors.text }]} numberOfLines={1}>
                       {item?.description || item?.message || 'Activity'}
                     </Text>
-                    <Text style={styles.activityDate}>
+                    <Text style={[styles.activityDate, { color: colors.textSecondary }]}>
                       {new Date(item?.createdAt || item?.date || Date.now()).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -254,7 +256,7 @@ export default function HomeScreen() {
                     <Text
                       style={[
                         styles.activityAmount,
-                        { color: item?.type === 'withdrawal' ? '#F87171' : '#34D399' },
+                        { color: item?.type === 'withdrawal' ? colors.red : colors.green },
                       ]}
                     >
                       {item?.type === 'withdrawal' ? '-' : '+'}$
@@ -265,12 +267,12 @@ export default function HomeScreen() {
               );
             })
           ) : (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIconBg}>
-                <Ionicons name="pulse-outline" size={32} color="#708090" />
+            <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              <View style={[styles.emptyIconBg, { backgroundColor: `${colors.textSecondary}20` }]}>
+                <Ionicons name="pulse-outline" size={32} color={colors.textSecondary} />
               </View>
-              <Text style={styles.emptyTitle}>No Recent Activity</Text>
-              <Text style={styles.emptySubtitle}>Your transactions and updates will appear here.</Text>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>No Recent Activity</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>Your transactions and updates will appear here.</Text>
             </View>
           )}
         </View>
@@ -284,7 +286,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#001F3F',
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -300,18 +301,15 @@ const styles = StyleSheet.create({
   appBrand: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#7FFFD4',
     letterSpacing: 2,
     marginBottom: 2,
   },
   greeting: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#FFFFFF',
   },
   subGreeting: {
     fontSize: 13,
-    color: '#708090',
     marginTop: 2,
   },
   bellContainer: {
@@ -322,11 +320,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
   },
   badge: {
     position: 'absolute',
@@ -340,7 +336,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 5,
     borderWidth: 2,
-    borderColor: '#001F3F',
   },
   badgeText: {
     color: '#FFFFFF',
@@ -377,14 +372,12 @@ const styles = StyleSheet.create({
   },
   balanceLabel: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.6)',
     fontWeight: '500',
     letterSpacing: 0.5,
   },
   balanceAmount: {
     fontSize: 38,
     fontWeight: '800',
-    color: '#FFFFFF',
     marginTop: 8,
     letterSpacing: -0.5,
   },
@@ -397,15 +390,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(127,255,212,0.12)',
     paddingVertical: 10,
     paddingHorizontal: 18,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(127,255,212,0.25)',
   },
   balancePillText: {
-    color: '#7FFFD4',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -421,13 +411,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFFFFF',
     letterSpacing: 0.3,
   },
   seeAll: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#7FFFD4',
   },
   quickActionsGrid: {
     flexDirection: 'row',
@@ -437,7 +425,6 @@ const styles = StyleSheet.create({
   },
   quickActionCard: {
     width: '47%',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 14,
     paddingVertical: 16,
     paddingHorizontal: 12,
@@ -445,7 +432,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
   },
   quickActionIconBg: {
     width: 40,
@@ -455,25 +441,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   quickActionLabel: {
-    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
   },
   poolCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 14,
     padding: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
   },
   poolCategoryIcon: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: 'rgba(127,255,212,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -490,25 +472,21 @@ const styles = StyleSheet.create({
   poolName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#FFFFFF',
     flex: 1,
     marginRight: 8,
   },
   poolPercent: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#7FFFD4',
   },
   poolProgressBarBg: {
     height: 6,
-    backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 3,
     overflow: 'hidden',
     marginBottom: 8,
   },
   poolProgressBarFill: {
     height: '100%',
-    backgroundColor: '#7FFFD4',
     borderRadius: 3,
   },
   poolBottomRow: {
@@ -519,26 +497,21 @@ const styles = StyleSheet.create({
   poolAmountText: {
     fontSize: 13,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.8)',
   },
   poolTargetText: {
     fontSize: 12,
-    color: '#708090',
   },
   emptyState: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 16,
     padding: 32,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
     borderStyle: 'dashed',
   },
   emptyIconBg: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(112,128,144,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -546,24 +519,20 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
     marginBottom: 4,
   },
   emptySubtitle: {
     fontSize: 13,
-    color: '#708090',
     textAlign: 'center',
     lineHeight: 18,
   },
   activityCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 14,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
   },
   activityIconCircle: {
     width: 42,
@@ -577,12 +546,10 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   activityDescription: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
   activityDate: {
-    color: '#708090',
     fontSize: 12,
     marginTop: 3,
   },

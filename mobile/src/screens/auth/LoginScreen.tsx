@@ -6,6 +6,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '@/navigation/AuthStack';
 import { useAuth } from '@/hooks/useAuth';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/theme/ThemeContext';
 
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
@@ -14,6 +15,7 @@ type LoginTab = 'email' | 'phone' | 'username';
 export default function LoginScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { sendOTP, verifyOTP, loginWithUsername } = useAuth();
+  const { colors, isDark } = useTheme();
   const [activeTab, setActiveTab] = useState<LoginTab>('email');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -174,19 +176,21 @@ export default function LoginScreen() {
     return !identifier.trim() || isLoading;
   };
 
+  const buttonTextColor = isDark ? '#001F3F' : '#FFFFFF';
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={20} color="#7FFFD4" />
-            <Text style={styles.backButtonText}>{step === 'otp' ? 'Change method' : 'Back'}</Text>
+            <Ionicons name="arrow-back" size={20} color={colors.mint} />
+            <Text style={[styles.backButtonText, { color: colors.mint }]}>{step === 'otp' ? 'Change method' : 'Back'}</Text>
           </TouchableOpacity>
 
           <View style={styles.header}>
-            <Text style={styles.appName}>ChipInPool</Text>
-            <Text style={styles.title}>{step === 'identifier' ? 'Welcome back' : 'Enter your code'}</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.appName, { color: colors.mint }]}>ChipInPool</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{step === 'identifier' ? 'Welcome back' : 'Enter your code'}</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               {step === 'identifier'
                 ? isUsernameTab
                   ? 'Sign in with your username and password'
@@ -198,26 +202,26 @@ export default function LoginScreen() {
 
           {error ? (
             <View style={styles.errorContainer}>
-              <Ionicons name="alert-circle" size={16} color="#f87171" />
-              <Text style={styles.errorText}>{error}</Text>
+              <Ionicons name="alert-circle" size={16} color={colors.red} />
+              <Text style={[styles.errorText, { color: colors.red }]}>{error}</Text>
             </View>
           ) : null}
 
           {step === 'identifier' ? (
             <View style={styles.form}>
-              <View style={styles.tabContainer}>
+              <View style={[styles.tabContainer, { backgroundColor: colors.inputBg, borderColor: colors.cardBorder }]}>
                 {(['email', 'phone', 'username'] as LoginTab[]).map((tab) => (
                   <TouchableOpacity
                     key={tab}
-                    style={[styles.tab, activeTab === tab && styles.activeTab]}
+                    style={[styles.tab, activeTab === tab && { backgroundColor: `${colors.mint}20` }]}
                     onPress={() => handleTabChange(tab)}
                   >
                     <Ionicons
                       name={getTabIcon(tab)}
                       size={16}
-                      color={activeTab === tab ? '#7FFFD4' : '#708090'}
+                      color={activeTab === tab ? colors.mint : colors.slate}
                     />
-                    <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                    <Text style={[styles.tabText, { color: colors.slate }, activeTab === tab && { color: colors.mint }]}>
                       {tab.charAt(0).toUpperCase() + tab.slice(1)}
                     </Text>
                   </TouchableOpacity>
@@ -225,17 +229,17 @@ export default function LoginScreen() {
               </View>
 
               <View style={styles.inputContainer}>
-                <View style={styles.inputWrapper}>
+                <View style={[styles.inputWrapper, { backgroundColor: colors.inputBg, borderColor: colors.cardBorder }]}>
                   <Ionicons
                     name={getTabIcon(activeTab)}
                     size={20}
-                    color="#708090"
+                    color={colors.slate}
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: colors.text }]}
                     placeholder={getPlaceholder()}
-                    placeholderTextColor="#708090"
+                    placeholderTextColor={colors.slate}
                     value={identifier}
                     onChangeText={setIdentifier}
                     keyboardType={getKeyboardType()}
@@ -246,17 +250,17 @@ export default function LoginScreen() {
                 </View>
 
                 {isUsernameTab && (
-                  <View style={styles.inputWrapper}>
+                  <View style={[styles.inputWrapper, { backgroundColor: colors.inputBg, borderColor: colors.cardBorder }]}>
                     <Ionicons
                       name="lock-closed-outline"
                       size={20}
-                      color="#708090"
+                      color={colors.slate}
                       style={styles.inputIcon}
                     />
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, { color: colors.text }]}
                       placeholder="Password"
-                      placeholderTextColor="#708090"
+                      placeholderTextColor={colors.slate}
                       value={password}
                       onChangeText={setPassword}
                       secureTextEntry={!showPassword}
@@ -267,7 +271,7 @@ export default function LoginScreen() {
                       <Ionicons
                         name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                         size={20}
-                        color="#708090"
+                        color={colors.slate}
                       />
                     </TouchableOpacity>
                   </View>
@@ -275,25 +279,25 @@ export default function LoginScreen() {
               </View>
 
               <TouchableOpacity
-                style={[styles.primaryButton, isSubmitDisabled() && styles.disabledButton]}
+                style={[styles.primaryButton, { backgroundColor: colors.mint }, isSubmitDisabled() && styles.disabledButton]}
                 onPress={handleSubmit}
                 disabled={isSubmitDisabled()}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#001F3F" />
+                  <ActivityIndicator color={buttonTextColor} />
                 ) : (
                   <View style={styles.buttonContent}>
-                    <Text style={styles.primaryButtonText}>
+                    <Text style={[styles.primaryButtonText, { color: buttonTextColor }]}>
                       {isUsernameTab ? 'Sign In' : 'Send Login Code'}
                     </Text>
-                    <Ionicons name={isUsernameTab ? 'log-in-outline' : 'arrow-forward'} size={18} color="#001F3F" />
+                    <Ionicons name={isUsernameTab ? 'log-in-outline' : 'arrow-forward'} size={18} color={buttonTextColor} />
                   </View>
                 )}
               </TouchableOpacity>
 
-              <View style={styles.infoCard}>
-                <Ionicons name="shield-checkmark-outline" size={18} color="#7FFFD4" />
-                <Text style={styles.infoText}>
+              <View style={[styles.infoCard, { backgroundColor: `${colors.mint}10`, borderColor: `${colors.mint}20` }]}>
+                <Ionicons name="shield-checkmark-outline" size={18} color={colors.mint} />
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                   {isUsernameTab
                     ? 'Sign in securely with your username and password.'
                     : 'No password needed. We\'ll send a secure one-time code to verify your identity.'
@@ -304,14 +308,14 @@ export default function LoginScreen() {
           ) : (
             <View style={styles.form}>
               <View style={styles.deliveryInfo}>
-                <View style={styles.deliveryIconContainer}>
+                <View style={[styles.deliveryIconContainer, { backgroundColor: `${colors.mint}1A` }]}>
                   <Ionicons
                     name={deliveryMethod === 'phone' ? 'chatbubble-outline' : 'mail-outline'}
                     size={24}
-                    color="#7FFFD4"
+                    color={colors.mint}
                   />
                 </View>
-                <Text style={styles.deliveryText}>
+                <Text style={[styles.deliveryText, { color: colors.textSecondary }]}>
                   {deliveryMethod === 'phone' ? 'Code sent via SMS' : 'Code sent via email'}
                 </Text>
               </View>
@@ -338,39 +342,40 @@ export default function LoginScreen() {
                     key={index}
                     style={[
                       styles.otpInput,
-                      otpCode[index] ? styles.otpInputFilled : {},
+                      { backgroundColor: colors.inputBg, borderColor: colors.cardBorder },
+                      otpCode[index] ? { borderColor: colors.mint, backgroundColor: `${colors.mint}14` } : {},
                     ]}
                   >
-                    <Text style={styles.otpDigitText}>{otpCode[index] || ''}</Text>
+                    <Text style={[styles.otpDigitText, { color: colors.text }]}>{otpCode[index] || ''}</Text>
                   </View>
                 ))}
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.primaryButton, (otpCode.length !== 6 || isLoading) && styles.disabledButton]}
+                style={[styles.primaryButton, { backgroundColor: colors.mint }, (otpCode.length !== 6 || isLoading) && styles.disabledButton]}
                 onPress={() => handleVerifyOTP()}
                 disabled={otpCode.length !== 6 || isLoading}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#001F3F" />
+                  <ActivityIndicator color={buttonTextColor} />
                 ) : (
                   <View style={styles.buttonContent}>
-                    <Text style={styles.primaryButtonText}>Verify & Sign In</Text>
-                    <Ionicons name="checkmark-circle" size={18} color="#001F3F" />
+                    <Text style={[styles.primaryButtonText, { color: buttonTextColor }]}>Verify & Sign In</Text>
+                    <Ionicons name="checkmark-circle" size={18} color={buttonTextColor} />
                   </View>
                 )}
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.resendButton} onPress={handleResend} disabled={isLoading}>
-                <Ionicons name="refresh-outline" size={16} color="#7FFFD4" />
-                <Text style={styles.resendText}>Resend code</Text>
+                <Ionicons name="refresh-outline" size={16} color={colors.mint} />
+                <Text style={[styles.resendText, { color: colors.mint }]}>Resend code</Text>
               </TouchableOpacity>
             </View>
           )}
 
           <TouchableOpacity style={styles.registerLink} onPress={() => navigation.navigate('Register')}>
-            <Text style={styles.registerLinkText}>
-              Don't have an account? <Text style={styles.registerLinkHighlight}>Sign up</Text>
+            <Text style={[styles.registerLinkText, { color: colors.textSecondary }]}>
+              Don't have an account? <Text style={{ color: colors.mint, fontWeight: '600' }}>Sign up</Text>
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -382,7 +387,6 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#001F3F',
   },
   scrollContent: {
     flexGrow: 1,
@@ -395,7 +399,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   backButtonText: {
-    color: '#7FFFD4',
     fontSize: 16,
   },
   header: {
@@ -404,18 +407,15 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#7FFFD4',
     marginBottom: 12,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 15,
-    color: '#708090',
     lineHeight: 22,
   },
   errorContainer: {
@@ -430,7 +430,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(239, 68, 68, 0.2)',
   },
   errorText: {
-    color: '#f87171',
     fontSize: 14,
     flex: 1,
   },
@@ -439,11 +438,9 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
     padding: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
   },
   tab: {
     flex: 1,
@@ -454,16 +451,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 8,
   },
-  activeTab: {
-    backgroundColor: 'rgba(127,255,212,0.12)',
-  },
   tabText: {
-    color: '#708090',
     fontSize: 13,
     fontWeight: '600',
-  },
-  activeTabText: {
-    color: '#7FFFD4',
   },
   inputContainer: {
     gap: 12,
@@ -471,9 +461,7 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 12,
     paddingHorizontal: 16,
   },
@@ -486,11 +474,9 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     paddingVertical: 16,
-    color: '#fff',
     fontSize: 16,
   },
   primaryButton: {
-    backgroundColor: '#7FFFD4',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -505,7 +491,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryButtonText: {
-    color: '#001F3F',
     fontSize: 17,
     fontWeight: '700',
   },
@@ -513,14 +498,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    backgroundColor: 'rgba(127,255,212,0.06)',
     padding: 14,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(127,255,212,0.12)',
   },
   infoText: {
-    color: '#708090',
     fontSize: 13,
     lineHeight: 19,
     flex: 1,
@@ -534,12 +516,10 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(127,255,212,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   deliveryText: {
-    color: '#708090',
     fontSize: 14,
   },
   otpContainer: {
@@ -557,22 +537,15 @@ const styles = StyleSheet.create({
   otpInput: {
     width: 48,
     height: 56,
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   otpDigitText: {
-    color: '#fff',
     fontSize: 22,
     fontWeight: '700',
     textAlign: 'center',
-  },
-  otpInputFilled: {
-    borderColor: '#7FFFD4',
-    backgroundColor: 'rgba(127,255,212,0.08)',
   },
   resendButton: {
     flexDirection: 'row',
@@ -582,7 +555,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   resendText: {
-    color: '#7FFFD4',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -591,11 +563,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   registerLinkText: {
-    color: '#708090',
     fontSize: 14,
-  },
-  registerLinkHighlight: {
-    color: '#7FFFD4',
-    fontWeight: '600',
   },
 });

@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/theme/ThemeContext';
 
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -19,19 +20,6 @@ const FILTERS = [
   { key: 'withdrawal', label: 'Withdrawals' },
   { key: 'deposit', label: 'Deposits' },
 ];
-
-function getActivityIcon(type: string): { name: string; color: string } {
-  switch (type) {
-    case 'contribution':
-      return { name: 'arrow-up-circle', color: '#22C55E' };
-    case 'withdrawal':
-      return { name: 'arrow-down-circle', color: '#60A5FA' };
-    case 'deposit':
-      return { name: 'add-circle', color: '#7FFFD4' };
-    default:
-      return { name: 'ellipse', color: '#708090' };
-  }
-}
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -53,24 +41,38 @@ function formatDate(dateString: string): string {
   });
 }
 
-function formatAmount(type: string, amount: string | number): { text: string; color: string } {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  const abs = Math.abs(num).toFixed(2);
-
-  switch (type) {
-    case 'contribution':
-      return { text: `-$${abs}`, color: '#22C55E' };
-    case 'withdrawal':
-      return { text: `-$${abs}`, color: '#60A5FA' };
-    case 'deposit':
-      return { text: `+$${abs}`, color: '#7FFFD4' };
-    default:
-      return { text: `$${abs}`, color: '#708090' };
-  }
-}
-
 export default function ActivityScreen() {
+  const { colors, isDark } = useTheme();
   const [activeFilter, setActiveFilter] = useState('all');
+
+  function getActivityIcon(type: string): { name: string; color: string } {
+    switch (type) {
+      case 'contribution':
+        return { name: 'arrow-up-circle', color: colors.green };
+      case 'withdrawal':
+        return { name: 'arrow-down-circle', color: colors.blue };
+      case 'deposit':
+        return { name: 'add-circle', color: colors.mint };
+      default:
+        return { name: 'ellipse', color: colors.slate };
+    }
+  }
+
+  function formatAmount(type: string, amount: string | number): { text: string; color: string } {
+    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+    const abs = Math.abs(num).toFixed(2);
+
+    switch (type) {
+      case 'contribution':
+        return { text: `-$${abs}`, color: colors.green };
+      case 'withdrawal':
+        return { text: `-$${abs}`, color: colors.blue };
+      case 'deposit':
+        return { text: `+$${abs}`, color: colors.mint };
+      default:
+        return { text: `$${abs}`, color: colors.slate };
+    }
+  }
 
   const {
     data: activityData,
@@ -91,18 +93,18 @@ export default function ActivityScreen() {
   }, [activityData, activeFilter]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={refetch}
-            tintColor="#7FFFD4"
+            tintColor={colors.mint}
           />
         }
       >
-        <Text style={styles.title}>Activity</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Activity</Text>
 
         <ScrollView
           horizontal
@@ -115,14 +117,16 @@ export default function ActivityScreen() {
               key={filter.key}
               style={[
                 styles.filterTab,
-                activeFilter === filter.key && styles.filterTabActive,
+                { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                activeFilter === filter.key && { backgroundColor: colors.mint, borderColor: colors.mint },
               ]}
               onPress={() => setActiveFilter(filter.key)}
             >
               <Text
                 style={[
                   styles.filterTabText,
-                  activeFilter === filter.key && styles.filterTabTextActive,
+                  { color: colors.slate },
+                  activeFilter === filter.key && { color: isDark ? '#001F3F' : '#FFFFFF', fontWeight: '700' },
                 ]}
               >
                 {filter.label}
@@ -134,7 +138,7 @@ export default function ActivityScreen() {
         {isLoading ? (
           <ActivityIndicator
             size="large"
-            color="#7FFFD4"
+            color={colors.mint}
             style={{ marginVertical: 60 }}
           />
         ) : activities.length === 0 ? (
@@ -142,15 +146,15 @@ export default function ActivityScreen() {
             <Ionicons
               name="receipt-outline"
               size={64}
-              color="rgba(112,128,144,0.3)"
+              color={`${colors.slate}4D`}
             />
-            <Text style={styles.emptyTitle}>No activity yet</Text>
-            <Text style={styles.emptySubtitle}>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>No activity yet</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.slate }]}>
               Your transactions and contributions will appear here
             </Text>
           </View>
         ) : (
-          <View style={styles.activityList}>
+          <View style={[styles.activityList, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
             {activities.map((item: any, index: number) => {
               const icon = getActivityIcon(item?.type ?? '');
               const amount = formatAmount(item?.type ?? '', item?.amount ?? '0');
@@ -159,7 +163,7 @@ export default function ActivityScreen() {
                   key={item.id || index}
                   style={[
                     styles.activityItem,
-                    index < activities.length - 1 && styles.activityItemBorder,
+                    index < activities.length - 1 && [styles.activityItemBorder, { borderBottomColor: colors.card }],
                   ]}
                 >
                   <View
@@ -175,10 +179,10 @@ export default function ActivityScreen() {
                     />
                   </View>
                   <View style={styles.activityInfo}>
-                    <Text style={styles.activityDescription} numberOfLines={1}>
+                    <Text style={[styles.activityDescription, { color: colors.text }]} numberOfLines={1}>
                       {item?.description || item?.title || item?.type || 'Activity'}
                     </Text>
-                    <Text style={styles.activityDate}>
+                    <Text style={[styles.activityDate, { color: colors.slate }]}>
                       {formatDate(item?.createdAt || item?.date || item?.timestamp || new Date().toISOString())}
                     </Text>
                   </View>
@@ -196,30 +200,21 @@ export default function ActivityScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#001F3F' },
+  container: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 20 },
+  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 20 },
   filtersContainer: { marginBottom: 20 },
   filtersContent: { gap: 8 },
   filterTab: {
     paddingHorizontal: 18,
     paddingVertical: 9,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
-  filterTabActive: {
-    backgroundColor: '#7FFFD4',
-    borderColor: '#7FFFD4',
-  },
-  filterTabText: { color: '#708090', fontSize: 13, fontWeight: '500' },
-  filterTabTextActive: { color: '#001F3F', fontWeight: '700' },
+  filterTabText: { fontSize: 13, fontWeight: '500' },
   activityList: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
     overflow: 'hidden',
   },
   activityItem: {
@@ -229,7 +224,6 @@ const styles = StyleSheet.create({
   },
   activityItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   activityIconWrap: {
     width: 44,
@@ -240,10 +234,10 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   activityInfo: { flex: 1, marginRight: 12 },
-  activityDescription: { color: '#fff', fontSize: 14, fontWeight: '500', marginBottom: 4 },
-  activityDate: { color: '#708090', fontSize: 12 },
+  activityDescription: { fontSize: 14, fontWeight: '500', marginBottom: 4 },
+  activityDate: { fontSize: 12 },
   activityAmount: { fontSize: 15, fontWeight: '700' },
   emptyState: { alignItems: 'center', paddingVertical: 80 },
-  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '600', marginTop: 16, marginBottom: 8 },
-  emptySubtitle: { color: '#708090', fontSize: 14, textAlign: 'center', paddingHorizontal: 20 },
+  emptyTitle: { fontSize: 18, fontWeight: '600', marginTop: 16, marginBottom: 8 },
+  emptySubtitle: { fontSize: 14, textAlign: 'center', paddingHorizontal: 20 },
 });

@@ -3,9 +3,11 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, A
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/theme/ThemeContext';
 
 export default function PaymentMethodsScreen() {
   const queryClient = useQueryClient();
+  const { colors, isDark } = useTheme();
 
   const { data: bankAccounts, isLoading, refetch } = useQuery({
     queryKey: ['bankAccounts'],
@@ -54,35 +56,35 @@ export default function PaymentMethodsScreen() {
 
   return (
     <ScrollView 
-      style={styles.container} 
+      style={[styles.container, { backgroundColor: colors.background }]} 
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor="#7FFFD4" />}
+      refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.mint} />}
     >
-      <Text style={styles.pageTitle}>Payment Methods</Text>
-      <Text style={styles.pageSubtitle}>Manage your payment methods for deposits and withdrawals</Text>
+      <Text style={[styles.pageTitle, { color: colors.text }]}>Payment Methods</Text>
+      <Text style={[styles.pageSubtitle, { color: colors.slate }]}>Manage your payment methods for deposits and withdrawals</Text>
 
-      <View style={styles.withdrawalStatusCard}>
+      <View style={[styles.withdrawalStatusCard, { backgroundColor: 'rgba(96, 165, 250, 0.08)', borderColor: 'rgba(96, 165, 250, 0.2)' }]}>
         <View style={styles.statusHeader}>
-          <Ionicons name="shield-checkmark" size={22} color="#60A5FA" />
+          <Ionicons name="shield-checkmark" size={22} color={colors.blue} />
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.statusTitle}>Withdrawal Status</Text>
-            <Text style={styles.statusSubtitle}>Link a bank account to receive funds</Text>
+            <Text style={[styles.statusTitle, { color: colors.text }]}>Withdrawal Status</Text>
+            <Text style={[styles.statusSubtitle, { color: colors.slate }]}>Link a bank account to receive funds</Text>
           </View>
         </View>
         {canReceivePayouts ? (
-          <View style={styles.statusReady}>
-            <Ionicons name="checkmark-circle" size={20} color="#4ADE80" />
+          <View style={[styles.statusReady, { backgroundColor: 'rgba(74, 222, 128, 0.1)', borderColor: 'rgba(74, 222, 128, 0.2)' }]}>
+            <Ionicons name="checkmark-circle" size={20} color={colors.green} />
             <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.statusReadyTitle}>Ready to Receive Payouts</Text>
-              <Text style={styles.statusReadySubtitle}>You can withdraw funds to your linked accounts</Text>
+              <Text style={[styles.statusReadyTitle, { color: colors.green }]}>Ready to Receive Payouts</Text>
+              <Text style={[styles.statusReadySubtitle, { color: colors.slate }]}>You can withdraw funds to your linked accounts</Text>
             </View>
           </View>
         ) : (
-          <View style={styles.statusPending}>
-            <Ionicons name="time" size={20} color="#FBBF24" />
+          <View style={[styles.statusPending, { backgroundColor: 'rgba(251, 191, 36, 0.1)', borderColor: 'rgba(251, 191, 36, 0.2)' }]}>
+            <Ionicons name="time" size={20} color={colors.yellow} />
             <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.statusPendingTitle}>Link a Payment Method</Text>
-              <Text style={styles.statusPendingSubtitle}>Add a bank account for free ACH transfers</Text>
+              <Text style={[styles.statusPendingTitle, { color: colors.yellow }]}>Link a Payment Method</Text>
+              <Text style={[styles.statusPendingSubtitle, { color: colors.slate }]}>Add a bank account for free ACH transfers</Text>
             </View>
           </View>
         )}
@@ -90,33 +92,33 @@ export default function PaymentMethodsScreen() {
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Ionicons name="business-outline" size={20} color="#60A5FA" />
-          <Text style={styles.sectionTitle}>ACH Bank Accounts</Text>
+          <Ionicons name="business-outline" size={20} color={colors.blue} />
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>ACH Bank Accounts</Text>
           {bankAccountsList.length > 0 && (
-            <View style={styles.linkedBadge}>
-              <Ionicons name="checkmark-circle" size={12} color="#4ADE80" />
-              <Text style={styles.linkedBadgeText}>Linked</Text>
+            <View style={[styles.linkedBadge, { backgroundColor: 'rgba(74, 222, 128, 0.15)', borderColor: 'rgba(74, 222, 128, 0.25)' }]}>
+              <Ionicons name="checkmark-circle" size={12} color={colors.green} />
+              <Text style={[styles.linkedBadgeText, { color: colors.green }]}>Linked</Text>
             </View>
           )}
         </View>
-        <View style={styles.achInfo}>
-          <Ionicons name="time-outline" size={18} color="#60A5FA" />
+        <View style={[styles.achInfo, { backgroundColor: 'rgba(96, 165, 250, 0.1)', borderColor: 'rgba(96, 165, 250, 0.2)' }]}>
+          <Ionicons name="time-outline" size={18} color={colors.blue} />
           <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={styles.achInfoTitle}>Standard ACH Transfer</Text>
-            <Text style={styles.achInfoSubtitle}>1-3 business days, no fees</Text>
+            <Text style={[styles.achInfoTitle, { color: colors.text }]}>Standard ACH Transfer</Text>
+            <Text style={[styles.achInfoSubtitle, { color: colors.slate }]}>1-3 business days, no fees</Text>
           </View>
         </View>
 
         {bankAccountsList.map((account: any) => (
-          <View key={account.id} style={styles.paymentMethod}>
+          <View key={account.id} style={[styles.paymentMethod, { backgroundColor: colors.card }]}>
             <View style={styles.pmIcon}>
-              <Ionicons name="business" size={20} color="#60A5FA" />
+              <Ionicons name="business" size={20} color={colors.blue} />
             </View>
             <View style={styles.pmInfo}>
-              <Text style={styles.pmName}>{account.institutionName}</Text>
-              <Text style={styles.pmDetails}>
+              <Text style={[styles.pmName, { color: colors.text }]}>{account.institutionName}</Text>
+              <Text style={[styles.pmDetails, { color: colors.slate }]}>
                 {account.accountType} ••••{account.accountMask}
-                {account.isDefault && <Text style={styles.defaultBadge}> (Default)</Text>}
+                {account.isDefault && <Text style={{ color: colors.blue }}> (Default)</Text>}
               </Text>
             </View>
             {!account.isDefault && (
@@ -125,23 +127,27 @@ export default function PaymentMethodsScreen() {
                 style={styles.actionButton}
                 data-testid={`button-set-default-${account.id}`}
               >
-                <Ionicons name="star-outline" size={18} color="#7FFFD4" />
+                <Ionicons name="star-outline" size={18} color={colors.mint} />
               </TouchableOpacity>
             )}
             {account.isDefault && (
               <View style={styles.actionButton}>
-                <Ionicons name="star" size={18} color="#7FFFD4" />
+                <Ionicons name="star" size={18} color={colors.mint} />
               </View>
             )}
             <TouchableOpacity onPress={() => handleDelete(account.id)} style={styles.actionButton}>
-              <Ionicons name="trash-outline" size={18} color="#f87171" />
+              <Ionicons name="trash-outline" size={18} color={colors.red} />
             </TouchableOpacity>
           </View>
         ))}
         
-        <TouchableOpacity style={styles.addButton} onPress={handleLinkBank} data-testid="button-link-bank">
-          <Ionicons name="add-circle-outline" size={20} color="#7FFFD4" />
-          <Text style={styles.addButtonText}>
+        <TouchableOpacity
+          style={[styles.addButton, { borderColor: `${colors.mint}4D` }]}
+          onPress={handleLinkBank}
+          data-testid="button-link-bank"
+        >
+          <Ionicons name="add-circle-outline" size={20} color={colors.mint} />
+          <Text style={[styles.addButtonText, { color: colors.mint }]}>
             {bankAccountsList.length > 0 ? 'Add Another Account' : 'Link Bank Account'}
           </Text>
         </TouchableOpacity>
@@ -151,75 +157,64 @@ export default function PaymentMethodsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#001F3F' },
+  container: { flex: 1 },
   content: { padding: 16, paddingBottom: 40 },
-  pageTitle: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginBottom: 4 },
-  pageSubtitle: { fontSize: 14, color: '#708090', marginBottom: 20 },
+  pageTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
+  pageSubtitle: { fontSize: 14, marginBottom: 20 },
   withdrawalStatusCard: {
-    backgroundColor: 'rgba(96, 165, 250, 0.08)',
     borderRadius: 16,
     padding: 16,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: 'rgba(96, 165, 250, 0.2)',
   },
   statusHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  statusTitle: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  statusSubtitle: { fontSize: 13, color: '#708090', marginTop: 2 },
+  statusTitle: { fontSize: 16, fontWeight: '600' },
+  statusSubtitle: { fontSize: 13, marginTop: 2 },
   statusReady: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: 'rgba(74, 222, 128, 0.1)',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(74, 222, 128, 0.2)',
   },
-  statusReadyTitle: { fontSize: 14, fontWeight: '500', color: '#4ADE80' },
-  statusReadySubtitle: { fontSize: 12, color: '#708090', marginTop: 2 },
+  statusReadyTitle: { fontSize: 14, fontWeight: '500' },
+  statusReadySubtitle: { fontSize: 12, marginTop: 2 },
   statusPending: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: 'rgba(251, 191, 36, 0.1)',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(251, 191, 36, 0.2)',
   },
-  statusPendingTitle: { fontSize: 14, fontWeight: '500', color: '#FBBF24' },
-  statusPendingSubtitle: { fontSize: 12, color: '#708090', marginTop: 2 },
+  statusPendingTitle: { fontSize: 14, fontWeight: '500' },
+  statusPendingSubtitle: { fontSize: 12, marginTop: 2 },
   section: { marginBottom: 24 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#fff' },
+  sectionTitle: { fontSize: 18, fontWeight: '600' },
   linkedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(74, 222, 128, 0.15)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(74, 222, 128, 0.25)',
   },
-  linkedBadgeText: { fontSize: 11, color: '#4ADE80', fontWeight: '600' },
+  linkedBadgeText: { fontSize: 11, fontWeight: '600' },
   achInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: 'rgba(96, 165, 250, 0.1)',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(96, 165, 250, 0.2)',
     marginTop: 8,
     marginBottom: 12,
   },
-  achInfoTitle: { fontSize: 14, fontWeight: '500', color: '#fff' },
-  achInfoSubtitle: { fontSize: 12, color: '#708090', marginTop: 2 },
+  achInfoTitle: { fontSize: 14, fontWeight: '500' },
+  achInfoSubtitle: { fontSize: 12, marginTop: 2 },
   paymentMethod: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     padding: 14,
     borderRadius: 12,
     marginBottom: 8,
@@ -233,9 +228,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pmInfo: { flex: 1, marginLeft: 12 },
-  pmName: { fontSize: 15, fontWeight: '500', color: '#fff' },
-  pmDetails: { fontSize: 13, color: '#708090', marginTop: 2 },
-  defaultBadge: { color: '#60A5FA' },
+  pmName: { fontSize: 15, fontWeight: '500' },
+  pmDetails: { fontSize: 13, marginTop: 2 },
   actionButton: { padding: 8 },
   addButton: {
     flexDirection: 'row',
@@ -243,11 +237,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderWidth: 1,
-    borderColor: 'rgba(127, 255, 212, 0.3)',
     borderStyle: 'dashed',
     borderRadius: 12,
     paddingVertical: 14,
     marginTop: 4,
   },
-  addButtonText: { color: '#7FFFD4', fontWeight: '500' },
+  addButtonText: { fontWeight: '500' },
 });

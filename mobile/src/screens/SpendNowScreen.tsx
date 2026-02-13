@@ -19,6 +19,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/theme/ThemeContext';
 
 const CATEGORIES = [
   { key: 'all', label: 'All' },
@@ -40,6 +41,7 @@ const CARD_WIDTH = (Dimensions.get('window').width - SCREEN_PADDING * 2 - CARD_G
 
 export default function SpendNowScreen() {
   const { user } = useAuth();
+  const { colors, isDark } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -109,7 +111,7 @@ export default function SpendNowScreen() {
   const renderPartnerCard = useCallback(
     ({ item }: { item: any }) => (
       <View style={styles.cardWrapper}>
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
           {item.bannerImage ? (
             <Image
               source={{ uri: item.bannerImage }}
@@ -117,102 +119,103 @@ export default function SpendNowScreen() {
               resizeMode="cover"
             />
           ) : (
-            <View style={styles.cardImagePlaceholder}>
-              <Ionicons name="storefront" size={32} color="rgba(127,255,212,0.3)" />
+            <View style={[styles.cardImagePlaceholder, { backgroundColor: `${colors.mint}0D` }]}>
+              <Ionicons name="storefront" size={32} color={`${colors.mint}4D`} />
             </View>
           )}
           {item.discountPercent > 0 && (
-            <View style={styles.discountBadge}>
-              <Text style={styles.discountText}>{item.discountPercent}% OFF</Text>
+            <View style={[styles.discountBadge, { backgroundColor: colors.green }]}>
+              <Text style={[styles.discountText, { color: colors.text }]}>{item.discountPercent}% OFF</Text>
             </View>
           )}
           <View style={styles.cardContent}>
-            <Text style={styles.cardName} numberOfLines={1}>
+            <Text style={[styles.cardName, { color: colors.text }]} numberOfLines={1}>
               {item.companyName}
             </Text>
-            <Text style={styles.cardDescription} numberOfLines={2}>
+            <Text style={[styles.cardDescription, { color: colors.textSecondary }]} numberOfLines={2}>
               {item.shortDescription || item.description}
             </Text>
             {item.partnerCategory && (
-              <View style={styles.categoryBadge}>
-                <Text style={styles.categoryBadgeText}>
+              <View style={[styles.categoryBadge, { backgroundColor: `${colors.mint}1A` }]}>
+                <Text style={[styles.categoryBadgeText, { color: colors.mint }]}>
                   {CATEGORIES.find((c) => c.key === item.partnerCategory)?.label ||
                     item.partnerCategory}
                 </Text>
               </View>
             )}
             <TouchableOpacity
-              style={styles.shopButton}
+              style={[styles.shopButton, { backgroundColor: colors.mint }]}
               onPress={() => {
                 const url = item.partnerShopUrl || item.website;
                 if (url) Linking.openURL(url);
               }}
             >
-              <Text style={styles.shopButtonText}>Shop Now</Text>
-              <Ionicons name="open-outline" size={14} color="#001F3F" />
+              <Text style={[styles.shopButtonText, { color: isDark ? colors.navy : '#FFFFFF' }]}>Shop Now</Text>
+              <Ionicons name="open-outline" size={14} color={isDark ? colors.navy : '#FFFFFF'} />
             </TouchableOpacity>
           </View>
         </View>
       </View>
     ),
-    [],
+    [colors, isDark],
   );
 
   const ListHeader = (
     <>
-      <Text style={styles.title}>Spend Now</Text>
-      <Text style={styles.subtitle}>
+      <Text style={[styles.title, { color: colors.text }]}>Spend Now</Text>
+      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
         Shop directly with your wallet or pool funds at partner stores
       </Text>
 
       <TouchableOpacity
-        style={styles.poolSelector}
+        style={[styles.poolSelector, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}
         onPress={() => setShowPoolPicker(!showPoolPicker)}
       >
         <View style={styles.poolSelectorLeft}>
-          <Ionicons name="wallet" size={20} color="#7FFFD4" />
-          <Text style={styles.poolSelectorLabel}>Spending from:</Text>
+          <Ionicons name="wallet" size={20} color={colors.mint} />
+          <Text style={[styles.poolSelectorLabel, { color: colors.textSecondary }]}>Spending from:</Text>
         </View>
         {isWalletSelected ? (
           <View style={styles.poolSelectorRight}>
-            <Text style={styles.poolSelectorName} numberOfLines={1}>
+            <Text style={[styles.poolSelectorName, { color: colors.text }]} numberOfLines={1}>
               My Wallet
             </Text>
-            <Text style={styles.poolSelectorBalance}>
+            <Text style={[styles.poolSelectorBalance, { color: colors.mint }]}>
               ${parseFloat(user?.balance || '0').toFixed(2)}
             </Text>
-            <Ionicons name="chevron-down" size={16} color="#708090" />
+            <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
           </View>
         ) : selectedPool ? (
           <View style={styles.poolSelectorRight}>
-            <Text style={styles.poolSelectorName} numberOfLines={1}>
+            <Text style={[styles.poolSelectorName, { color: colors.text }]} numberOfLines={1}>
               {selectedPool.title}
             </Text>
-            <Text style={styles.poolSelectorBalance}>
+            <Text style={[styles.poolSelectorBalance, { color: colors.mint }]}>
               ${getPoolBalance(selectedPool)}
             </Text>
-            <Ionicons name="chevron-down" size={16} color="#708090" />
+            <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
           </View>
         ) : (
-          <Text style={styles.poolSelectorEmpty}>No funds available</Text>
+          <Text style={[styles.poolSelectorEmpty, { color: colors.textSecondary }]}>No funds available</Text>
         )}
       </TouchableOpacity>
 
       {showPoolPicker && (availablePools.length > 0 || parseFloat(user?.balance || '0') > 0) && (
-        <View style={styles.poolDropdown}>
+        <View style={[styles.poolDropdown, { backgroundColor: colors.cardBorder, borderColor: colors.inputBorder }]}>
           {parseFloat(user?.balance || '0') > 0 && (
             <TouchableOpacity
               style={[
                 styles.poolOption,
-                selectedPoolId === 'wallet' && styles.poolOptionSelected,
+                { borderBottomColor: colors.inputBg },
+                selectedPoolId === 'wallet' && { backgroundColor: `${colors.mint}1A` },
               ]}
               onPress={() => {
                 setSelectedPoolId('wallet');
                 setShowPoolPicker(false);
               }}
             >
-              <Text style={styles.poolOptionName}>My Wallet</Text>
-              <Text style={styles.poolOptionBalance}>
+              <Text style={[styles.poolOptionName, { color: colors.text }]}>My Wallet</Text>
+              <Text style={[styles.poolOptionBalance, { color: colors.mint }]}>
                 ${parseFloat(user?.balance || '0').toFixed(2)}
               </Text>
             </TouchableOpacity>
@@ -222,17 +225,18 @@ export default function SpendNowScreen() {
               key={pool.id}
               style={[
                 styles.poolOption,
-                String(pool.id) === selectedPoolId && styles.poolOptionSelected,
+                { borderBottomColor: colors.inputBg },
+                String(pool.id) === selectedPoolId && { backgroundColor: `${colors.mint}1A` },
               ]}
               onPress={() => {
                 setSelectedPoolId(String(pool.id));
                 setShowPoolPicker(false);
               }}
             >
-              <Text style={styles.poolOptionName}>
+              <Text style={[styles.poolOptionName, { color: colors.text }]}>
                 {pool.title}
               </Text>
-              <Text style={styles.poolOptionBalance}>
+              <Text style={[styles.poolOptionBalance, { color: colors.mint }]}>
                 ${getPoolBalance(pool)}
               </Text>
             </TouchableOpacity>
@@ -251,14 +255,16 @@ export default function SpendNowScreen() {
             key={cat.key}
             style={[
               styles.categoryPill,
-              selectedCategory === cat.key && styles.categoryPillActive,
+              { backgroundColor: colors.inputBg, borderColor: colors.inputBorder },
+              selectedCategory === cat.key && { backgroundColor: colors.mint, borderColor: colors.mint },
             ]}
             onPress={() => setSelectedCategory(cat.key)}
           >
             <Text
               style={[
                 styles.categoryPillText,
-                selectedCategory === cat.key && styles.categoryPillTextActive,
+                { color: colors.textSecondary },
+                selectedCategory === cat.key && { color: isDark ? colors.navy : '#FFFFFF', fontWeight: '700' },
               ]}
             >
               {cat.label}
@@ -267,23 +273,23 @@ export default function SpendNowScreen() {
         ))}
       </ScrollView>
 
-      <View style={styles.searchContainer}>
+      <View style={[styles.searchContainer, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
         <Ionicons
           name="search"
           size={18}
-          color="#708090"
+          color={colors.textSecondary}
           style={styles.searchIcon}
         />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: colors.text }]}
           placeholder="Search partners..."
-          placeholderTextColor="#708090"
+          placeholderTextColor={colors.textSecondary}
           value={searchInput}
           onChangeText={setSearchInput}
         />
         {searchInput.length > 0 && (
           <TouchableOpacity onPress={() => setSearchInput('')}>
-            <Ionicons name="close-circle" size={18} color="#708090" />
+            <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
@@ -291,7 +297,7 @@ export default function SpendNowScreen() {
       {loadingPartners && (
         <ActivityIndicator
           size="large"
-          color="#7FFFD4"
+          color={colors.mint}
           style={{ marginVertical: 40 }}
         />
       )}
@@ -300,9 +306,9 @@ export default function SpendNowScreen() {
 
   const ListEmpty = !loadingPartners ? (
     <View style={styles.emptyState}>
-      <Ionicons name="storefront-outline" size={64} color="rgba(112,128,144,0.3)" />
-      <Text style={styles.emptyTitle}>No partners found</Text>
-      <Text style={styles.emptySubtitle}>
+      <Ionicons name="storefront-outline" size={64} color={`${colors.textSecondary}4D`} />
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>No partners found</Text>
+      <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
         {debouncedSearch
           ? `No partners match "${debouncedSearch}". Try a different search.`
           : 'No partners available in this category yet.'}
@@ -311,7 +317,7 @@ export default function SpendNowScreen() {
   ) : null;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <FlatList
         data={loadingPartners ? [] : partners}
         renderItem={renderPartnerCard}
@@ -325,7 +331,7 @@ export default function SpendNowScreen() {
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={refetchPartners}
-            tintColor="#7FFFD4"
+            tintColor={colors.mint}
           />
         }
       />
@@ -334,32 +340,28 @@ export default function SpendNowScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#001F3F' },
+  container: { flex: 1 },
   listContent: { padding: SCREEN_PADDING, paddingBottom: 40 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 4 },
-  subtitle: { fontSize: 14, color: '#708090', marginBottom: 20 },
+  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 4 },
+  subtitle: { fontSize: 14, marginBottom: 20 },
   poolSelector: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
     padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
     marginBottom: 8,
   },
   poolSelectorLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  poolSelectorLabel: { color: '#708090', fontSize: 13, fontWeight: '500' },
+  poolSelectorLabel: { fontSize: 13, fontWeight: '500' },
   poolSelectorRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'flex-end' },
-  poolSelectorName: { color: '#fff', fontSize: 14, fontWeight: '600', maxWidth: 120 },
-  poolSelectorBalance: { color: '#7FFFD4', fontSize: 14, fontWeight: '700' },
-  poolSelectorEmpty: { color: '#708090', fontSize: 13 },
+  poolSelectorName: { fontSize: 14, fontWeight: '600', maxWidth: 120 },
+  poolSelectorBalance: { fontSize: 14, fontWeight: '700' },
+  poolSelectorEmpty: { fontSize: 13 },
   poolDropdown: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
     marginBottom: 8,
     overflow: 'hidden',
   },
@@ -369,46 +371,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 14,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
-  poolOptionSelected: { backgroundColor: 'rgba(127,255,212,0.1)' },
-  poolOptionName: { color: '#fff', fontSize: 14, fontWeight: '500' },
-  poolOptionBalance: { color: '#7FFFD4', fontSize: 14, fontWeight: '600' },
+  poolOptionName: { fontSize: 14, fontWeight: '500' },
+  poolOptionBalance: { fontSize: 14, fontWeight: '600' },
   categoriesContainer: { marginBottom: 16 },
   categoriesContent: { gap: 8, paddingVertical: 4 },
   categoryPill: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
-  categoryPillActive: {
-    backgroundColor: '#7FFFD4',
-    borderColor: '#7FFFD4',
-  },
-  categoryPillText: { color: '#708090', fontSize: 13, fontWeight: '500' },
-  categoryPillTextActive: { color: '#001F3F', fontWeight: '700' },
+  categoryPillText: { fontSize: 13, fontWeight: '500' },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
     paddingHorizontal: 12,
     marginBottom: 20,
   },
   searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 12 },
+  searchInput: { flex: 1, fontSize: 14, paddingVertical: 12 },
   row: { gap: CARD_GAP },
   cardWrapper: { width: CARD_WIDTH, marginBottom: CARD_GAP },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
     overflow: 'hidden',
   },
   cardImage: { width: '100%', height: 100 },
@@ -417,32 +406,28 @@ const styles = StyleSheet.create({
     height: 100,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(127,255,212,0.05)',
   },
   discountBadge: {
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: '#22C55E',
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  discountText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  discountText: { fontSize: 10, fontWeight: '700' },
   cardContent: { padding: 10 },
-  cardName: { color: '#fff', fontSize: 14, fontWeight: '700', marginBottom: 4 },
-  cardDescription: { color: '#708090', fontSize: 11, marginBottom: 8, lineHeight: 16 },
+  cardName: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  cardDescription: { fontSize: 11, marginBottom: 8, lineHeight: 16 },
   categoryBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(127,255,212,0.1)',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
     marginBottom: 8,
   },
-  categoryBadgeText: { color: '#7FFFD4', fontSize: 10, fontWeight: '600' },
+  categoryBadgeText: { fontSize: 10, fontWeight: '600' },
   shopButton: {
-    backgroundColor: '#7FFFD4',
     borderRadius: 8,
     paddingVertical: 8,
     flexDirection: 'row',
@@ -450,8 +435,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
-  shopButtonText: { color: '#001F3F', fontSize: 13, fontWeight: '700' },
+  shopButtonText: { fontSize: 13, fontWeight: '700' },
   emptyState: { alignItems: 'center', paddingVertical: 60 },
-  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '600', marginTop: 16, marginBottom: 8 },
-  emptySubtitle: { color: '#708090', fontSize: 14, textAlign: 'center', paddingHorizontal: 20 },
+  emptyTitle: { fontSize: 18, fontWeight: '600', marginTop: 16, marginBottom: 8 },
+  emptySubtitle: { fontSize: 14, textAlign: 'center', paddingHorizontal: 20 },
 });

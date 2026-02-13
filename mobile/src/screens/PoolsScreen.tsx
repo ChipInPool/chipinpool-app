@@ -6,6 +6,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { api } from '@/services/api';
 import { PoolsStackParamList } from '@/navigation/AppTabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/theme/ThemeContext';
 
 type NavigationProp = NativeStackNavigationProp<PoolsStackParamList, 'PoolsList'>;
 
@@ -31,6 +32,7 @@ function formatCurrency(value: string | number): string {
 
 export default function PoolsScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const { colors, isDark } = useTheme();
 
   const { data: pools, refetch, isLoading } = useQuery({
     queryKey: ['pools'],
@@ -52,7 +54,7 @@ export default function PoolsScreen() {
 
     return (
       <TouchableOpacity
-        style={styles.poolCard}
+        style={[styles.poolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
         activeOpacity={0.7}
         onPress={() => navigation.navigate('PoolDetails', { poolId: pool.id })}
         data-testid={`card-pool-${pool.id}`}
@@ -62,33 +64,33 @@ export default function PoolsScreen() {
             <Ionicons name={icon} size={22} color={color} />
           </View>
           <View style={styles.poolInfo}>
-            <Text style={styles.poolTitle} numberOfLines={1}>{pool.title}</Text>
-            <Text style={styles.poolDescription} numberOfLines={1}>{pool.description}</Text>
+            <Text style={[styles.poolTitle, { color: colors.text }]} numberOfLines={1}>{pool.title}</Text>
+            <Text style={[styles.poolDescription, { color: colors.textSecondary }]} numberOfLines={1}>{pool.description}</Text>
           </View>
         </View>
 
         <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Progress</Text>
-            <Text style={styles.progressPercent}>{Math.round(progress)}%</Text>
+            <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>Progress</Text>
+            <Text style={[styles.progressPercent, { color: colors.mint }]}>{Math.round(progress)}%</Text>
           </View>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progress}%` }]} />
+          <View style={[styles.progressTrack, { backgroundColor: colors.cardBorder }]}>
+            <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: colors.mint }]} />
           </View>
           <View style={styles.amountRow}>
-            <Text style={styles.currentAmount}>{formatCurrency(current)}</Text>
-            <Text style={styles.targetAmount}>of {formatCurrency(target)}</Text>
+            <Text style={[styles.currentAmount, { color: colors.text }]}>{formatCurrency(current)}</Text>
+            <Text style={[styles.targetAmount, { color: colors.textSecondary }]}>of {formatCurrency(target)}</Text>
           </View>
         </View>
 
-        <View style={styles.bottomRow}>
+        <View style={[styles.bottomRow, { borderTopColor: colors.cardBorder }]}>
           <View style={styles.contributorInfo}>
-            <Ionicons name="people-outline" size={15} color="#708090" />
-            <Text style={styles.contributorText}>{pool.contributorCount || 0} contributors</Text>
+            <Ionicons name="people-outline" size={15} color={colors.textSecondary} />
+            <Text style={[styles.contributorText, { color: colors.textSecondary }]}>{pool.contributorCount || 0} contributors</Text>
           </View>
-          <View style={[styles.statusBadge, isActive ? styles.statusActive : styles.statusInactive]}>
-            <View style={[styles.statusDot, { backgroundColor: isActive ? '#7FFFD4' : '#708090' }]} />
-            <Text style={[styles.statusText, { color: isActive ? '#7FFFD4' : '#708090' }]}>
+          <View style={[styles.statusBadge, { backgroundColor: isActive ? `${colors.mint}20` : colors.card }]}>
+            <View style={[styles.statusDot, { backgroundColor: isActive ? colors.mint : colors.textSecondary }]} />
+            <Text style={[styles.statusText, { color: isActive ? colors.mint : colors.textSecondary }]}>
               {pool.status}
             </Text>
           </View>
@@ -98,7 +100,7 @@ export default function PoolsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={pools || []}
         renderItem={renderPool}
@@ -108,38 +110,38 @@ export default function PoolsScreen() {
           (!pools || pools.length === 0) && styles.listContentEmpty,
         ]}
         refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor="#7FFFD4" />
+          <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.mint} />
         }
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <View style={styles.emptyIconCircle}>
-              <Ionicons name="wallet-outline" size={40} color="#7FFFD4" />
+            <View style={[styles.emptyIconCircle, { backgroundColor: `${colors.mint}1A` }]}>
+              <Ionicons name="wallet-outline" size={40} color={colors.mint} />
             </View>
-            <Text style={styles.emptyTitle}>No Pools Yet</Text>
-            <Text style={styles.emptySubtitle}>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>No Pools Yet</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
               Create a pool and start collecting funds with friends and family.
             </Text>
             <TouchableOpacity
-              style={styles.emptyButton}
+              style={[styles.emptyButton, { backgroundColor: colors.mint }]}
               activeOpacity={0.8}
               onPress={() => navigation.navigate('CreatePool')}
               data-testid="button-create-first-pool"
             >
-              <Ionicons name="add-circle-outline" size={20} color="#001F3F" />
-              <Text style={styles.emptyButtonText}>Create Your First Pool</Text>
+              <Ionicons name="add-circle-outline" size={20} color={isDark ? '#001F3F' : '#FFFFFF'} />
+              <Text style={[styles.emptyButtonText, { color: isDark ? '#001F3F' : '#FFFFFF' }]}>Create Your First Pool</Text>
             </TouchableOpacity>
           </View>
         }
       />
 
       <TouchableOpacity
-        style={styles.fab}
+        style={[styles.fab, { backgroundColor: colors.mint }]}
         activeOpacity={0.85}
         onPress={() => navigation.navigate('CreatePool')}
         data-testid="button-create-pool"
       >
-        <Ionicons name="add" size={28} color="#001F3F" />
+        <Ionicons name="add" size={28} color={isDark ? '#001F3F' : '#FFFFFF'} />
       </TouchableOpacity>
     </View>
   );
@@ -148,7 +150,6 @@ export default function PoolsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#001F3F',
   },
   listContent: {
     padding: 16,
@@ -159,12 +160,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   poolCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 16,
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
   poolHeader: {
     flexDirection: 'row',
@@ -185,12 +184,10 @@ const styles = StyleSheet.create({
   poolTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#FFFFFF',
     letterSpacing: 0.2,
   },
   poolDescription: {
     fontSize: 13,
-    color: '#708090',
     marginTop: 3,
     lineHeight: 18,
   },
@@ -205,25 +202,21 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     fontSize: 12,
-    color: '#708090',
     fontWeight: '500',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   progressPercent: {
     fontSize: 13,
-    color: '#7FFFD4',
     fontWeight: '700',
   },
   progressTrack: {
     height: 6,
-    backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 3,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#7FFFD4',
     borderRadius: 3,
   },
   amountRow: {
@@ -235,11 +228,9 @@ const styles = StyleSheet.create({
   currentAmount: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
   targetAmount: {
     fontSize: 13,
-    color: '#708090',
     fontWeight: '400',
   },
   bottomRow: {
@@ -248,7 +239,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
   },
   contributorInfo: {
     flexDirection: 'row',
@@ -257,7 +247,6 @@ const styles = StyleSheet.create({
   },
   contributorText: {
     fontSize: 12,
-    color: '#708090',
     fontWeight: '500',
   },
   statusBadge: {
@@ -267,12 +256,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     gap: 5,
-  },
-  statusActive: {
-    backgroundColor: 'rgba(127, 255, 212, 0.12)',
-  },
-  statusInactive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
   statusDot: {
     width: 6,
@@ -292,7 +275,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(127, 255, 212, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -300,12 +282,10 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#FFFFFF',
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#708090',
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 28,
@@ -313,7 +293,6 @@ const styles = StyleSheet.create({
   emptyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#7FFFD4',
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 14,
@@ -322,7 +301,6 @@ const styles = StyleSheet.create({
   emptyButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#001F3F',
   },
   fab: {
     position: 'absolute',
@@ -331,7 +309,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#7FFFD4',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
