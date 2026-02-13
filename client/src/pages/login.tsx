@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
-import { Loader2, Shield, CheckCircle2, ArrowRight, Phone, Mail, Calendar, User, AlertCircle, Check, ArrowLeft, KeyRound } from "lucide-react";
+import { Loader2, Shield, CheckCircle2, ArrowRight, Phone, Mail, Calendar, User, AlertCircle, Check, ArrowLeft } from "lucide-react";
 
 type LoginMethod = 'email' | 'username' | 'phone';
 type ForgotMethod = 'email' | 'phone';
@@ -30,12 +30,6 @@ export default function Login() {
   const [phoneOtpCode, setPhoneOtpCode] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
-  
-  const [mfaRequired, setMfaRequired] = useState(false);
-  const [mfaUserId, setMfaUserId] = useState<string | null>(null);
-  const [mfaCode, setMfaCode] = useState("");
-  const [useRecoveryCode, setUseRecoveryCode] = useState(false);
-  const [mfaVerifying, setMfaVerifying] = useState(false);
   
   const [registerForm, setRegisterForm] = useState({
     firstName: "",
@@ -178,12 +172,6 @@ export default function Login() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       
-      if (data.mfaRequired) {
-        setMfaRequired(true);
-        setMfaUserId(data.userId);
-        return;
-      }
-      
       toast({ description: "Welcome back!" });
       window.location.href = '/';
     } catch (error: any) {
@@ -209,46 +197,12 @@ export default function Login() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       
-      if (data.mfaRequired) {
-        setMfaRequired(true);
-        setMfaUserId(data.userId);
-        return;
-      }
-      
       toast({ description: "Welcome back!" });
       window.location.href = '/';
     } catch (error: any) {
       toast({ description: error.message || "Login failed", variant: "destructive" });
     } finally {
       setIsLoading(false);
-    }
-  };
-  
-  const handleMfaVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mfaUserId || mfaCode.length < 6) return;
-    
-    setMfaVerifying(true);
-    try {
-      const res = await fetch('/api/auth/verify-mfa', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ 
-          userId: mfaUserId, 
-          code: mfaCode,
-          useRecoveryCode 
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-      
-      toast({ description: "Welcome back!" });
-      window.location.href = '/';
-    } catch (error: any) {
-      toast({ description: error.message || "Invalid code", variant: "destructive" });
-    } finally {
-      setMfaVerifying(false);
     }
   };
 
@@ -291,12 +245,6 @@ export default function Login() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
-      
-      if (data.mfaRequired) {
-        setMfaRequired(true);
-        setMfaUserId(data.userId);
-        return;
-      }
       
       toast({ description: "Welcome back!" });
       window.location.href = '/';
@@ -630,70 +578,6 @@ export default function Login() {
 
             <CardContent className="px-4 md:px-6">
               <TabsContent value="login">
-                {mfaRequired ? (
-                  <div className="space-y-6">
-                    <div className="text-center space-y-2">
-                      <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-                        <KeyRound className="w-8 h-8 text-primary" />
-                      </div>
-                      <h3 className="text-lg font-semibold">Two-Factor Authentication</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {useRecoveryCode 
-                          ? "Enter one of your recovery codes"
-                          : "Enter the 6-digit code from your authenticator app"}
-                      </p>
-                    </div>
-                    <form onSubmit={handleMfaVerify} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="mfa-code">{useRecoveryCode ? "Recovery Code" : "Authentication Code"}</Label>
-                        <Input
-                          id="mfa-code"
-                          placeholder={useRecoveryCode ? "XXXXXXXX" : "000000"}
-                          value={mfaCode}
-                          onChange={(e) => setMfaCode(e.target.value)}
-                          maxLength={useRecoveryCode ? 8 : 6}
-                          className="text-center text-lg tracking-widest"
-                          autoFocus
-                          data-testid="input-mfa-code"
-                        />
-                      </div>
-                      <Button 
-                        type="submit"
-                        className="w-full"
-                        disabled={mfaCode.length < 6 || mfaVerifying}
-                        data-testid="button-verify-mfa"
-                      >
-                        {mfaVerifying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        Verify
-                      </Button>
-                    </form>
-                    <div className="flex flex-col gap-2 text-center">
-                      <Button
-                        variant="link"
-                        onClick={() => {
-                          setUseRecoveryCode(!useRecoveryCode);
-                          setMfaCode("");
-                        }}
-                        data-testid="button-toggle-recovery-code"
-                      >
-                        {useRecoveryCode ? "Use authenticator app instead" : "Use a recovery code"}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setMfaRequired(false);
-                          setMfaUserId(null);
-                          setMfaCode("");
-                          setUseRecoveryCode(false);
-                        }}
-                        data-testid="button-back-to-login"
-                      >
-                        <ArrowLeft className="w-4 h-4 mr-1" /> Back to login
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-1.5 md:gap-2">
                     <Button
@@ -864,7 +748,6 @@ export default function Login() {
                     Forgot password?
                   </Button>
                 </div>
-                )}
               </TabsContent>
 
               <TabsContent value="register">

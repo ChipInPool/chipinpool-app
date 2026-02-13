@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Shield, Mail, Phone, Key, Smartphone, UserCheck, CheckCircle, XCircle, Loader2, Building, Plus, CreditCard, Zap, Trash2, Star, RefreshCw } from "lucide-react";
+import { Shield, Mail, Phone, Key, UserCheck, CheckCircle, XCircle, Loader2, Building, Plus, CreditCard, Zap, Trash2, Star, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Stripe } from "@stripe/stripe-js";
@@ -156,12 +156,6 @@ export default function Security() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneCode, setPhoneCode] = useState("");
   const [pin, setPin] = useState("");
-  const [twoFactorCode, setTwoFactorCode] = useState("");
-  const [qrCode, setQrCode] = useState("");
-  const [twoFactorSecret, setTwoFactorSecret] = useState("");
-  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
-  const [showQRDialog, setShowQRDialog] = useState(false);
-  const [showRecoveryCodesDialog, setShowRecoveryCodesDialog] = useState(false);
   const [phoneSent, setPhoneSent] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
@@ -417,76 +411,6 @@ export default function Security() {
     },
   });
 
-  const setup2FAMutation = useMutation({
-    mutationFn: api.security.setup2FA,
-    onSuccess: (data: any) => {
-      setQrCode(data.qrCode);
-      setTwoFactorSecret(data.secret);
-      setRecoveryCodes(data.recoveryCodes || []);
-      setShowQRDialog(true);
-    },
-    onError: (error: any) => {
-      toast({ description: error.message, variant: "destructive" });
-    },
-  });
-
-  const enable2FAMutation = useMutation({
-    mutationFn: api.security.enable2FA,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["securityStatus"] });
-      setShowQRDialog(false);
-      setTwoFactorCode("");
-      if (recoveryCodes.length > 0) {
-        setShowRecoveryCodesDialog(true);
-      } else {
-        toast({ description: "Two-factor authentication enabled!" });
-      }
-    },
-    onError: (error: any) => {
-      toast({ description: error.message, variant: "destructive" });
-    },
-  });
-  
-  const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
-  const [regenerateCode, setRegenerateCode] = useState("");
-  
-  const regenerateCodesMutation = useMutation({
-    mutationFn: async (token: string) => {
-      const res = await fetch('/api/mfa/regenerate-codes', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to regenerate codes');
-      }
-      return res.json();
-    },
-    onSuccess: (data: any) => {
-      setRecoveryCodes(data.recoveryCodes || []);
-      setShowRegenerateDialog(false);
-      setRegenerateCode("");
-      setShowRecoveryCodesDialog(true);
-    },
-    onError: (error: any) => {
-      toast({ description: error.message || "Failed to regenerate recovery codes", variant: "destructive" });
-    },
-  });
-
-  const disable2FAMutation = useMutation({
-    mutationFn: api.security.disable2FA,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["securityStatus"] });
-      setTwoFactorCode("");
-      toast({ description: "Two-factor authentication disabled" });
-    },
-    onError: (error: any) => {
-      toast({ description: error.message, variant: "destructive" });
-    },
-  });
-
   const [showKYCModal, setShowKYCModal] = useState(false);
   const [kycClientSecret, setKycClientSecret] = useState<string | null>(null);
 
@@ -681,67 +605,6 @@ export default function Security() {
                   {status.hasTransactionPin ? "Update PIN" : "Set PIN"}
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/[0.02] border-white/5">
-            <CardHeader className="px-4 md:px-6">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 md:gap-3 min-w-0">
-                  <Smartphone className="w-5 h-5 text-purple-400 shrink-0" />
-                  <CardTitle className="text-base md:text-lg truncate">Two-Factor Authentication</CardTitle>
-                </div>
-                {status.twoFactorEnabled ? (
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30 shrink-0 text-xs">
-                    <CheckCircle className="w-3 h-3 mr-1" /> Enabled
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="border-orange-500/30 text-orange-400 shrink-0 text-xs">
-                    <XCircle className="w-3 h-3 mr-1" /> Disabled
-                  </Badge>
-                )}
-              </div>
-              <CardDescription className="text-xs md:text-sm">Use an authenticator app for extra security when logging in</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {status.twoFactorEnabled ? (
-                <div className="space-y-4">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Enter 6-digit code to disable"
-                      value={twoFactorCode}
-                      onChange={(e) => setTwoFactorCode(e.target.value)}
-                      maxLength={6}
-                      data-testid="input-2fa-disable-code"
-                    />
-                    <Button 
-                      variant="destructive"
-                      onClick={() => disable2FAMutation.mutate(twoFactorCode)}
-                      disabled={twoFactorCode.length !== 6 || disable2FAMutation.isPending}
-                      data-testid="button-disable-2fa"
-                    >
-                      {disable2FAMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                      Disable 2FA
-                    </Button>
-                  </div>
-                  <Button 
-                    variant="outline"
-                    onClick={() => setShowRegenerateDialog(true)}
-                    data-testid="button-regenerate-recovery-codes"
-                  >
-                    Regenerate Recovery Codes
-                  </Button>
-                </div>
-              ) : (
-                <Button 
-                  onClick={() => setup2FAMutation.mutate()}
-                  disabled={setup2FAMutation.isPending}
-                  data-testid="button-setup-2fa"
-                >
-                  {setup2FAMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Set Up 2FA
-                </Button>
-              )}
             </CardContent>
           </Card>
 
@@ -990,128 +853,6 @@ export default function Security() {
           </Card>
         </div>
       </div>
-
-      <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
-        <DialogContent className="bg-card border-white/10">
-          <DialogHeader>
-            <DialogTitle>Set Up Two-Factor Authentication</DialogTitle>
-            <DialogDescription>
-              Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col items-center gap-4 py-4">
-            {qrCode && (
-              <img src={qrCode} alt="2FA QR Code" className="w-48 h-48 rounded-lg" />
-            )}
-            <p className="text-xs text-muted-foreground text-center">
-              Or enter this code manually: <code className="bg-muted px-2 py-1 rounded">{twoFactorSecret}</code>
-            </p>
-            <div className="w-full space-y-2">
-              <Label>Enter the 6-digit code from your app</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="000000"
-                  value={twoFactorCode}
-                  onChange={(e) => setTwoFactorCode(e.target.value)}
-                  maxLength={6}
-                  data-testid="input-2fa-enable-code"
-                />
-                <Button 
-                  onClick={() => enable2FAMutation.mutate(twoFactorCode)}
-                  disabled={twoFactorCode.length !== 6 || enable2FAMutation.isPending}
-                  data-testid="button-enable-2fa"
-                >
-                  {enable2FAMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Enable
-                </Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showRecoveryCodesDialog} onOpenChange={setShowRecoveryCodesDialog}>
-        <DialogContent className="bg-card border-white/10">
-          <DialogHeader>
-            <DialogTitle>Recovery Codes</DialogTitle>
-            <DialogDescription>
-              Save these codes in a secure place. Each code can only be used once to access your account if you lose your authenticator.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <div className="bg-muted/50 rounded-lg p-4 grid grid-cols-2 gap-2">
-              {recoveryCodes.map((code, i) => (
-                <code key={i} className="text-sm font-mono text-center py-1" data-testid={`recovery-code-${i}`}>
-                  {code}
-                </code>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-4 text-center">
-              These codes will not be shown again. Copy them now!
-            </p>
-            <div className="flex justify-center gap-2 mt-4">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  navigator.clipboard.writeText(recoveryCodes.join('\n'));
-                  toast({ description: "Recovery codes copied to clipboard" });
-                }}
-                data-testid="button-copy-recovery-codes"
-              >
-                Copy All
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowRecoveryCodesDialog(false);
-                  setRecoveryCodes([]);
-                  toast({ description: "Two-factor authentication enabled!" });
-                }}
-                data-testid="button-close-recovery-codes"
-              >
-                I've Saved My Codes
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
-        <DialogContent className="bg-card border-white/10">
-          <DialogHeader>
-            <DialogTitle>Regenerate Recovery Codes</DialogTitle>
-            <DialogDescription>
-              Enter your current 6-digit authenticator code to generate new recovery codes. This will invalidate all existing codes.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="regenerate-code">Authentication Code</Label>
-              <Input
-                id="regenerate-code"
-                placeholder="000000"
-                value={regenerateCode}
-                onChange={(e) => setRegenerateCode(e.target.value)}
-                maxLength={6}
-                className="text-center text-lg tracking-widest"
-                data-testid="input-regenerate-code"
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => { setShowRegenerateDialog(false); setRegenerateCode(""); }}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => regenerateCodesMutation.mutate(regenerateCode)}
-                disabled={regenerateCode.length !== 6 || regenerateCodesMutation.isPending}
-                data-testid="button-confirm-regenerate"
-              >
-                {regenerateCodesMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Regenerate
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showDebitCardDialog} onOpenChange={setShowDebitCardDialog}>
         <DialogContent className="bg-card border-white/10">

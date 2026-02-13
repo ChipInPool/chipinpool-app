@@ -164,12 +164,6 @@ export const api = {
       fetchApi("/api/security/pin/set", { method: "POST", body: JSON.stringify({ pin }) }),
     verifyPin: (pin: string) =>
       fetchApi("/api/security/pin/verify", { method: "POST", body: JSON.stringify({ pin }) }),
-    setup2FA: () =>
-      fetchApi("/api/security/2fa/setup", { method: "POST" }),
-    enable2FA: (code: string) =>
-      fetchApi("/api/security/2fa/enable", { method: "POST", body: JSON.stringify({ code }) }),
-    disable2FA: (code: string) =>
-      fetchApi("/api/security/2fa/disable", { method: "POST", body: JSON.stringify({ code }) }),
     startKYC: () =>
       fetchApi("/api/security/kyc/start", { method: "POST" }),
   },

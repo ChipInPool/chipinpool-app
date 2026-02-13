@@ -97,13 +97,6 @@ export default function LoginScreen() {
     }
   };
 
-  const { needs2FA } = useAuth();
-  React.useEffect(() => {
-    if (needs2FA) {
-      navigation.navigate('Verify2FA');
-    }
-  }, [needs2FA]);
-
   const handleOtpChange = (value: string) => {
     const cleaned = value.replace(/[^0-9]/g, '').slice(0, 6);
     setOtpCode(cleaned);
@@ -124,10 +117,7 @@ export default function LoginScreen() {
     setError('');
 
     try {
-      const result = await verifyOTP(identifier.trim(), verificationCode);
-      if (result?.mfaRequired) {
-        navigation.navigate('Verify2FA');
-      }
+      await verifyOTP(identifier.trim(), verificationCode);
     } catch (err: any) {
       setError(err.message || 'Invalid code');
       setOtpCode('');

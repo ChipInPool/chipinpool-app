@@ -86,8 +86,6 @@ export default function SecurityScreen() {
     },
   });
 
-  const twoFAEnabled = securityQuery.data?.twoFactorEnabled || false;
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -144,31 +142,6 @@ export default function SecurityScreen() {
             </View>
           </View>
         )}
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Two-Factor Authentication</Text>
-          <View style={styles.card}>
-            <View style={styles.statusRow}>
-              <Ionicons
-                name={twoFAEnabled ? 'lock-closed' : 'lock-open-outline'}
-                size={32}
-                color={twoFAEnabled ? '#7FFFD4' : '#708090'}
-              />
-              <View style={styles.statusInfo}>
-                <Text style={styles.statusLabel}>2FA Status</Text>
-                <Text style={[styles.statusValue, { color: twoFAEnabled ? '#7FFFD4' : '#708090' }]}>
-                  {twoFAEnabled ? 'Enabled' : 'Disabled'}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.infoText}>
-              Two-factor authentication adds an extra layer of security to your account by requiring a verification code in addition to your password.
-            </Text>
-            {securityQuery.isLoading && (
-              <ActivityIndicator color="#7FFFD4" style={{ marginTop: 12 }} />
-            )}
-          </View>
-        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Password</Text>

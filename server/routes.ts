@@ -1016,8 +1016,22 @@ export async function registerRoutes(
           )
         );
 
-      const allPools = await storage.getPools();
-      res.json({ pools: allPools });
+      const userId = req.session.userId!;
+      const [createdPools, contributedPools] = await Promise.all([
+        storage.getPoolsByCreator(userId),
+        storage.getPoolsByContributor(userId),
+      ]);
+      const poolMap = new Map<string, typeof createdPools[0]>();
+      for (const pool of createdPools) {
+        poolMap.set(pool.id, pool);
+      }
+      for (const pool of contributedPools) {
+        if (!poolMap.has(pool.id)) {
+          poolMap.set(pool.id, pool);
+        }
+      }
+      const userPools = Array.from(poolMap.values());
+      res.json({ pools: userPools });
     } catch (error) {
       next(error);
     }

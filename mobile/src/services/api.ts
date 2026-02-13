@@ -131,9 +131,6 @@ export const api = {
       if (result.sessionToken) {
         await saveSessionCookie(result.sessionToken);
       }
-      if (result.mfaRequired) {
-        return result;
-      }
       return result.user;
     },
     loginUsername: async (username: string, password: string) => {
@@ -143,9 +140,6 @@ export const api = {
       });
       if (result.sessionToken) {
         await saveSessionCookie(result.sessionToken);
-      }
-      if (result.mfaRequired) {
-        return result;
       }
       return result.user;
     },
@@ -187,25 +181,12 @@ export const api = {
       if (result.sessionToken) {
         await saveSessionCookie(result.sessionToken);
       }
-      if (result.mfaRequired) {
-        return result;
-      }
       return result.user;
     },
     logout: async () => {
       const result = await fetchApi<any>('/api/auth/logout', { method: 'POST' });
       await clearSessionCookie();
       return result;
-    },
-    verify2FA: async (code: string, userId: string) => {
-      const result = await fetchApi<any>('/api/auth/verify-mfa', {
-        method: 'POST',
-        body: JSON.stringify({ code, userId }),
-      });
-      if (result.sessionToken) {
-        await saveSessionCookie(result.sessionToken);
-      }
-      return result.user;
     },
   },
   user: {
