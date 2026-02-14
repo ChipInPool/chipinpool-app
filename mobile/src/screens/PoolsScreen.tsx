@@ -65,7 +65,7 @@ export default function PoolsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { colors, isDark } = useTheme();
 
-  const [filtersExpanded, setFiltersExpanded] = useState(true);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('Active');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
@@ -170,7 +170,7 @@ export default function PoolsScreen() {
       >
         {pool.image && (
           <Image
-            source={{ uri: pool.image.startsWith('http') ? pool.image : `${API_URL}/objects/${encodeURIComponent(pool.image.replace(/^\/objects\//, ''))}` }}
+            source={{ uri: pool.image.startsWith('http') ? pool.image : `${API_URL}/objects/${pool.image.replace(/^\/objects\//, '')}` }}
             style={styles.poolImage}
             resizeMode="cover"
           />

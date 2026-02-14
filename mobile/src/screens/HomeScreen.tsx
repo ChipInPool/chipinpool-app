@@ -39,6 +39,7 @@ export default function HomeScreen() {
   const queryClient = useQueryClient();
   const { colors, isDark } = useTheme();
   const [showTour, setShowTour] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     SecureStore.getItemAsync(TOUR_STORAGE_KEY)
@@ -75,10 +76,12 @@ export default function HomeScreen() {
   const balance = parseFloat(user?.balance ?? user?.walletBalance ?? '0') || 0;
 
   const handleRefresh = async () => {
+    setRefreshing(true);
     await refreshUser();
-    refetch();
-    queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    queryClient.invalidateQueries({ queryKey: ['activityFeed'] });
+    await refetch();
+    await queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    await queryClient.invalidateQueries({ queryKey: ['activityFeed'] });
+    setRefreshing(false);
   };
 
   useFocusEffect(
@@ -102,7 +105,7 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={handleRefresh} tintColor={colors.mint} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.mint} />}
       >
         <View style={styles.headerRow}>
           <View>

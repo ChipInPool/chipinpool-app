@@ -442,7 +442,7 @@ export default function PoolDetailsScreen() {
       <View style={styles.header}>
         {pool?.image && (
           <Image 
-            source={{ uri: pool.image.startsWith('http') ? pool.image : `${API_URL}/objects/${encodeURIComponent(pool.image.replace(/^\/objects\//, ''))}` }}
+            source={{ uri: pool.image.startsWith('http') ? pool.image : `${API_URL}/objects/${pool.image.replace(/^\/objects\//, '')}` }}
             style={{ width: '100%', height: 160, borderRadius: 16, marginBottom: 16 }}
             resizeMode="cover"
           />

@@ -2339,6 +2339,10 @@ export async function registerRoutes(
       if (userId === targetId) {
         return res.status(400).json({ message: "Cannot follow yourself" });
       }
+      const alreadyFollowing = await storage.isFollowingNew(userId, targetId);
+      if (alreadyFollowing) {
+        return res.json({ success: true, message: "Already following" });
+      }
       await storage.followUserNew(userId, targetId);
       res.json({ success: true });
     } catch (error) {
@@ -2378,7 +2382,17 @@ export async function registerRoutes(
       const limit = parseInt(req.query.limit as string) || 20;
       const offset = parseInt(req.query.offset as string) || 0;
       const followers = await storage.getFollowersDetailed(targetUser.id, limit, offset);
-      res.json(followers);
+      if (viewerId && followers.length > 0) {
+        const viewerFollowingList = await storage.getFollowingDetailed(viewerId, 1000, 0);
+        const viewerFollowingSet = new Set(viewerFollowingList.map((f: any) => f.id));
+        const followersWithStatus = followers.map((f: any) => ({
+          ...f,
+          isFollowing: viewerFollowingSet.has(f.id),
+        }));
+        res.json(followersWithStatus);
+      } else {
+        res.json(followers.map((f: any) => ({ ...f, isFollowing: false })));
+      }
     } catch (error) {
       next(error);
     }
@@ -2406,7 +2420,17 @@ export async function registerRoutes(
       const limit = parseInt(req.query.limit as string) || 20;
       const offset = parseInt(req.query.offset as string) || 0;
       const following = await storage.getFollowingDetailed(targetUser.id, limit, offset);
-      res.json(following);
+      if (viewerId && following.length > 0) {
+        const viewerFollowingList = await storage.getFollowingDetailed(viewerId, 1000, 0);
+        const viewerFollowingSet = new Set(viewerFollowingList.map((f: any) => f.id));
+        const followingWithStatus = following.map((f: any) => ({
+          ...f,
+          isFollowing: viewerFollowingSet.has(f.id),
+        }));
+        res.json(followingWithStatus);
+      } else {
+        res.json(following.map((f: any) => ({ ...f, isFollowing: false })));
+      }
     } catch (error) {
       next(error);
     }
