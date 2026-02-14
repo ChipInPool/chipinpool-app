@@ -26,6 +26,8 @@ import HelpCenterScreen from '@/screens/HelpCenterScreen';
 import ContactScreen from '@/screens/ContactScreen';
 import AboutScreen from '@/screens/AboutScreen';
 import ArchivedPoolsScreen from '@/screens/ArchivedPoolsScreen';
+import UserProfileScreen from '@/screens/UserProfileScreen';
+import UserSearchScreen from '@/screens/UserSearchScreen';
 
 export type AppTabParamList = {
   HomeTab: undefined;
@@ -41,6 +43,8 @@ export type PoolsStackParamList = {
   CreatePool: undefined;
   SpendNow: undefined;
   ArchivedPools: undefined;
+  UserProfile: { userId?: string; username?: string };
+  UserSearch: undefined;
 };
 
 export type ProfileStackParamList = {
@@ -58,6 +62,8 @@ export type ProfileStackParamList = {
   HelpCenter: undefined;
   Contact: undefined;
   About: undefined;
+  UserProfile: { userId?: string; username?: string };
+  UserSearch: undefined;
 };
 
 const Tab = createBottomTabNavigator();
@@ -80,6 +86,8 @@ function PoolsStackNavigator() {
       <PoolsStackNav.Screen name="CreatePool" component={CreatePoolScreen} options={{ title: 'Create Pool' }} />
       <PoolsStackNav.Screen name="SpendNow" component={SpendNowScreen} options={{ title: 'Spend Now' }} />
       <PoolsStackNav.Screen name="ArchivedPools" component={ArchivedPoolsScreen} options={{ title: 'Archived Pools' }} />
+      <PoolsStackNav.Screen name="UserProfile" component={UserProfileScreen} options={{ title: 'Profile', headerShown: false }} />
+      <PoolsStackNav.Screen name="UserSearch" component={UserSearchScreen} options={{ title: 'Find People', headerShown: false }} />
     </PoolsStackNav.Navigator>
   );
 }
@@ -107,6 +115,8 @@ function ProfileStackNavigator() {
       <ProfileStackNav.Screen name="HelpCenter" component={HelpCenterScreen} options={{ title: 'Help Center' }} />
       <ProfileStackNav.Screen name="Contact" component={ContactScreen} options={{ title: 'Contact Us' }} />
       <ProfileStackNav.Screen name="About" component={AboutScreen} options={{ title: 'About' }} />
+      <ProfileStackNav.Screen name="UserProfile" component={UserProfileScreen} options={{ title: 'Profile', headerShown: false }} />
+      <ProfileStackNav.Screen name="UserSearch" component={UserSearchScreen} options={{ title: 'Find People', headerShown: false }} />
     </ProfileStackNav.Navigator>
   );
 }

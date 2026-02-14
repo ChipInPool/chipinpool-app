@@ -51,6 +51,7 @@ import SpendNow from "@/pages/spend-now";
 import Cards from "@/pages/cards";
 import Notifications from "@/pages/notifications";
 import ArchivedPools from "@/pages/archived-pools";
+import UserSearch from "@/pages/user-search";
 
 function Router() {
   return (
@@ -67,6 +68,7 @@ function Router() {
       <Route path="/security" component={Security} />
       <Route path="/payment-methods" component={PaymentMethods} />
       <Route path="/user/:id" component={UserProfile} />
+      <Route path="/profile/:username" component={UserProfile} />
       <Route path="/pool/:id" component={PoolDetails} />
       <Route path="/pool/:id/spend" component={SpendPool} />
       <Route path="/transactions" component={Transactions} />
@@ -99,6 +101,7 @@ function Router() {
       <Route path="/cards" component={Cards} />
       <Route path="/notifications" component={Notifications} />
       <Route path="/archived" component={ArchivedPools} />
+      <Route path="/search/users" component={UserSearch} />
       <Route path="/@:username/:amount" component={PayMe} />
       <Route path="/@:username" component={PayMe} />
       <Route component={NotFound} />

@@ -377,6 +377,24 @@ export const api = {
     initBadges: () =>
       fetchApi<any>('/api/rewards/init-badges', { method: 'POST' }),
   },
+  users: {
+    search: (query: string) =>
+      fetchApi<any>(`/api/users/search?q=${encodeURIComponent(query)}`),
+    getProfileByUsername: (username: string) =>
+      fetchApi<any>(`/api/users/${username}/profile`),
+    getProfile: (userId: string) =>
+      fetchApi<any>(`/api/users/${userId}/profile`),
+    follow: (userId: string) =>
+      fetchApi<any>(`/api/users/${userId}/follow`, { method: 'POST' }),
+    unfollow: (userId: string) =>
+      fetchApi<any>(`/api/users/${userId}/follow`, { method: 'DELETE' }),
+    getFollowers: (userId: string) =>
+      fetchApi<any>(`/api/users/${userId}/followers`),
+    getFollowing: (userId: string) =>
+      fetchApi<any>(`/api/users/${userId}/following`),
+    updatePrivacy: (isPublic: boolean) =>
+      fetchApi<any>('/api/user/privacy', { method: 'PATCH', body: JSON.stringify({ isPublic }) }),
+  },
   recurring: {
     list: () => fetchApi<any>('/api/user/recurring-contributions'),
     create: (poolId: string, amount: string, frequency: string, startImmediately: boolean = true, paymentMethod: 'wallet' | 'bank' = 'wallet', bankAccountId?: string) =>

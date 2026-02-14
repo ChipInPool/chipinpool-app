@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { api, queryKeys } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Wallet, Menu, Bell, Moon, Sun, LogOut, Shield, Settings, CreditCard, ShoppingBag } from "lucide-react";
+import { Plus, Wallet, Menu, Bell, Moon, Sun, LogOut, Shield, Settings, CreditCard, ShoppingBag, Search } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -71,6 +71,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <FeatureTooltip id="nav-rewards" title="Rewards" description="Earn badges, points, and climb the leaderboard by contributing to pools and being active.">
                 <span>Rewards</span>
               </FeatureTooltip>
+            </Link>
+            <Link href="/search/users" className={`text-sm font-medium hover:text-primary transition-colors ${location === '/search/users' ? 'text-primary' : 'text-muted-foreground'}`} data-testid="link-find-people">
+              Find People
             </Link>
             <Link href="/api-docs" className={`text-sm font-medium hover:text-primary transition-colors ${location === '/api-docs' ? 'text-primary' : 'text-muted-foreground'}`}>
               Developers
@@ -225,6 +228,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <Bell className="w-5 h-5" /> Notifications
                       {unreadCount > 0 && <span className="ml-auto text-xs bg-red-500 text-white rounded-full px-1.5 py-0.5">{unreadCount}</span>}
                     </Link>
+                    <Link href="/search/users" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)} data-testid="link-find-people-mobile"><Search className="w-5 h-5" /> Find People</Link>
                     <Link href="/settings" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Settings</Link>
                     <Link href="/api-docs" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>For Developers</Link>
                     

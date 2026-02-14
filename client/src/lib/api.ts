@@ -132,6 +132,9 @@ export const api = {
       fetchApi("/api/user/withdraw", { method: "POST", body: JSON.stringify({ amount }) }),
     getTransactionHistory: () => fetchApi("/api/user/transactions"),
     getWalletHistory: () => fetchApi("/api/user/wallet-history"),
+    getProfileByUsername: (username: string) => fetchApi(`/api/users/${username}/profile`),
+    updatePrivacy: (isPublic: boolean) => fetchApi("/api/user/privacy", { method: "PATCH", body: JSON.stringify({ isPublic }) }),
+    search: (query: string) => fetchApi(`/api/users/search?q=${encodeURIComponent(query)}`),
   },
   recurring: {
     create: (poolId: string, amount: string, frequency: 'weekly' | 'monthly' | 'quarterly', startImmediately: boolean = true, paymentMethod: 'wallet' | 'bank' = 'wallet', bankAccountId?: string) =>
@@ -182,6 +185,8 @@ export const queryKeys = {
   myFollowers: ["myFollowers"] as const,
   transactionHistory: ["transactionHistory"] as const,
   walletHistory: ["walletHistory"] as const,
+  userProfileByUsername: (username: string) => ["userProfileByUsername", username] as const,
+  userSearch: (query: string) => ["userSearch", query] as const,
 };
 
 export const userQueryOptions = queryOptions({
