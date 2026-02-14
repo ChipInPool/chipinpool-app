@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, ActivityIndicator, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 const THEME_STORAGE_KEY = '@chipinpool_theme_mode';
@@ -28,7 +28,7 @@ const lightColors = {
   amber: '#F59E0B',
   red: '#EF4444',
   green: '#10B981',
-  statusBar: 'dark' as const,
+  statusBar: 'dark' as 'light' | 'dark',
 };
 
 const darkColors = {
@@ -53,7 +53,7 @@ const darkColors = {
   amber: '#F59E0B',
   red: '#f87171',
   green: '#34D399',
-  statusBar: 'light' as const,
+  statusBar: 'light' as 'light' | 'dark',
 };
 
 export type ThemeColors = typeof darkColors;
@@ -78,17 +78,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    SecureStore.getItemAsync(THEME_STORAGE_KEY).then((stored) => {
-      if (stored === 'light' || stored === 'dark' || stored === 'system') {
-        setThemeModeState(stored);
-      }
-      setIsLoaded(true);
-    });
+    SecureStore.getItemAsync(THEME_STORAGE_KEY)
+      .then((stored: string | null) => {
+        if (stored === 'light' || stored === 'dark' || stored === 'system') {
+          setThemeModeState(stored);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        setIsLoaded(true);
+      });
   }, []);
 
   const setThemeMode = useCallback((mode: ThemeMode) => {
     setThemeModeState(mode);
-    SecureStore.setItemAsync(THEME_STORAGE_KEY, mode);
+    SecureStore.setItemAsync(THEME_STORAGE_KEY, mode).catch(() => {});
   }, []);
 
   const isDark = themeMode === 'system'
@@ -98,7 +102,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const colors = isDark ? darkColors : lightColors;
 
   if (!isLoaded) {
-    return null;
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#001F3F' }}>
+        <ActivityIndicator size="large" color="#7FFFD4" />
+      </View>
+    );
   }
 
   return (

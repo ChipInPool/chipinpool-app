@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '@/hooks/useAuth';
+import { useTheme } from '@/theme/ThemeContext';
 import AuthStack from './AuthStack';
 import AppTabs from './AppTabs';
 
@@ -9,11 +10,12 @@ const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
   const { isLoading, isAuthenticated } = useAuth();
+  const { colors } = useTheme();
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#001F3F' }}>
-        <ActivityIndicator size="large" color="#7FFFD4" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.mint} />
       </View>
     );
   }
