@@ -1337,7 +1337,9 @@ export async function registerRoutes(
         description: z.string().optional(),
         targetAmount: z.string().optional(),
         deadline: z.string().optional(),
-        image: z.string().optional(),
+        image: z.string().nullable().optional(),
+        emoji: z.string().nullable().optional(),
+        externalLink: z.string().nullable().optional(),
         status: z.enum(['active', 'completed', 'expired', 'closed', 'paused']).optional(),
       });
 
@@ -1357,7 +1359,9 @@ export async function registerRoutes(
         description: data.description,
         targetAmount: data.targetAmount,
         deadline: data.deadline ? new Date(data.deadline) : undefined,
-        image: data.image,
+        image: data.image ?? undefined,
+        emoji: data.emoji ?? undefined,
+        externalLink: data.externalLink ?? undefined,
         status: data.status,
       });
 

@@ -162,11 +162,6 @@ export default function SpendNowScreen() {
 
   const ListHeader = (
     <>
-      <Text style={[styles.title, { color: colors.text }]}>Spend Now</Text>
-      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-        Shop directly with your wallet or pool funds at partner stores
-      </Text>
-
       <TouchableOpacity
         style={[styles.poolSelector, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}
         onPress={() => setShowPoolPicker(!showPoolPicker)}
@@ -342,8 +337,6 @@ export default function SpendNowScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   listContent: { padding: SCREEN_PADDING, paddingBottom: 40 },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 4 },
-  subtitle: { fontSize: 14, marginBottom: 20 },
   poolSelector: {
     borderRadius: 12,
     padding: 14,

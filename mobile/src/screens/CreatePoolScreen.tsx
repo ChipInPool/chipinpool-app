@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
@@ -15,6 +15,13 @@ const CATEGORIES: { label: string; value: string; icon: keyof typeof Ionicons.gl
   { label: 'Other', value: 'Other', icon: 'ellipsis-horizontal-outline' },
 ];
 
+const POOL_EMOJIS = [
+  '🎂', '🎉', '✈️', '🏖️', '🎁', '🛒', '🏠', '🎓',
+  '💍', '🚗', '🏕️', '🎯', '🏢', '🔁', '💰', '🍕',
+  '🎮', '⚽', '🎵', '📱', '🐶', '🌴', '🎄', '❤️',
+  '🥳', '🍽️', '🎬', '🧳', '💐', '🎊', '🏆', '🌟',
+];
+
 const getDefaultDeadline = (daysFromNow: number = 30): string => {
   const d = new Date();
   d.setDate(d.getDate() + daysFromNow);
@@ -22,12 +29,12 @@ const getDefaultDeadline = (daysFromNow: number = 30): string => {
 };
 
 const TEMPLATES = [
-  { label: '🎂 Birthday Gift', title: 'Birthday Gift', category: 'Gift', amount: '100.00', description: 'Collecting for a birthday present', deadline: getDefaultDeadline(14) },
-  { label: '✈️ Group Trip', title: 'Group Trip', category: 'Trip', amount: '500.00', description: 'Pooling funds for our group trip', deadline: getDefaultDeadline(60) },
-  { label: '🏢 Office Fund', title: 'Office Fund', category: 'Other', amount: '50.00', description: 'Office snacks and supplies fund', deadline: getDefaultDeadline(30) },
-  { label: '🎉 Party Fund', title: 'Party Fund', category: 'Event', amount: '200.00', description: 'Collecting for the party expenses', deadline: getDefaultDeadline(21) },
-  { label: '🛒 Group Purchase', title: 'Group Purchase', category: 'Purchase', amount: '150.00', description: 'Splitting cost of a shared purchase', deadline: getDefaultDeadline(14) },
-  { label: '🔁 Monthly Pool', title: 'Monthly Pool', category: 'Recurring', amount: '100.00', description: 'Recurring monthly contribution pool', deadline: getDefaultDeadline(30), isRecurring: true, frequency: 'monthly' as const },
+  { label: '🎂 Birthday Gift', title: 'Birthday Gift', category: 'Gift', amount: '100.00', description: 'Collecting for a birthday present', deadline: getDefaultDeadline(14), emoji: '🎂' },
+  { label: '✈️ Group Trip', title: 'Group Trip', category: 'Trip', amount: '500.00', description: 'Pooling funds for our group trip', deadline: getDefaultDeadline(60), emoji: '✈️' },
+  { label: '🏢 Office Fund', title: 'Office Fund', category: 'Other', amount: '50.00', description: 'Office snacks and supplies fund', deadline: getDefaultDeadline(30), emoji: '🏢' },
+  { label: '🎉 Party Fund', title: 'Party Fund', category: 'Event', amount: '200.00', description: 'Collecting for the party expenses', deadline: getDefaultDeadline(21), emoji: '🎉' },
+  { label: '🛒 Group Purchase', title: 'Group Purchase', category: 'Purchase', amount: '150.00', description: 'Splitting cost of a shared purchase', deadline: getDefaultDeadline(14), emoji: '🛒' },
+  { label: '🔁 Monthly Pool', title: 'Monthly Pool', category: 'Recurring', amount: '100.00', description: 'Recurring monthly contribution pool', deadline: getDefaultDeadline(30), isRecurring: true, frequency: 'monthly' as const, emoji: '🔁' },
 ];
 
 export default function CreatePoolScreen() {
@@ -42,6 +49,9 @@ export default function CreatePoolScreen() {
   const [deadline, setDeadline] = useState(getDefaultDeadline());
   const [isRecurring, setIsRecurring] = useState(false);
   const [frequency, setFrequency] = useState('');
+  const [emoji, setEmoji] = useState('');
+  const [externalLink, setExternalLink] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [error, setError] = useState('');
 
   const createMutation = useMutation({
@@ -64,6 +74,7 @@ export default function CreatePoolScreen() {
     setDeadline(template.deadline);
     setIsRecurring(!!(template as any).isRecurring);
     setFrequency((template as any).frequency || '');
+    setEmoji(template.emoji || '');
     setError('');
   };
 
@@ -97,6 +108,9 @@ export default function CreatePoolScreen() {
       deadline: new Date(deadline).toISOString(),
     };
 
+    if (emoji) payload.emoji = emoji;
+    if (externalLink.trim()) payload.externalLink = externalLink.trim();
+
     if (isRecurring) {
       payload.isRecurring = true;
       if (frequency) payload.frequency = frequency;
@@ -104,6 +118,8 @@ export default function CreatePoolScreen() {
 
     createMutation.mutate(payload);
   };
+
+  const selectedEmoji = emoji || '💰';
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
@@ -129,6 +145,25 @@ export default function CreatePoolScreen() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, { color: colors.mint }]}>Pool Icon</Text>
+          <TouchableOpacity
+            style={[styles.emojiSelector, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}
+            onPress={() => setShowEmojiPicker(true)}
+            activeOpacity={0.7}
+            data-testid="button-emoji-picker"
+          >
+            <Text style={styles.emojiPreview}>{selectedEmoji}</Text>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={[styles.emojiSelectorLabel, { color: colors.text }]}>
+                {emoji ? 'Tap to change' : 'Choose an emoji'}
+              </Text>
+              <Text style={[styles.emojiSelectorHint, { color: colors.textSecondary }]}>Optional - defaults to 💰</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.inputContainer}>
@@ -207,6 +242,29 @@ export default function CreatePoolScreen() {
           </View>
         </View>
 
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, { color: colors.mint }]}>Link (Optional)</Text>
+          <View style={[styles.linkRow, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+            <View style={[styles.linkIconWrap, { backgroundColor: `${colors.blue}1F` }]}>
+              <Ionicons name="link-outline" size={20} color={colors.blue} />
+            </View>
+            <TextInput
+              style={[styles.linkInput, { color: colors.text }]}
+              placeholder="https://example.com"
+              placeholderTextColor={colors.textSecondary}
+              value={externalLink}
+              onChangeText={setExternalLink}
+              keyboardType="url"
+              autoCapitalize="none"
+              autoCorrect={false}
+              data-testid="input-external-link"
+            />
+          </View>
+          <Text style={[styles.linkHint, { color: colors.textSecondary }]}>
+            Add a link to a wishlist, event page, or related website
+          </Text>
+        </View>
+
         {category === 'Recurring' && (
           <View style={styles.inputContainer}>
             <Text style={[styles.label, { color: colors.mint }]}>Frequency</Text>
@@ -245,6 +303,47 @@ export default function CreatePoolScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <Modal visible={showEmojiPicker} transparent animationType="slide" onRequestClose={() => setShowEmojiPicker(false)}>
+        <View style={styles.emojiModalOverlay}>
+          <TouchableOpacity style={styles.emojiModalBackdrop} activeOpacity={1} onPress={() => setShowEmojiPicker(false)} />
+          <View style={[styles.emojiModalContent, { backgroundColor: isDark ? '#0A1929' : '#FFFFFF', borderColor: `${colors.mint}1A` }]}>
+            <View style={[styles.emojiModalHandle, { backgroundColor: colors.cardBorder }]} />
+            <View style={styles.emojiModalHeader}>
+              <Text style={[styles.emojiModalTitle, { color: colors.text }]}>Choose Pool Icon</Text>
+              <TouchableOpacity onPress={() => setShowEmojiPicker(false)} data-testid="button-close-emoji-picker">
+                <Ionicons name="close-circle" size={28} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            {emoji ? (
+              <TouchableOpacity
+                style={[styles.emojiClearButton, { backgroundColor: `${colors.red}15`, borderColor: `${colors.red}30` }]}
+                onPress={() => { setEmoji(''); setShowEmojiPicker(false); }}
+                data-testid="button-clear-emoji"
+              >
+                <Ionicons name="close-outline" size={16} color={colors.red} />
+                <Text style={[styles.emojiClearText, { color: colors.red }]}>Remove icon (use default)</Text>
+              </TouchableOpacity>
+            ) : null}
+            <View style={styles.emojiGrid}>
+              {POOL_EMOJIS.map((e) => (
+                <TouchableOpacity
+                  key={e}
+                  style={[
+                    styles.emojiGridItem,
+                    { backgroundColor: colors.inputBg },
+                    emoji === e && { backgroundColor: `${colors.mint}30`, borderWidth: 2, borderColor: colors.mint },
+                  ]}
+                  onPress={() => { setEmoji(e); setShowEmojiPicker(false); }}
+                  data-testid={`button-emoji-${e}`}
+                >
+                  <Text style={styles.emojiGridText}>{e}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -406,6 +505,50 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     fontSize: 16,
   },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+  },
+  linkIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  linkInput: {
+    flex: 1,
+    paddingVertical: 16,
+    fontSize: 16,
+  },
+  linkHint: {
+    fontSize: 12,
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  emojiSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  emojiPreview: {
+    fontSize: 32,
+  },
+  emojiSelectorLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  emojiSelectorHint: {
+    fontSize: 12,
+    marginTop: 2,
+  },
   frequencyRow: {
     flexDirection: 'row',
     gap: 10,
@@ -441,5 +584,68 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  emojiModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  emojiModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  emojiModalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 12,
+    borderWidth: 1,
+  },
+  emojiModalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  emojiModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  emojiModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  emojiClearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+  },
+  emojiClearText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  emojiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  emojiGridItem: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emojiGridText: {
+    fontSize: 28,
   },
 });

@@ -60,9 +60,6 @@ export default function PaymentMethodsScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.mint} />}
     >
-      <Text style={[styles.pageTitle, { color: colors.text }]}>Payment Methods</Text>
-      <Text style={[styles.pageSubtitle, { color: colors.slate }]}>Manage your payment methods for deposits and withdrawals</Text>
-
       <View style={[styles.withdrawalStatusCard, { backgroundColor: 'rgba(96, 165, 250, 0.08)', borderColor: 'rgba(96, 165, 250, 0.2)' }]}>
         <View style={styles.statusHeader}>
           <Ionicons name="shield-checkmark" size={22} color={colors.blue} />
@@ -159,8 +156,6 @@ export default function PaymentMethodsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 16, paddingBottom: 40 },
-  pageTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
-  pageSubtitle: { fontSize: 14, marginBottom: 20 },
   withdrawalStatusCard: {
     borderRadius: 16,
     padding: 16,

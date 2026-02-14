@@ -103,6 +103,9 @@ export default function PoolDetailsScreen() {
   const [editTargetAmount, setEditTargetAmount] = useState('');
   const [editDeadline, setEditDeadline] = useState('');
   const [editStatus, setEditStatus] = useState('');
+  const [editEmoji, setEditEmoji] = useState('');
+  const [editExternalLink, setEditExternalLink] = useState('');
+  const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showAutoContribute, setShowAutoContribute] = useState(false);
   const [autoContributeAmount, setAutoContributeAmount] = useState('');
@@ -257,6 +260,8 @@ export default function PoolDetailsScreen() {
       if (editTargetAmount.trim()) data.targetAmount = editTargetAmount.trim();
       if (editDeadline.trim()) data.deadline = editDeadline.trim();
       data.status = editStatus;
+      data.emoji = editEmoji || null;
+      data.externalLink = editExternalLink.trim() || null;
       return api.pools.update(poolId, data);
     },
     onSuccess: () => {
@@ -355,12 +360,32 @@ export default function PoolDetailsScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.mint} />}>
       <View style={styles.header}>
-        <View style={[styles.iconCircle, { backgroundColor: `${categoryColor}20` }]}>
-          <Ionicons name={getCategoryIcon(pool.category)} size={36} color={categoryColor} />
-        </View>
+        {pool?.emoji ? (
+          <View style={[styles.iconCircle, { backgroundColor: `${categoryColor}20` }]}>
+            <Text style={{ fontSize: 36 }}>{pool.emoji}</Text>
+          </View>
+        ) : (
+          <View style={[styles.iconCircle, { backgroundColor: `${categoryColor}20` }]}>
+            <Ionicons name={getCategoryIcon(pool.category)} size={36} color={categoryColor} />
+          </View>
+        )}
         <Text style={[styles.title, { color: colors.text }]} data-testid="text-pool-title">{pool?.title ?? 'Untitled Pool'}</Text>
         {pool?.description ? (
           <Text style={[styles.description, { color: colors.textSecondary }]} data-testid="text-pool-description">{pool.description}</Text>
+        ) : null}
+        {pool?.externalLink ? (
+          <TouchableOpacity
+            style={[styles.externalLinkButton, { backgroundColor: `${colors.blue}15`, borderColor: `${colors.blue}30` }]}
+            onPress={() => Linking.openURL(pool.externalLink!)}
+            activeOpacity={0.7}
+            data-testid="button-external-link"
+          >
+            <Ionicons name="link-outline" size={16} color={colors.blue} />
+            <Text style={[styles.externalLinkText, { color: colors.blue }]} numberOfLines={1}>
+              {pool.externalLink.replace(/^https?:\/\//, '').split('/')[0]}
+            </Text>
+            <Ionicons name="open-outline" size={14} color={colors.blue} />
+          </TouchableOpacity>
         ) : null}
       </View>
 
@@ -480,6 +505,8 @@ export default function PoolDetailsScreen() {
                 setEditTargetAmount(pool?.targetAmount || '');
                 setEditDeadline(pool?.deadline ? new Date(pool.deadline).toISOString().split('T')[0] : '');
                 setEditStatus(pool?.status || 'active');
+                setEditEmoji(pool?.emoji || '');
+                setEditExternalLink(pool?.externalLink || '');
                 setShowEditPool(true);
               }}
               activeOpacity={0.7}
@@ -1089,6 +1116,46 @@ export default function PoolDetailsScreen() {
                 data-testid="input-edit-deadline"
               />
 
+              <Text style={[styles.paymentMethodLabel, { marginTop: 16, color: colors.text }]}>Pool Icon</Text>
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 14, padding: 12, marginBottom: 4 }}
+                onPress={() => setShowEditEmojiPicker(!showEditEmojiPicker)}
+                data-testid="button-edit-emoji"
+              >
+                <Text style={{ fontSize: 28, marginRight: 12 }}>{editEmoji || '💰'}</Text>
+                <Text style={{ flex: 1, fontSize: 14, color: colors.textSecondary }}>{editEmoji ? 'Tap to change' : 'Choose an emoji (optional)'}</Text>
+                {editEmoji ? (
+                  <TouchableOpacity onPress={() => setEditEmoji('')} style={{ padding: 4 }} data-testid="button-clear-edit-emoji">
+                    <Ionicons name="close-circle" size={20} color={colors.red} />
+                  </TouchableOpacity>
+                ) : null}
+              </TouchableOpacity>
+              {showEditEmojiPicker && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8, marginBottom: 8 }}>
+                  {['🎂', '🎉', '✈️', '🏖️', '🎁', '🛒', '🏠', '🎓', '💍', '🚗', '🏕️', '🎯', '🏢', '🔁', '💰', '🍕', '🎮', '⚽', '🎵', '📱', '🐶', '🌴', '🎄', '❤️'].map((e) => (
+                    <TouchableOpacity
+                      key={e}
+                      style={{ width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: editEmoji === e ? `${colors.mint}30` : colors.inputBg, borderWidth: editEmoji === e ? 2 : 0, borderColor: colors.mint }}
+                      onPress={() => { setEditEmoji(e); setShowEditEmojiPicker(false); }}
+                    >
+                      <Text style={{ fontSize: 24 }}>{e}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              <Text style={[styles.paymentMethodLabel, { marginTop: 16, color: colors.text }]}>Link (Optional)</Text>
+              <TextInput
+                style={[styles.amountInput, { paddingHorizontal: 16, fontSize: 15, backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 14, color: colors.text }]}
+                placeholder="https://example.com"
+                placeholderTextColor={colors.textSecondary}
+                value={editExternalLink}
+                onChangeText={setEditExternalLink}
+                keyboardType="url"
+                autoCapitalize="none"
+                data-testid="input-edit-link"
+              />
+
               <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginTop: 16, marginBottom: 8 }}>Status</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {[
@@ -1379,6 +1446,21 @@ const styles = StyleSheet.create({
     marginTop: 8,
     lineHeight: 22,
     paddingHorizontal: 12,
+  },
+  externalLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  externalLinkText: {
+    fontSize: 13,
+    fontWeight: '500',
+    maxWidth: 200,
   },
   infoCardsRow: {
     flexDirection: 'row',
