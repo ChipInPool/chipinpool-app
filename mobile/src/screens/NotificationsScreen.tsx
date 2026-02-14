@@ -77,7 +77,7 @@ export default function NotificationsScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <View style={[styles.header, { borderBottomColor: colors.cardBorder }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Notifications</Text>
         <TouchableOpacity

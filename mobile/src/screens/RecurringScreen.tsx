@@ -151,7 +151,7 @@ export default function RecurringScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.mint} />
           <Text style={[styles.loadingText, { color: colors.slate }]}>Loading...</Text>
@@ -161,7 +161,7 @@ export default function RecurringScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} data-testid="button-back">
           <Ionicons name="arrow-back" size={24} color={colors.text} />

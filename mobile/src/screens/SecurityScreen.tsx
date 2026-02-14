@@ -93,7 +93,7 @@ export default function SecurityScreen() {
   });
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.slate }]}>KYC Verification</Text>

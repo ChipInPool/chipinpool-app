@@ -40,7 +40,7 @@ export default function CardsScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.comingSoonBanner, { backgroundColor: `${colors.mint}10`, borderColor: `${colors.mint}26` }]}>
           <View style={[styles.bannerIconContainer, { backgroundColor: `${colors.mint}1F` }]}>

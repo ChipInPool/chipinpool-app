@@ -96,14 +96,14 @@ export default function NotificationSettingsScreen() {
 
   if (isLoading || !prefs) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
         <ActivityIndicator color={colors.mint} style={{ marginTop: 60 }} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.header, { color: colors.text }]}>Notification Settings</Text>
         <Text style={[styles.subtitle, { color: colors.slate }]}>Choose how you want to be notified about activity on your account.</Text>

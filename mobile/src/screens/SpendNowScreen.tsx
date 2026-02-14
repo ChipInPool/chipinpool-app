@@ -317,7 +317,7 @@ export default function SpendNowScreen() {
   ) : null;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <FlatList
         data={loadingPartners ? [] : partners}
         renderItem={renderPartnerCard}

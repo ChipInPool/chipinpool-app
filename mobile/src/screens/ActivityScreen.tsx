@@ -111,7 +111,7 @@ export default function ActivityScreen() {
   }, [activityData]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={

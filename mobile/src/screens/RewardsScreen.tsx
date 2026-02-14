@@ -210,7 +210,7 @@ export default function RewardsScreen() {
   ];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <View style={[styles.header, { borderBottomColor: colors.cardBorder }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Rewards</Text>
       </View>

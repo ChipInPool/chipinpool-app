@@ -50,7 +50,7 @@ export default function SettingsScreen() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={[]}>
         <ScrollView contentContainerStyle={{ padding: 20 }}>
           <View style={{ alignItems: 'center', marginBottom: 32 }}>
             <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: isDark ? 'rgba(127, 255, 212, 0.2)' : 'rgba(0, 168, 120, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
