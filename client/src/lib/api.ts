@@ -81,6 +81,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ method, recipients }),
       }),
+    discover: () => fetchApi("/api/pools/discover"),
   },
   myFollowers: () => fetchApi("/api/my-followers"),
   stripe: {
@@ -183,6 +184,7 @@ export const queryKeys = {
   following: (userId: string) => ["following", userId] as const,
   followers: (userId: string) => ["followers", userId] as const,
   myFollowers: ["myFollowers"] as const,
+  discoverPools: ["discoverPools"] as const,
   transactionHistory: ["transactionHistory"] as const,
   walletHistory: ["walletHistory"] as const,
   userProfileByUsername: (username: string) => ["userProfileByUsername", username] as const,

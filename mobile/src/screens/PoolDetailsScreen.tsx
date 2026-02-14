@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Share, Modal, TextInput, Linking, Switch, RefreshControl, Image } from 'react-native';
 import { useRoute, RouteProp, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -114,6 +114,13 @@ export default function PoolDetailsScreen() {
   const [autoContributeFrequency, setAutoContributeFrequency] = useState<'weekly' | 'monthly' | 'quarterly'>('monthly');
   const [startImmediately, setStartImmediately] = useState(true);
   const [autoPaymentMethod, setAutoPaymentMethod] = useState<'wallet' | string>('wallet');
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteSearch, setInviteSearch] = useState('');
+  const [inviteSearchResults, setInviteSearchResults] = useState<any[]>([]);
+  const [selectedInviteUsers, setSelectedInviteUsers] = useState<string[]>([]);
+  const [inviteSearching, setInviteSearching] = useState(false);
+  const [inviteSending, setInviteSending] = useState(false);
+  const inviteSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { refreshUser } = useAuth();
 
   const { data: pool, isLoading, isError } = useQuery({
@@ -406,6 +413,62 @@ export default function PoolDetailsScreen() {
     setPaymentMethod('stripe');
   };
 
+  const { data: followingData } = useQuery({
+    queryKey: ['following', currentUser?.id],
+    queryFn: () => api.users.getFollowing(currentUser?.id),
+    enabled: !!currentUser?.id && showInvite,
+  });
+
+  const followingList = Array.isArray(followingData) ? followingData : (followingData as any)?.following || (followingData as any)?.users || [];
+
+  useEffect(() => {
+    if (!showInvite) return;
+    if (!inviteSearch.trim()) {
+      setInviteSearchResults([]);
+      setInviteSearching(false);
+      return;
+    }
+    setInviteSearching(true);
+    if (inviteSearchTimer.current) clearTimeout(inviteSearchTimer.current);
+    inviteSearchTimer.current = setTimeout(async () => {
+      try {
+        const result = await api.users.search(inviteSearch.trim());
+        const users = Array.isArray(result) ? result : (result as any)?.users || [];
+        setInviteSearchResults(users);
+      } catch {
+        setInviteSearchResults([]);
+      } finally {
+        setInviteSearching(false);
+      }
+    }, 300);
+    return () => {
+      if (inviteSearchTimer.current) clearTimeout(inviteSearchTimer.current);
+    };
+  }, [inviteSearch, showInvite]);
+
+  const toggleInviteUser = (userId: string) => {
+    setSelectedInviteUsers(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleSendInvites = async () => {
+    if (selectedInviteUsers.length === 0) return;
+    setInviteSending(true);
+    try {
+      await api.pools.invite(poolId, 'push', selectedInviteUsers);
+      Alert.alert('Success', `Invite${selectedInviteUsers.length > 1 ? 's' : ''} sent!`);
+      setShowInvite(false);
+      setSelectedInviteUsers([]);
+      setInviteSearch('');
+      setInviteSearchResults([]);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to send invites');
+    } finally {
+      setInviteSending(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
@@ -565,6 +628,15 @@ export default function PoolDetailsScreen() {
         <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: colors.card, borderColor: `${colors.mint}40` }]} onPress={handleShare} activeOpacity={0.7} data-testid="button-share">
           <Ionicons name="share-outline" size={20} color={colors.mint} />
           <Text style={[styles.secondaryButtonText, { color: colors.mint }]}>Share</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.secondaryButton, { backgroundColor: colors.card, borderColor: `${colors.mint}40` }]}
+          onPress={() => { setShowInvite(true); setSelectedInviteUsers([]); setInviteSearch(''); setInviteSearchResults([]); }}
+          activeOpacity={0.7}
+          data-testid="button-invite"
+        >
+          <Ionicons name="person-add-outline" size={20} color={colors.mint} />
+          <Text style={[styles.secondaryButtonText, { color: colors.mint }]}>Invite</Text>
         </TouchableOpacity>
       </View>
 
@@ -1506,6 +1578,131 @@ export default function PoolDetailsScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showInvite}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowInvite(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowInvite(false)} />
+          <View style={[styles.modalContent, { backgroundColor: isDark ? '#0A1929' : colors.navyLight, borderColor: `${colors.mint}1A` }]}>
+            <View style={[styles.modalHandle, { backgroundColor: colors.cardBorder }]} />
+            <View style={styles.modalHeaderRow}>
+              <View>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Invite to Pool</Text>
+                <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>{pool?.title ?? ''}</Text>
+              </View>
+              <TouchableOpacity style={[styles.modalCloseBtn, { backgroundColor: colors.cardBorder }]} onPress={() => setShowInvite(false)} data-testid="button-close-invite">
+                <Ionicons name="close" size={22} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.amountInputContainer, { backgroundColor: colors.inputBg, borderColor: `${colors.mint}33`, marginBottom: 16 }]}>
+              <Ionicons name="search-outline" size={20} color={colors.textSecondary} style={{ marginRight: 8 }} />
+              <TextInput
+                style={[styles.amountInput, { color: colors.text, fontSize: 15, fontWeight: '500' }]}
+                placeholder="Search by username..."
+                placeholderTextColor={colors.textSecondary}
+                value={inviteSearch}
+                onChangeText={setInviteSearch}
+                autoCapitalize="none"
+                autoCorrect={false}
+                data-testid="input-invite-search"
+              />
+              {inviteSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setInviteSearch('')}>
+                  <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {selectedInviteUsers.length > 0 && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 6 }}>
+                <Ionicons name="checkmark-circle" size={16} color={colors.mint} />
+                <Text style={{ color: colors.mint, fontSize: 13, fontWeight: '600' }}>{selectedInviteUsers.length} selected</Text>
+              </View>
+            )}
+
+            <ScrollView style={{ maxHeight: 320 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+              {inviteSearching && (
+                <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+                  <ActivityIndicator size="small" color={colors.mint} />
+                </View>
+              )}
+
+              {!inviteSearching && inviteSearch.trim().length > 0 && inviteSearchResults.length === 0 && (
+                <View style={[styles.emptyContributors, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+                  <Ionicons name="search-outline" size={28} color={colors.textSecondary} />
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No users found</Text>
+                </View>
+              )}
+
+              {(inviteSearch.trim().length > 0 ? inviteSearchResults : followingList).map((user: any) => {
+                const userId = user.id || user.userId;
+                const isSelected = selectedInviteUsers.includes(userId);
+                const avatarUrl = user.avatar || user.profileImage;
+                return (
+                  <TouchableOpacity
+                    key={userId}
+                    style={[styles.paymentMethodCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }, isSelected && { borderColor: colors.mint, backgroundColor: `${colors.mint}14` }]}
+                    onPress={() => toggleInviteUser(userId)}
+                    activeOpacity={0.7}
+                    data-testid={`invite-user-${userId}`}
+                  >
+                    {avatarUrl ? (
+                      <Image
+                        source={{ uri: avatarUrl.startsWith('http') ? avatarUrl : `${API_URL}/objects/${avatarUrl.replace(/^\/objects\//, '')}` }}
+                        style={{ width: 44, height: 44, borderRadius: 22 }}
+                      />
+                    ) : (
+                      <View style={[styles.contributorAvatar, { backgroundColor: `${colors.mint}26`, borderColor: `${colors.mint}40` }]}>
+                        <Text style={[styles.contributorInitials, { color: colors.mint }]}>
+                          {(user.firstName?.[0] || '')}{(user.lastName?.[0] || '')}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.paymentMethodInfo}>
+                      <Text style={[styles.paymentMethodName, { color: colors.text }]}>{user.firstName || ''} {user.lastName || ''}</Text>
+                      {user.username && (
+                        <Text style={[styles.paymentMethodDesc, { color: colors.textSecondary }]}>@{user.username}</Text>
+                      )}
+                    </View>
+                    <View style={[styles.paymentMethodRadio, { borderColor: isSelected ? colors.mint : colors.cardBorder }]}>
+                      {isSelected && <View style={[styles.paymentMethodRadioDot, { backgroundColor: colors.mint }]} />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {!inviteSearch.trim() && followingList.length === 0 && !inviteSearching && (
+                <View style={[styles.emptyContributors, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+                  <Ionicons name="people-outline" size={28} color={colors.textSecondary} />
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Search for users to invite</Text>
+                  <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>Type a username above</Text>
+                </View>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.confirmButton, { marginTop: 16, backgroundColor: colors.mint }, (inviteSending || selectedInviteUsers.length === 0) && styles.confirmButtonDisabled]}
+              onPress={handleSendInvites}
+              disabled={inviteSending || selectedInviteUsers.length === 0}
+              activeOpacity={0.8}
+              data-testid="button-send-invites"
+            >
+              {inviteSending ? (
+                <ActivityIndicator color={isDark ? colors.navy : '#FFFFFF'} />
+              ) : (
+                <Text style={[styles.confirmButtonText, { color: isDark ? colors.navy : '#FFFFFF' }]}>
+                  Send Invite{selectedInviteUsers.length > 1 ? 's' : ''}{selectedInviteUsers.length > 0 ? ` (${selectedInviteUsers.length})` : ''}
+                </Text>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

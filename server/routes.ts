@@ -7,7 +7,7 @@ import cors from "cors";
 import cookieSignature from "cookie-signature";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { fileStorageService, isAzureStorage } from "./fileStorage";
-import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, walletDeposits, bankAccounts, merchantPayouts, payMeTransactions, apiAccessRequests, poolActivities } from "@shared/schema";
+import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, walletDeposits, bankAccounts, merchantPayouts, payMeTransactions, apiAccessRequests, poolActivities, invites } from "@shared/schema";
 import express from "express";
 import { db } from "./db";
 import { eq, desc, sql, inArray, and, lt, isNull, or } from "drizzle-orm";
@@ -1089,6 +1089,68 @@ export async function registerRoutes(
         })
       );
       res.json({ pools: poolsWithContributorCount });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/pools/discover", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const followingList = await storage.getFollowingDetailed(userId, 1000, 0);
+      const followingIds = followingList.map((f: any) => f.id);
+
+      let followingPools: any[] = [];
+      if (followingIds.length > 0) {
+        const allFollowingPools = await Promise.all(
+          followingIds.map((fId: string) => storage.getPoolsByCreator(fId))
+        );
+        followingPools = allFollowingPools
+          .flat()
+          .filter((p: any) => p.isPublic && p.status === 'active' && p.creatorId !== userId);
+      }
+
+      const userInvites = await db.select({ poolId: invites.poolId })
+        .from(invites)
+        .where(eq(invites.inviteeId, userId));
+      const invitedPoolIds = userInvites.map(i => i.poolId);
+
+      let invitedPools: any[] = [];
+      if (invitedPoolIds.length > 0) {
+        const invitedPoolResults = await Promise.all(
+          invitedPoolIds.map(id => storage.getPool(id))
+        );
+        invitedPools = invitedPoolResults
+          .filter((p): p is NonNullable<typeof p> => !!p && p.status === 'active' && p.creatorId !== userId);
+      }
+
+      const poolMap = new Map<string, any>();
+      for (const pool of followingPools) {
+        poolMap.set(pool.id, { ...pool, source: 'following' });
+      }
+      for (const pool of invitedPools) {
+        if (!poolMap.has(pool.id)) {
+          poolMap.set(pool.id, { ...pool, source: 'invited' });
+        }
+      }
+
+      const discoveredPools = Array.from(poolMap.values());
+      const poolsWithDetails = await Promise.all(
+        discoveredPools.map(async (pool) => {
+          const contribs = await storage.getContributionsByPool(pool.id);
+          const uniqueContributors = new Set(contribs.map(c => c.userId).filter(Boolean));
+          const creator = await storage.getUser(pool.creatorId);
+          return {
+            ...pool,
+            contributorCount: uniqueContributors.size,
+            creatorName: creator ? `${creator.firstName} ${creator.lastName}` : 'Unknown',
+            creatorUsername: creator?.username || '',
+            creatorAvatar: creator?.avatar || null,
+          };
+        })
+      );
+
+      res.json({ pools: poolsWithDetails });
     } catch (error) {
       next(error);
     }

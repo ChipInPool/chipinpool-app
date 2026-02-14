@@ -9,6 +9,8 @@ import { useQuery } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format, formatDistanceToNow } from "date-fns";
 import { GuidedTour } from "@/components/guided-tour";
@@ -40,6 +42,12 @@ export default function Home() {
     enabled: isAuthenticated,
   });
 
+  const { data: discoverData, isLoading: discoverLoading } = useQuery({
+    queryKey: queryKeys.discoverPools,
+    queryFn: api.pools.discover,
+    enabled: isAuthenticated,
+  });
+
   const { data: activityData } = useQuery({
     queryKey: ["activityFeed"],
     queryFn: () => fetch("/api/activity-feed", { credentials: "include" }).then(r => r.json()),
@@ -50,6 +58,7 @@ export default function Home() {
   const pools = (poolsData?.pools || []).filter((p: any) => p.status !== 'archived');
   const notifications = notificationsData?.notifications || [];
   const activities = activityData?.activities || [];
+  const discoverPools = discoverData?.pools || [];
 
   const myPools = pools.filter((p: any) => p.creatorId === user?.id);
   const contributedPools = pools.filter((p: any) => p.creatorId !== user?.id);
@@ -273,6 +282,106 @@ export default function Home() {
                 ))}
               </div>
             </>
+          )}
+
+          {discoverLoading && (
+            <div className="mt-8 md:mt-10">
+              <div className="flex items-center gap-2 mb-4">
+                <Compass className="w-5 h-5 text-primary" />
+                <h2 className="text-lg md:text-xl font-display font-bold tracking-tight">Pools to Join</h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[1, 2].map((i) => (
+                  <Skeleton key={i} className="h-[200px] rounded-xl" />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!discoverLoading && discoverPools.length > 0 && (
+            <div className="mt-8 md:mt-10">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Compass className="w-5 h-5 text-primary" />
+                  <h2 className="text-lg md:text-xl font-display font-bold tracking-tight">Pools to Join</h2>
+                </div>
+                <Button variant="ghost" size="sm" className="text-muted-foreground/60 hover:text-primary text-xs" asChild>
+                  <Link href="/explore">View All <ArrowRight className="w-3.5 h-3.5 ml-1" /></Link>
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {discoverPools.slice(0, 4).map((pool: any) => {
+                  const currentAmt = parseFloat(pool.currentAmount || '0');
+                  const targetAmt = parseFloat(pool.targetAmount || '1');
+                  const pct = Math.min(100, Math.round((currentAmt / targetAmt) * 100));
+                  const creator = pool.creator || { name: 'Unknown', avatar: null, username: 'unknown' };
+
+                  return (
+                    <Link key={pool.id} href={`/pool/${pool.id}`}>
+                      <Card
+                        className="group cursor-pointer border-white/[0.08] bg-gradient-to-br from-white/[0.04] to-white/[0.01] hover:border-white/[0.15] hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-0.5 overflow-hidden"
+                        data-testid={`discover-pool-${pool.id}`}
+                      >
+                        <CardHeader className="pb-2 p-4 md:p-5 md:pb-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {pool.emoji && (
+                                <span className="text-xl flex-shrink-0">{pool.emoji}</span>
+                              )}
+                              <h3 className="font-display font-semibold text-sm md:text-base leading-tight group-hover:text-primary transition-colors truncate">
+                                {pool.title}
+                              </h3>
+                            </div>
+                            <Badge
+                              variant="secondary"
+                              className={`text-[10px] flex-shrink-0 ${
+                                pool.source === 'invited'
+                                  ? 'bg-accent/15 text-accent border-accent/20'
+                                  : 'bg-primary/15 text-primary border-primary/20'
+                              }`}
+                            >
+                              {pool.source === 'invited' ? 'Invited' : 'From Following'}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="px-4 md:px-5 pb-3 md:pb-4">
+                          <div className="space-y-2.5">
+                            <div className="flex justify-between items-baseline">
+                              <span className="text-muted-foreground text-xs">Collected</span>
+                              <div className="flex items-baseline gap-1.5">
+                                <span className="text-sm md:text-base font-bold text-emerald-400">
+                                  ${currentAmt.toLocaleString()}
+                                </span>
+                                <span className="text-muted-foreground text-xs">/ ${targetAmt.toLocaleString()}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Progress
+                                value={pct}
+                                className="h-2 bg-white/5 flex-1"
+                                indicatorClassName="bg-gradient-to-r from-primary via-primary to-accent"
+                              />
+                              <span className="text-[10px] font-bold bg-primary/15 text-primary px-1.5 py-0.5 rounded-md min-w-[36px] text-center">
+                                {pct}%
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 pt-1">
+                              <Avatar className="w-5 h-5 ring-1 ring-white/10">
+                                <AvatarImage src={creator.avatar} />
+                                <AvatarFallback className="text-[8px]">{creator.name?.[0] || '?'}</AvatarFallback>
+                              </Avatar>
+                              <span className="text-xs text-muted-foreground">
+                                Created by @{creator.username || creator.name}
+                              </span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
 

@@ -271,6 +271,15 @@ export const api = {
       fetchApi<any>(`/api/pools/${poolId}/archive`, { method: 'POST' }),
     unarchive: (poolId: string) =>
       fetchApi<any>(`/api/pools/${poolId}/unarchive`, { method: 'POST' }),
+    discover: async () => {
+      const result = await fetchApi<any>('/api/pools/discover');
+      return result.pools || [];
+    },
+    invite: (poolId: string, method: 'email' | 'sms' | 'push', recipients: string[]) =>
+      fetchApi<any>(`/api/pools/${poolId}/invite`, {
+        method: 'POST',
+        body: JSON.stringify({ method, recipients }),
+      }),
   },
   wallet: {
     getBalance: () => fetchApi<any>('/api/auth/me').then((r: any) => {

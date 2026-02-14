@@ -169,10 +169,26 @@ export default function PoolDetails() {
     },
   });
 
-  const { data: followersData } = useQuery({
-    queryKey: queryKeys.myFollowers,
-    queryFn: () => api.myFollowers(),
-    enabled: isAuthenticated && inviteDialogOpen,
+  const { data: followingData } = useQuery({
+    queryKey: queryKeys.following(user?.id || ""),
+    queryFn: () => api.users.getFollowing(user?.id || ""),
+    enabled: isAuthenticated && !!user?.id && inviteDialogOpen,
+  });
+
+  const [friendSearchQuery, setFriendSearchQuery] = useState("");
+  const [friendDebouncedQuery, setFriendDebouncedQuery] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFriendDebouncedQuery(friendSearchQuery.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [friendSearchQuery]);
+
+  const { data: friendSearchData } = useQuery({
+    queryKey: queryKeys.userSearch(friendDebouncedQuery),
+    queryFn: () => api.users.search(friendDebouncedQuery),
+    enabled: friendDebouncedQuery.length >= 2,
   });
 
   const inviteMutation = useMutation({
@@ -1478,40 +1494,66 @@ export default function PoolDetails() {
                         
                         <TabsContent value="friends" className="space-y-4 pt-4">
                           <div className="space-y-2">
-                            <Label>Select followers to invite</Label>
+                            <Label>Search & select friends to invite</Label>
+                            <Input
+                              placeholder="Search by username or name..."
+                              value={friendSearchQuery}
+                              onChange={(e) => setFriendSearchQuery(e.target.value)}
+                              data-testid="input-friend-search"
+                            />
                             <div className="max-h-64 overflow-y-auto space-y-2 rounded-lg border border-white/10 p-2">
-                              {followersData?.followers && followersData.followers.length > 0 ? (
-                                followersData.followers.map((follower: any) => (
-                                  <div 
-                                    key={follower.id}
-                                    className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                                      selectedFollowers.includes(follower.id) ? 'bg-primary/20 border border-primary/50' : 'bg-white/5 hover:bg-white/10'
-                                    }`}
-                                    onClick={() => toggleFollowerSelection(follower.id)}
-                                    data-testid={`follower-item-${follower.id}`}
-                                  >
-                                    <Checkbox 
-                                      checked={selectedFollowers.includes(follower.id)}
-                                      className="pointer-events-none"
-                                    />
-                                    <Avatar className="w-8 h-8">
-                                      <AvatarImage src={follower.avatar} />
-                                      <AvatarFallback>{follower.name?.[0]}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex-1">
-                                      <p className="font-medium text-sm">{follower.name}</p>
-                                      <p className="text-xs text-muted-foreground">{follower.email}</p>
-                                    </div>
-                                    {selectedFollowers.includes(follower.id) && (
-                                      <Check className="w-4 h-4 text-primary" />
-                                    )}
-                                  </div>
-                                ))
-                              ) : (
-                                <p className="text-sm text-muted-foreground text-center py-4">
-                                  No followers yet. Share your pool to get more followers!
-                                </p>
-                              )}
+                              {(() => {
+                                const followingList = Array.isArray(followingData) ? followingData : (followingData?.following || []);
+                                const searchQuery = friendSearchQuery.trim().toLowerCase();
+                                const filteredFollowing = searchQuery
+                                  ? followingList.filter((u: any) => {
+                                      const name = `${u.firstName || ''} ${u.lastName || ''}`.trim().toLowerCase();
+                                      const username = (u.username || '').toLowerCase();
+                                      return name.includes(searchQuery) || username.includes(searchQuery);
+                                    })
+                                  : followingList;
+                                const searchResults = Array.isArray(friendSearchData) ? friendSearchData : (friendSearchData?.users || []);
+                                const followingIds = new Set(followingList.map((u: any) => u.id));
+                                const filteredIds = new Set(filteredFollowing.map((u: any) => u.id));
+                                const additionalResults = searchResults.filter((u: any) => !filteredIds.has(u.id) && u.id !== user?.id);
+                                const combinedUsers = [...filteredFollowing, ...additionalResults];
+
+                                return combinedUsers.length > 0 ? (
+                                  combinedUsers.map((friend: any) => {
+                                    const displayName = `${friend.firstName || ''} ${friend.lastName || ''}`.trim() || friend.name || 'Unknown';
+                                    return (
+                                      <div 
+                                        key={friend.id}
+                                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                                          selectedFollowers.includes(friend.id) ? 'bg-primary/20 border border-primary/50' : 'bg-white/5 hover:bg-white/10'
+                                        }`}
+                                        onClick={() => toggleFollowerSelection(friend.id)}
+                                        data-testid={`follower-item-${friend.id}`}
+                                      >
+                                        <Checkbox 
+                                          checked={selectedFollowers.includes(friend.id)}
+                                          className="pointer-events-none"
+                                        />
+                                        <Avatar className="w-8 h-8">
+                                          <AvatarImage src={friend.avatar} />
+                                          <AvatarFallback>{displayName[0]}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1">
+                                          <p className="font-medium text-sm">{displayName}</p>
+                                          <p className="text-xs text-muted-foreground">@{friend.username || 'user'}</p>
+                                        </div>
+                                        {selectedFollowers.includes(friend.id) && (
+                                          <Check className="w-4 h-4 text-primary" />
+                                        )}
+                                      </div>
+                                    );
+                                  })
+                                ) : (
+                                  <p className="text-sm text-muted-foreground text-center py-4">
+                                    {searchQuery ? 'No users found. Try a different search.' : 'You are not following anyone yet. Search for users to invite!'}
+                                  </p>
+                                );
+                              })()}
                             </div>
                           </div>
                           <Button 
