@@ -196,11 +196,11 @@ export default function UserProfileScreen() {
             <Ionicons name="people" size={16} color={colors.mint} /> Network
           </Text>
           <View style={styles.networkRow}>
-            <TouchableOpacity style={[styles.networkItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]} data-testid="button-followers">
+            <TouchableOpacity style={[styles.networkItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]} onPress={() => navigation.navigate('FollowersList', { userId: user?.id, tab: 'followers' })} data-testid="button-followers">
               <Text style={[styles.networkValue, { color: colors.text }]}>{followerCount}</Text>
               <Text style={[styles.networkLabel, { color: colors.textSecondary }]}>Followers</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.networkItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]} data-testid="button-following">
+            <TouchableOpacity style={[styles.networkItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]} onPress={() => navigation.navigate('FollowersList', { userId: user?.id, tab: 'following' })} data-testid="button-following">
               <Text style={[styles.networkValue, { color: colors.text }]}>{followingCount}</Text>
               <Text style={[styles.networkLabel, { color: colors.textSecondary }]}>Following</Text>
             </TouchableOpacity>

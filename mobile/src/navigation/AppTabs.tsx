@@ -28,6 +28,7 @@ import AboutScreen from '@/screens/AboutScreen';
 import ArchivedPoolsScreen from '@/screens/ArchivedPoolsScreen';
 import UserProfileScreen from '@/screens/UserProfileScreen';
 import UserSearchScreen from '@/screens/UserSearchScreen';
+import FollowersListScreen from '@/screens/FollowersListScreen';
 
 export type AppTabParamList = {
   HomeTab: undefined;
@@ -45,6 +46,7 @@ export type PoolsStackParamList = {
   ArchivedPools: undefined;
   UserProfile: { userId?: string; username?: string };
   UserSearch: undefined;
+  FollowersList: { userId: string; tab?: 'followers' | 'following' };
 };
 
 export type ProfileStackParamList = {
@@ -64,6 +66,7 @@ export type ProfileStackParamList = {
   About: undefined;
   UserProfile: { userId?: string; username?: string };
   UserSearch: undefined;
+  FollowersList: { userId: string; tab?: 'followers' | 'following' };
 };
 
 const Tab = createBottomTabNavigator();
@@ -88,6 +91,7 @@ function PoolsStackNavigator() {
       <PoolsStackNav.Screen name="ArchivedPools" component={ArchivedPoolsScreen} options={{ title: 'Archived Pools' }} />
       <PoolsStackNav.Screen name="UserProfile" component={UserProfileScreen} options={{ title: 'Profile', headerShown: false }} />
       <PoolsStackNav.Screen name="UserSearch" component={UserSearchScreen} options={{ title: 'Find People', headerShown: false }} />
+      <PoolsStackNav.Screen name="FollowersList" component={FollowersListScreen} options={{ title: 'Connections', headerShown: false }} />
     </PoolsStackNav.Navigator>
   );
 }
@@ -117,6 +121,7 @@ function ProfileStackNavigator() {
       <ProfileStackNav.Screen name="About" component={AboutScreen} options={{ title: 'About' }} />
       <ProfileStackNav.Screen name="UserProfile" component={UserProfileScreen} options={{ title: 'Profile', headerShown: false }} />
       <ProfileStackNav.Screen name="UserSearch" component={UserSearchScreen} options={{ title: 'Find People', headerShown: false }} />
+      <ProfileStackNav.Screen name="FollowersList" component={FollowersListScreen} options={{ title: 'Connections', headerShown: false }} />
     </ProfileStackNav.Navigator>
   );
 }

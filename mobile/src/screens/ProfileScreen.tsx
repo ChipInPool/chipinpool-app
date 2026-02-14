@@ -70,6 +70,12 @@ export default function ProfileScreen() {
     queryFn: api.rewards.points,
   });
 
+  const { data: profileData } = useQuery({
+    queryKey: ['userProfile', user?.id],
+    queryFn: () => api.users.getProfile(user?.id),
+    enabled: !!user?.id,
+  });
+
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
@@ -137,6 +143,26 @@ export default function ProfileScreen() {
           <StatCard icon="star-outline" value={rewardsPoints} label="Rewards" colors={colors} />
         </View>
 
+        <View style={[styles.followRow, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <TouchableOpacity
+            style={styles.followItem}
+            onPress={() => navigation.navigate('FollowersList', { userId: user?.id, tab: 'followers' })}
+            data-testid="button-followers"
+          >
+            <Text style={[styles.followValue, { color: colors.text }]}>{profileData?.user?.followerCount || 0}</Text>
+            <Text style={[styles.followLabel, { color: colors.textSecondary }]}>Followers</Text>
+          </TouchableOpacity>
+          <View style={[styles.followDivider, { backgroundColor: colors.cardBorder }]} />
+          <TouchableOpacity
+            style={styles.followItem}
+            onPress={() => navigation.navigate('FollowersList', { userId: user?.id, tab: 'following' })}
+            data-testid="button-following"
+          >
+            <Text style={[styles.followValue, { color: colors.text }]}>{profileData?.user?.followingCount || 0}</Text>
+            <Text style={[styles.followLabel, { color: colors.textSecondary }]}>Following</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Account</Text>
           <MenuItem
@@ -189,6 +215,14 @@ export default function ProfileScreen() {
             iconBg={`${colors.amber}26`}
             label="Rewards & Badges"
             onPress={() => navigation.navigate('Rewards')}
+            colors={colors}
+          />
+          <MenuItem
+            icon="search-outline"
+            iconColor={colors.blue}
+            iconBg={`${colors.blue}26`}
+            label="Find People"
+            onPress={() => navigation.navigate('UserSearch')}
             colors={colors}
           />
           <MenuItem
@@ -416,5 +450,29 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 12,
     marginTop: 24,
+  },
+  followRow: {
+    flexDirection: 'row',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 28,
+  },
+  followItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  followValue: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  followLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  followDivider: {
+    width: 1,
+    marginHorizontal: 4,
   },
 });
