@@ -2189,25 +2189,48 @@ export async function registerRoutes(
         return res.status(404).json({ message: "User not found" });
       }
 
-      const [badges, createdPools, followers, following] = await Promise.all([
+      const viewerId = req.session?.userId;
+      const isOwner = viewerId === user.id;
+      const isViewerFollowing = viewerId ? await storage.isFollowingNew(viewerId, user.id) : false;
+
+      if (!user.isPublic && !isOwner && !isViewerFollowing) {
+        return res.json({
+          id: user.id,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          avatar: user.avatar,
+          isPublic: false,
+          isPrivate: true,
+        });
+      }
+
+      const [badges, createdPools, contributedPools, followersCount, followingCount, recentActivity] = await Promise.all([
         storage.getUserBadges(user.id),
         storage.getPoolsByCreator(user.id),
-        storage.getFollowers(user.id),
-        storage.getFollowing(user.id),
+        storage.getPoolsByContributor(user.id),
+        storage.getFollowersCount(user.id),
+        storage.getFollowingCount(user.id),
+        db.select().from(poolActivities).where(eq(poolActivities.userId, user.id)).orderBy(desc(poolActivities.createdAt)).limit(10),
       ]);
 
-      const isFollowing = req.session.userId ? await storage.isFollowing(req.session.userId, user.id) : false;
+      const totalRaised = createdPools.reduce((sum: number, pool: any) => sum + parseFloat(pool.currentAmount || '0'), 0);
 
       const { password, ...userWithoutPassword } = user;
       res.json({
         user: {
           ...userWithoutPassword,
           badges,
-          followerCount: followers.length,
-          followingCount: following.length,
+          followerCount: followersCount,
+          followingCount,
+          poolsCreated: createdPools.length,
         },
         pools: createdPools,
-        isFollowing,
+        poolsJoined: contributedPools.length,
+        totalRaised: totalRaised.toFixed(2),
+        isFollowing: isViewerFollowing,
+        achievements: badges.length,
+        recentActivity,
       });
     } catch (error) {
       next(error);
@@ -2286,12 +2309,16 @@ export async function registerRoutes(
 
       const { password, ...userWithoutPassword } = user;
       res.json({
-        ...userWithoutPassword,
-        poolsCreated: createdPools.length,
+        user: {
+          ...userWithoutPassword,
+          badges,
+          followerCount: followersCount,
+          followingCount,
+          poolsCreated: createdPools.length,
+        },
+        pools: createdPools,
         poolsJoined: contributedPools.length,
         totalRaised: totalRaised.toFixed(2),
-        followersCount,
-        followingCount,
         isFollowing: isViewerFollowing,
         achievements: badges.length,
         recentActivity,
