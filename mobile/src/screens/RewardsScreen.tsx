@@ -211,10 +211,6 @@ export default function RewardsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
-      <View style={[styles.header, { borderBottomColor: colors.cardBorder }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Rewards</Text>
-      </View>
-
       <View style={styles.tabBar}>
         {tabs.map((tab) => (
           <TouchableOpacity
@@ -245,16 +241,10 @@ export default function RewardsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-  },
-  headerTitle: { fontSize: 24, fontWeight: 'bold' },
   tabBar: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 8,
     gap: 8,
   },
   tab: {

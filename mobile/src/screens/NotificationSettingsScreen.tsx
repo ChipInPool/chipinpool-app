@@ -105,7 +105,6 @@ export default function NotificationSettingsScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.header, { color: colors.text }]}>Notification Settings</Text>
         <Text style={[styles.subtitle, { color: colors.slate }]}>Choose how you want to be notified about activity on your account.</Text>
 
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
@@ -160,7 +159,6 @@ export default function NotificationSettingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 20, paddingBottom: 40 },
-  header: { fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
   subtitle: { fontSize: 14, marginBottom: 24, lineHeight: 20 },
   section: { marginBottom: 24, borderRadius: 16, padding: 16, borderWidth: 1 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },

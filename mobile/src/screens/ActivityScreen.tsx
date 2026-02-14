@@ -122,8 +122,6 @@ export default function ActivityScreen() {
           />
         }
       >
-        <Text style={[styles.title, { color: colors.text }]}>Activity</Text>
-
         <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
@@ -266,8 +264,7 @@ export default function ActivityScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 40 },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 12 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 },
   summaryCard: {
     borderRadius: 16,
     borderWidth: 1,

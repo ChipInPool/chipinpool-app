@@ -79,7 +79,6 @@ export default function NotificationsScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <View style={[styles.header, { borderBottomColor: colors.cardBorder }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Notifications</Text>
         <TouchableOpacity
           onPress={() => markAllReadMutation.mutate()}
           disabled={markAllReadMutation.isPending}
@@ -118,13 +117,12 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 8,
     borderBottomWidth: 1,
   },
-  headerTitle: { fontSize: 24, fontWeight: 'bold' },
   markAllRead: { fontSize: 14, fontWeight: '500' },
   listContent: { padding: 20, paddingTop: 8 },
   notificationCard: {
