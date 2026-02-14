@@ -1291,7 +1291,7 @@ export default function PoolDetailsScreen() {
                   { value: 'active', label: 'Active', color: colors.mint },
                   { value: 'paused', label: 'Paused', color: colors.yellow },
                   { value: 'closed', label: 'Closed', color: colors.red },
-                  { value: 'completed', label: 'Completed', color: colors.green },
+                  { value: 'completed', label: 'Complete', color: colors.green },
                   { value: 'expired', label: 'Expired', color: colors.textSecondary },
                 ].map((option) => (
                   <TouchableOpacity

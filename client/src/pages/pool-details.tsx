@@ -610,7 +610,7 @@ export default function PoolDetails() {
                   </span>
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium bg-muted/50 dark:bg-black/40 dark:text-white/80 px-2 py-1 rounded-full backdrop-blur-md">
                     <Clock className="w-3.5 h-3.5" />
-                    {pool.status === 'active' ? `Ends ${formatDistanceToNow(new Date(pool.deadline), { addSuffix: true })}` : 'Completed'}
+                    {pool.status === 'active' ? `Ends ${formatDistanceToNow(new Date(pool.deadline), { addSuffix: true })}` : pool.status === 'completed' ? 'Complete' : pool.status.charAt(0).toUpperCase() + pool.status.slice(1)}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 mb-2 md:mb-3">
@@ -1802,13 +1802,13 @@ export default function PoolDetails() {
                               <option value="active">Active</option>
                               <option value="paused">Paused</option>
                               <option value="closed">Closed</option>
-                              <option value="completed">Completed</option>
+                              <option value="completed">Complete</option>
                               <option value="expired">Expired</option>
                             </select>
                             <p className="text-xs text-muted-foreground">
                               {editStatus === 'paused' && 'Contributions will be temporarily suspended'}
                               {editStatus === 'closed' && 'Pool will be closed. Can be reopened later.'}
-                              {editStatus === 'completed' && 'Mark pool as complete when goal is reached'}
+                              {editStatus === 'completed' && 'Mark pool as complete when the goal is reached'}
                               {editStatus === 'active' && 'Pool is open for contributions'}
                               {editStatus === 'expired' && 'Pool deadline has passed'}
                             </p>

@@ -3,7 +3,7 @@ import { Layout } from "@/components/layout";
 import { PoolCard } from "@/components/pool-card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, TrendingUp, Users, ArrowRight, Archive } from "lucide-react";
+import { Search, Filter, TrendingUp, Users, ArrowRight, Archive, ArrowUp, ArrowDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -15,6 +15,10 @@ export default function Explore() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [filterMode, setFilterMode] = useState<"all" | "following">("all");
+  const [selectedStatus, setSelectedStatus] = useState("active");
+  const [sortBy, setSortBy] = useState<"date" | "amount">("date");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [dateFilter, setDateFilter] = useState("all");
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const [, setLocation] = useLocation();
 
@@ -44,13 +48,57 @@ export default function Explore() {
   const following = followingData?.following || [];
   const followingIds = following.map((u: any) => u.id);
   
-  const filteredPools = pools.filter((pool: any) => {
-    const matchesSearch = pool.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      pool.category.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === "All" || pool.category === selectedCategory;
-    const matchesFollowing = filterMode === "all" || followingIds.includes(pool.creatorId);
-    return matchesSearch && matchesCategory && matchesFollowing;
-  });
+  const dateFilters = [
+    { key: 'all', label: 'All Time' },
+    { key: '7d', label: '7 Days' },
+    { key: '30d', label: '30 Days' },
+    { key: '90d', label: '90 Days' },
+    { key: 'year', label: 'This Year' },
+  ];
+
+  const getDateCutoff = (filter: string): Date | null => {
+    const now = new Date();
+    switch (filter) {
+      case '7d': return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      case '30d': return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      case '90d': return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      case 'year': return new Date(now.getFullYear(), 0, 1);
+      default: return null;
+    }
+  };
+
+  const statusFilters = ['all', 'active', 'completed', 'closed', 'expired', 'paused'];
+  const statusLabels: Record<string, string> = {
+    all: 'All',
+    active: 'Active',
+    completed: 'Complete',
+    closed: 'Closed',
+    expired: 'Expired',
+    paused: 'Paused',
+  };
+
+  const filteredPools = pools
+    .filter((pool: any) => {
+      const matchesSearch = pool.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        pool.category.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory === "All" || pool.category === selectedCategory;
+      const matchesFollowing = filterMode === "all" || followingIds.includes(pool.creatorId);
+      const matchesStatus = selectedStatus === "all" || pool.status === selectedStatus;
+      const dateCutoff = getDateCutoff(dateFilter);
+      const matchesDate = !dateCutoff || new Date(pool.createdAt) >= dateCutoff;
+      return matchesSearch && matchesCategory && matchesFollowing && matchesStatus && matchesDate;
+    })
+    .sort((a: any, b: any) => {
+      let aVal: number, bVal: number;
+      if (sortBy === "date") {
+        aVal = new Date(a.createdAt || 0).getTime();
+        bVal = new Date(b.createdAt || 0).getTime();
+      } else {
+        aVal = parseFloat(a.targetAmount || '0');
+        bVal = parseFloat(b.targetAmount || '0');
+      }
+      return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+    });
 
   const categories = ['All', 'Trip', 'Gift', 'Purchase', 'Event', 'Recurring', 'Other'];
 
@@ -158,6 +206,63 @@ export default function Explore() {
             {cat}
           </button>
         ))}
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto pb-4 mb-2 no-scrollbar">
+        {statusFilters.map((status) => (
+          <button
+            key={status}
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${selectedStatus === status ? 'bg-primary text-primary-foreground' : 'bg-white/5 hover:bg-white/10 border border-white/10'}`}
+            onClick={() => setSelectedStatus(status)}
+            data-testid={`button-status-${status}`}
+          >
+            {statusLabels[status]}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto pb-4 mb-2 no-scrollbar">
+        {dateFilters.map((df) => (
+          <button
+            key={df.key}
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${dateFilter === df.key ? 'bg-primary text-primary-foreground' : 'bg-white/5 hover:bg-white/10 border border-white/10'}`}
+            onClick={() => setDateFilter(df.key)}
+            data-testid={`button-date-${df.key}`}
+          >
+            {df.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2 mb-6">
+        <span className="text-xs text-muted-foreground mr-1">Sort by:</span>
+        <Button
+          variant={sortBy === "date" ? "default" : "outline"}
+          size="sm"
+          className="h-7 text-xs px-3"
+          onClick={() => setSortBy("date")}
+          data-testid="button-sort-date"
+        >
+          Date
+        </Button>
+        <Button
+          variant={sortBy === "amount" ? "default" : "outline"}
+          size="sm"
+          className="h-7 text-xs px-3"
+          onClick={() => setSortBy("amount")}
+          data-testid="button-sort-amount"
+        >
+          Amount
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 w-7 p-0 ml-1"
+          onClick={() => setSortDirection(d => d === "asc" ? "desc" : "asc")}
+          data-testid="button-sort-direction"
+        >
+          {sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
+        </Button>
       </div>
 
       <div className="space-y-12">

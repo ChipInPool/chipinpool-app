@@ -112,7 +112,7 @@ export function PoolCard({ pool }: PoolCardProps) {
                 <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5" />
-                    <span>{isCompleted ? 'Completed' : `Ends ${formatDistanceToNow(new Date(pool.deadline), { addSuffix: true })}`}</span>
+                    <span>{isCompleted ? 'Complete' : `Ends ${formatDistanceToNow(new Date(pool.deadline), { addSuffix: true })}`}</span>
                   </div>
                   <div className="flex items-center">
                     <div className="flex -space-x-1.5">

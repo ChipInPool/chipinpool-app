@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import React, { useCallback, useState, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ScrollView } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -20,6 +20,27 @@ const CATEGORY_CONFIG: Record<string, { icon: keyof typeof Ionicons.glyphMap; co
 
 const DEFAULT_CATEGORY = { icon: 'ellipsis-horizontal' as keyof typeof Ionicons.glyphMap, color: '#A0AEC0' };
 
+const STATUS_OPTIONS = ['All', 'Active', 'Complete', 'Closed', 'Expired', 'Paused', 'Archived'];
+const CATEGORY_OPTIONS = ['All', 'Trip', 'Gift', 'Purchase', 'Event', 'Recurring', 'Other'];
+const DATE_FILTERS = [
+  { key: 'all', label: 'All Time' },
+  { key: '7d', label: '7 Days' },
+  { key: '30d', label: '30 Days' },
+  { key: '90d', label: '90 Days' },
+  { key: 'year', label: 'This Year' },
+];
+
+const getDateCutoff = (filter: string): Date | null => {
+  const now = new Date();
+  switch (filter) {
+    case '7d': return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    case '30d': return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    case '90d': return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    case 'year': return new Date(now.getFullYear(), 0, 1);
+    default: return null;
+  }
+};
+
 function getCategoryConfig(category: string) {
   return CATEGORY_CONFIG[category] || DEFAULT_CATEGORY;
 }
@@ -30,9 +51,26 @@ function formatCurrency(value: string | number): string {
   return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
+function displayStatus(status: string): string {
+  if (status === 'completed') return 'complete';
+  return status;
+}
+
+function statusFilterValue(label: string): string {
+  if (label === 'Complete') return 'completed';
+  return label.toLowerCase();
+}
+
 export default function PoolsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { colors, isDark } = useTheme();
+
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
+  const [selectedStatus, setSelectedStatus] = useState('Active');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
+  const [sortAsc, setSortAsc] = useState(false);
+  const [dateFilter, setDateFilter] = useState('all');
 
   const { data: pools, refetch, isLoading } = useQuery({
     queryKey: ['pools'],
@@ -45,12 +83,83 @@ export default function PoolsScreen() {
     }, [])
   );
 
+  const filteredAndSortedPools = useMemo(() => {
+    if (!pools) return [];
+    let result = [...pools];
+
+    if (selectedStatus !== 'All') {
+      const matchValue = statusFilterValue(selectedStatus);
+      result = result.filter((pool: any) => pool.status === matchValue);
+    }
+
+    if (selectedCategory !== 'All') {
+      if (selectedCategory === 'Other') {
+        const knownCategories = CATEGORY_OPTIONS.filter(c => c !== 'All' && c !== 'Other');
+        result = result.filter((pool: any) => !knownCategories.includes(pool.category));
+      } else {
+        result = result.filter((pool: any) =>
+          pool.category?.toLowerCase() === selectedCategory.toLowerCase()
+        );
+      }
+    }
+
+    const dateCutoff = getDateCutoff(dateFilter);
+    if (dateCutoff) {
+      result = result.filter((pool: any) => new Date(pool.createdAt) >= dateCutoff);
+    }
+
+    result.sort((a: any, b: any) => {
+      let valA: number, valB: number;
+      if (sortBy === 'date') {
+        valA = new Date(a.createdAt || 0).getTime();
+        valB = new Date(b.createdAt || 0).getTime();
+      } else {
+        valA = parseFloat(a.targetAmount) || 0;
+        valB = parseFloat(b.targetAmount) || 0;
+      }
+      return sortAsc ? valA - valB : valB - valA;
+    });
+
+    return result;
+  }, [pools, selectedStatus, selectedCategory, dateFilter, sortBy, sortAsc]);
+
+  const renderPill = (
+    label: string,
+    isSelected: boolean,
+    onPress: () => void,
+    testId: string,
+  ) => (
+    <TouchableOpacity
+      key={label}
+      style={[
+        styles.pill,
+        {
+          backgroundColor: isSelected ? colors.mint : colors.card,
+          borderColor: isSelected ? colors.mint : colors.cardBorder,
+        },
+      ]}
+      activeOpacity={0.7}
+      onPress={onPress}
+      data-testid={testId}
+    >
+      <Text
+        style={[
+          styles.pillText,
+          { color: isSelected ? (isDark ? '#001F3F' : '#FFFFFF') : colors.textSecondary },
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
   const renderPool = ({ item: pool }: { item: any }) => {
     const current = parseFloat(pool.currentAmount) || 0;
     const target = parseFloat(pool.targetAmount) || 0;
     const progress = target > 0 ? Math.min((current / target) * 100, 100) : 0;
     const { icon, color } = getCategoryConfig(pool.category);
     const isActive = pool.status === 'active';
+    const statusDisplay = displayStatus(pool.status);
 
     return (
       <TouchableOpacity
@@ -95,7 +204,7 @@ export default function PoolsScreen() {
           <View style={[styles.statusBadge, { backgroundColor: isActive ? `${colors.mint}20` : colors.card }]}>
             <View style={[styles.statusDot, { backgroundColor: isActive ? colors.mint : colors.textSecondary }]} />
             <Text style={[styles.statusText, { color: isActive ? colors.mint : colors.textSecondary }]}>
-              {pool.status}
+              {statusDisplay}
             </Text>
           </View>
         </View>
@@ -105,13 +214,154 @@ export default function PoolsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <TouchableOpacity
+        style={[styles.filterToggleRow, { backgroundColor: colors.card, borderBottomColor: colors.cardBorder }]}
+        activeOpacity={0.7}
+        onPress={() => setFiltersExpanded(!filtersExpanded)}
+        data-testid="button-toggle-filters"
+      >
+        <View style={styles.filterToggleLeft}>
+          <Ionicons name="options-outline" size={18} color={colors.mint} />
+          <Text style={[styles.filterToggleText, { color: colors.text }]}>Filters & Sort</Text>
+        </View>
+        <Ionicons
+          name={filtersExpanded ? 'chevron-up' : 'chevron-down'}
+          size={18}
+          color={colors.textSecondary}
+        />
+      </TouchableOpacity>
+
+      {filtersExpanded && (
+        <View style={[styles.filterSection, { backgroundColor: colors.background }]}>
+          <View style={styles.filterRow}>
+            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Status</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.pillsContainer}
+            >
+              {STATUS_OPTIONS.map((status) =>
+                renderPill(
+                  status,
+                  selectedStatus === status,
+                  () => setSelectedStatus(status),
+                  `pill-status-${status.toLowerCase()}`
+                )
+              )}
+            </ScrollView>
+          </View>
+
+          <View style={[styles.filterDivider, { backgroundColor: colors.cardBorder }]} />
+
+          <View style={styles.filterRow}>
+            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Category</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.pillsContainer}
+            >
+              {CATEGORY_OPTIONS.map((category) =>
+                renderPill(
+                  category,
+                  selectedCategory === category,
+                  () => setSelectedCategory(category),
+                  `pill-category-${category.toLowerCase()}`
+                )
+              )}
+            </ScrollView>
+          </View>
+
+          <View style={[styles.filterDivider, { backgroundColor: colors.cardBorder }]} />
+
+          <View style={styles.filterRow}>
+            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Created</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.pillsContainer}
+            >
+              {DATE_FILTERS.map((df) =>
+                renderPill(
+                  df.label,
+                  dateFilter === df.key,
+                  () => setDateFilter(df.key),
+                  `pill-date-${df.key}`
+                )
+              )}
+            </ScrollView>
+          </View>
+
+          <View style={[styles.filterDivider, { backgroundColor: colors.cardBorder }]} />
+
+          <View style={styles.sortRow}>
+            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Sort</Text>
+            <View style={styles.sortControls}>
+              <TouchableOpacity
+                style={[
+                  styles.sortButton,
+                  {
+                    backgroundColor: sortBy === 'date' ? colors.mint : colors.card,
+                    borderColor: sortBy === 'date' ? colors.mint : colors.cardBorder,
+                  },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => setSortBy('date')}
+                data-testid="button-sort-date"
+              >
+                <Text
+                  style={[
+                    styles.sortButtonText,
+                    { color: sortBy === 'date' ? (isDark ? '#001F3F' : '#FFFFFF') : colors.textSecondary },
+                  ]}
+                >
+                  Date
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.sortButton,
+                  {
+                    backgroundColor: sortBy === 'amount' ? colors.mint : colors.card,
+                    borderColor: sortBy === 'amount' ? colors.mint : colors.cardBorder,
+                  },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => setSortBy('amount')}
+                data-testid="button-sort-amount"
+              >
+                <Text
+                  style={[
+                    styles.sortButtonText,
+                    { color: sortBy === 'amount' ? (isDark ? '#001F3F' : '#FFFFFF') : colors.textSecondary },
+                  ]}
+                >
+                  Amount
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sortDirectionButton, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+                activeOpacity={0.7}
+                onPress={() => setSortAsc(!sortAsc)}
+                data-testid="button-sort-direction"
+              >
+                <Ionicons
+                  name={sortAsc ? 'arrow-up' : 'arrow-down'}
+                  size={16}
+                  color={colors.mint}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
       <FlatList
-        data={pools || []}
+        data={filteredAndSortedPools}
         renderItem={renderPool}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={[
           styles.listContent,
-          (!pools || pools.length === 0) && styles.listContentEmpty,
+          filteredAndSortedPools.length === 0 && styles.listContentEmpty,
         ]}
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.mint} />
@@ -154,6 +404,87 @@ export default function PoolsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  filterToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  filterToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  filterToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  filterSection: {
+    paddingVertical: 8,
+  },
+  filterRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+  },
+  filterLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  filterDivider: {
+    height: 1,
+    marginHorizontal: 16,
+    marginVertical: 2,
+  },
+  pillsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 16,
+  },
+  pill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  pillText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  sortRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sortControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sortButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  sortButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  sortDirectionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   listContent: {
     padding: 16,
