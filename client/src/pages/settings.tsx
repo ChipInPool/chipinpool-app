@@ -579,6 +579,31 @@ export default function Settings() {
 
           <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5">
             <h3 className="font-bold flex items-center gap-2 mb-4">
+              <Shield className="w-4 h-4 text-green-400" /> Privacy
+            </h3>
+            <div className="flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors">
+              <div>
+                <div className="font-medium text-sm">Public Profile</div>
+                <div className="text-xs text-muted-foreground">When enabled, anyone can see your full profile. When disabled, only followers can see your pools and activity.</div>
+              </div>
+              <Switch
+                checked={user?.isPublic !== false}
+                onCheckedChange={async (checked) => {
+                  try {
+                    await api.users.updatePrivacy(checked);
+                    queryClient.invalidateQueries({ queryKey: ["user"] });
+                    toast({ description: checked ? "Profile is now public" : "Profile is now private" });
+                  } catch (err: any) {
+                    toast({ description: err.message || "Failed to update privacy", variant: "destructive" });
+                  }
+                }}
+                data-testid="switch-profile-privacy"
+              />
+            </div>
+          </div>
+
+          <div className="p-4 md:p-6 rounded-2xl bg-card border border-white/5">
+            <h3 className="font-bold flex items-center gap-2 mb-4">
               <Mail className="w-4 h-4 text-blue-400" /> Email Notifications
             </h3>
             <div className="space-y-1">
