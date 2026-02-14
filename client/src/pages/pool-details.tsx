@@ -1496,7 +1496,7 @@ export default function PoolDetails() {
                           <div className="space-y-2">
                             <Label>Search & select friends to invite</Label>
                             <Input
-                              placeholder="Search by username or name..."
+                              placeholder="Search by username..."
                               value={friendSearchQuery}
                               onChange={(e) => setFriendSearchQuery(e.target.value)}
                               data-testid="input-friend-search"

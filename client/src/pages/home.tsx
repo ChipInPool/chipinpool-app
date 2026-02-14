@@ -284,37 +284,43 @@ export default function Home() {
             </>
           )}
 
-          {discoverLoading && (
-            <div className="mt-8 md:mt-10">
-              <div className="flex items-center gap-2 mb-4">
+          <div className="mt-8 md:mt-10" data-testid="section-discover-pools">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
                 <Compass className="w-5 h-5 text-primary" />
-                <h2 className="text-lg md:text-xl font-display font-bold tracking-tight">Pools to Join</h2>
+                <h2 className="text-lg md:text-xl font-display font-bold tracking-tight">Join a Pool</h2>
               </div>
+              {discoverPools.length > 0 && (
+                <Button variant="ghost" size="sm" className="text-muted-foreground/60 hover:text-primary text-xs" asChild>
+                  <Link href="/explore" data-testid="link-view-all-discover">View All <ArrowRight className="w-3.5 h-3.5 ml-1" /></Link>
+                </Button>
+              )}
+            </div>
+            {discoverLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[1, 2].map((i) => (
                   <Skeleton key={i} className="h-[200px] rounded-xl" />
                 ))}
               </div>
-            </div>
-          )}
-
-          {!discoverLoading && discoverPools.length > 0 && (
-            <div className="mt-8 md:mt-10">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Compass className="w-5 h-5 text-primary" />
-                  <h2 className="text-lg md:text-xl font-display font-bold tracking-tight">Pools to Join</h2>
+            ) : discoverPools.length === 0 ? (
+              <div className="relative rounded-2xl border border-dashed border-white/[0.1] bg-gradient-to-br from-white/[0.04] to-white/[0.01] p-8 md:p-12 text-center overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.03] to-transparent pointer-events-none" />
+                <div className="relative">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                    <Compass className="w-8 h-8 text-primary/60" />
+                  </div>
+                  <h3 className="text-base md:text-lg font-semibold mb-2">No pools to join yet</h3>
+                  <p className="text-sm text-muted-foreground/70 max-w-sm mx-auto" data-testid="text-discover-empty">
+                    No pools to join yet. Follow people to discover their pools!
+                  </p>
                 </div>
-                <Button variant="ghost" size="sm" className="text-muted-foreground/60 hover:text-primary text-xs" asChild>
-                  <Link href="/explore">View All <ArrowRight className="w-3.5 h-3.5 ml-1" /></Link>
-                </Button>
               </div>
+            ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {discoverPools.slice(0, 4).map((pool: any) => {
                   const currentAmt = parseFloat(pool.currentAmount || '0');
                   const targetAmt = parseFloat(pool.targetAmount || '1');
                   const pct = Math.min(100, Math.round((currentAmt / targetAmt) * 100));
-                  const creator = pool.creator || { name: 'Unknown', avatar: null, username: 'unknown' };
 
                   return (
                     <Link key={pool.id} href={`/pool/${pool.id}`}>
@@ -339,8 +345,9 @@ export default function Home() {
                                   ? 'bg-accent/15 text-accent border-accent/20'
                                   : 'bg-primary/15 text-primary border-primary/20'
                               }`}
+                              data-testid={`badge-source-${pool.id}`}
                             >
-                              {pool.source === 'invited' ? 'Invited' : 'From Following'}
+                              {pool.source === 'invited' ? 'Invited' : `From @${pool.creatorUsername}`}
                             </Badge>
                           </div>
                         </CardHeader>
@@ -365,13 +372,19 @@ export default function Home() {
                                 {pct}%
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 pt-1">
-                              <Avatar className="w-5 h-5 ring-1 ring-white/10">
-                                <AvatarImage src={creator.avatar} />
-                                <AvatarFallback className="text-[8px]">{creator.name?.[0] || '?'}</AvatarFallback>
-                              </Avatar>
-                              <span className="text-xs text-muted-foreground">
-                                Created by @{creator.username || creator.name}
+                            <div className="flex items-center justify-between pt-1">
+                              <div className="flex items-center gap-2">
+                                <Avatar className="w-5 h-5 ring-1 ring-white/10">
+                                  <AvatarImage src={pool.creatorAvatar} />
+                                  <AvatarFallback className="text-[8px]">{pool.creatorName?.[0] || '?'}</AvatarFallback>
+                                </Avatar>
+                                <span className="text-xs text-muted-foreground" data-testid={`text-creator-${pool.id}`}>
+                                  {pool.creatorName}
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-medium text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded-full" data-testid={`text-contributors-${pool.id}`}>
+                                <Users className="w-3 h-3 inline mr-0.5" />
+                                {pool.contributorCount || 0} {(pool.contributorCount || 0) === 1 ? 'contributor' : 'contributors'}
                               </span>
                             </div>
                           </div>
@@ -381,8 +394,8 @@ export default function Home() {
                   );
                 })}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         <div className="space-y-6">

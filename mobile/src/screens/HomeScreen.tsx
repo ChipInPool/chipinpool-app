@@ -71,6 +71,11 @@ export default function HomeScreen() {
     queryFn: api.activity.feed,
   });
 
+  const { data: discoverPools } = useQuery({
+    queryKey: ['discoverPools'],
+    queryFn: api.pools.discover,
+  });
+
   const safeNotifications = Array.isArray(notifications) ? notifications : [];
   const unreadCount = safeNotifications.filter((n: any) => !n?.read)?.length ?? 0;
   const balance = parseFloat(user?.balance ?? user?.walletBalance ?? '0') || 0;
@@ -81,6 +86,7 @@ export default function HomeScreen() {
     await refetch();
     await queryClient.invalidateQueries({ queryKey: ['notifications'] });
     await queryClient.invalidateQueries({ queryKey: ['activityFeed'] });
+    await queryClient.invalidateQueries({ queryKey: ['discoverPools'] });
     setRefreshing(false);
   };
 
@@ -90,6 +96,7 @@ export default function HomeScreen() {
       queryClient.invalidateQueries({ queryKey: ['pools'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['activityFeed'] });
+      queryClient.invalidateQueries({ queryKey: ['discoverPools'] });
     }, [])
   );
 
@@ -245,6 +252,60 @@ export default function HomeScreen() {
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text }]}>No Pools Yet</Text>
               <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>Create your first pool and start saving together!</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Join a Pool</Text>
+            {discoverPools && discoverPools.length > 0 && (
+              <TouchableOpacity onPress={() => navigation.navigate('PoolsTab')} activeOpacity={0.7}>
+                <Text style={[styles.seeAll, { color: colors.mint }]}>See All</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {discoverPools && discoverPools.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+              {discoverPools.slice(0, 6).map((pool: any) => {
+                const current = parseFloat(pool.currentAmount || '0');
+                const target = parseFloat(pool.targetAmount || '1');
+                const percent = Math.min(Math.round((current / target) * 100), 100);
+                return (
+                  <TouchableOpacity
+                    key={pool.id}
+                    style={[styles.discoverCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+                    activeOpacity={0.7}
+                    onPress={() => navigation.navigate('PoolsTab', { screen: 'PoolDetails', params: { poolId: pool.id } })}
+                    data-testid={`card-discover-${pool.id}`}
+                  >
+                    <View style={styles.discoverCardHeader}>
+                      <Text style={styles.discoverEmoji}>{pool.emoji || '💰'}</Text>
+                      <View style={[styles.discoverBadge, { backgroundColor: pool.source === 'invited' ? `${colors.blue}20` : `${colors.mint}20` }]}>
+                        <Text style={[styles.discoverBadgeText, { color: pool.source === 'invited' ? colors.blue : colors.mint }]}>
+                          {pool.source === 'invited' ? 'Invited' : 'Following'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.discoverTitle, { color: colors.text }]} numberOfLines={1}>{pool.title}</Text>
+                    <Text style={[styles.discoverCreator, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {pool.creatorName} {pool.creatorUsername ? `@${pool.creatorUsername}` : ''}
+                    </Text>
+                    <View style={[styles.discoverProgressBg, { backgroundColor: colors.cardBorder }]}>
+                      <View style={[styles.discoverProgressFill, { width: `${percent}%`, backgroundColor: colors.mint }]} />
+                    </View>
+                    <Text style={[styles.discoverPercent, { color: colors.mint }]}>{percent}% funded</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          ) : (
+            <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              <View style={[styles.emptyIconBg, { backgroundColor: `${colors.textSecondary}20` }]}>
+                <Ionicons name="people-outline" size={32} color={colors.textSecondary} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>No Pools to Discover</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>Follow people to discover pools!</Text>
             </View>
           )}
         </View>
@@ -609,5 +670,52 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     marginLeft: 8,
+  },
+  discoverCard: {
+    width: 200,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+  },
+  discoverCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  discoverEmoji: {
+    fontSize: 28,
+  },
+  discoverBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  discoverBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  discoverTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  discoverCreator: {
+    fontSize: 12,
+    marginBottom: 10,
+  },
+  discoverProgressBg: {
+    height: 5,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  discoverProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  discoverPercent: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

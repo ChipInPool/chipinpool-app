@@ -629,15 +629,17 @@ export default function PoolDetailsScreen() {
           <Ionicons name="share-outline" size={20} color={colors.mint} />
           <Text style={[styles.secondaryButtonText, { color: colors.mint }]}>Share</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.secondaryButton, { backgroundColor: colors.card, borderColor: `${colors.mint}40` }]}
-          onPress={() => { setShowInvite(true); setSelectedInviteUsers([]); setInviteSearch(''); setInviteSearchResults([]); }}
-          activeOpacity={0.7}
-          data-testid="button-invite"
-        >
-          <Ionicons name="person-add-outline" size={20} color={colors.mint} />
-          <Text style={[styles.secondaryButtonText, { color: colors.mint }]}>Invite</Text>
-        </TouchableOpacity>
+        {isCreator && (
+          <TouchableOpacity
+            style={[styles.secondaryButton, { backgroundColor: colors.card, borderColor: `${colors.mint}40` }]}
+            onPress={() => { setShowInvite(true); setSelectedInviteUsers([]); setInviteSearch(''); setInviteSearchResults([]); }}
+            activeOpacity={0.7}
+            data-testid="button-invite"
+          >
+            <Ionicons name="person-add-outline" size={20} color={colors.mint} />
+            <Text style={[styles.secondaryButtonText, { color: colors.mint }]}>Invite</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {pool?.status === 'active' && (
