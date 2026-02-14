@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { api, API_URL } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/theme/ThemeContext';
 
@@ -307,6 +306,14 @@ export default function PoolDetailsScreen() {
 
   const handlePoolImageUpload = async () => {
     try {
+      let ImagePicker: any;
+      try {
+        ImagePicker = await import('expo-image-picker');
+      } catch {
+        Alert.alert('Not Available', 'Image picker is not available in this build. Please update the app to use this feature.');
+        return;
+      }
+      
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,

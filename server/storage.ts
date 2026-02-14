@@ -34,9 +34,13 @@ export interface IStorage {
   getPoolsByCreator(creatorId: string): Promise<Pool[]>;
   getPoolsByContributor(userId: string): Promise<Pool[]>;
   createPool(pool: InsertPool): Promise<Pool>;
-  updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date; image?: string; emoji?: string; externalLink?: string; status?: 'active' | 'completed' | 'expired' | 'closed' | 'paused' }): Promise<Pool | undefined>;
+  updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date; image?: string; emoji?: string; externalLink?: string; status?: 'active' | 'completed' | 'expired' | 'closed' | 'paused' | 'archived' }): Promise<Pool | undefined>;
   updatePoolAmount(id: string, amount: string): Promise<void>;
-  updatePoolStatus(id: string, status: 'active' | 'completed' | 'expired' | 'closed' | 'paused'): Promise<void>;
+  updatePoolStatus(id: string, status: 'active' | 'completed' | 'expired' | 'closed' | 'paused' | 'archived'): Promise<void>;
+  archivePool(id: string): Promise<Pool | undefined>;
+  unarchivePool(id: string): Promise<Pool | undefined>;
+  getArchivedPools(userId: string): Promise<Pool[]>;
+  autoArchiveClosedPools(daysThreshold: number): Promise<number>;
   
   // Contribution operations
   getContributionsByPool(poolId: string): Promise<Contribution[]>;
@@ -228,7 +232,7 @@ export class DatabaseStorage implements IStorage {
     return pool;
   }
 
-  async updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date; image?: string; emoji?: string; externalLink?: string; status?: 'active' | 'completed' | 'expired' | 'closed' | 'paused' }): Promise<Pool | undefined> {
+  async updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date; image?: string; emoji?: string; externalLink?: string; status?: 'active' | 'completed' | 'expired' | 'closed' | 'paused' | 'archived' }): Promise<Pool | undefined> {
     const updates: any = { updatedAt: new Date() };
     if (data.title !== undefined) updates.title = data.title;
     if (data.description !== undefined) updates.description = data.description;
@@ -237,7 +241,11 @@ export class DatabaseStorage implements IStorage {
     if (data.image !== undefined) updates.image = data.image;
     if (data.emoji !== undefined) updates.emoji = data.emoji;
     if (data.externalLink !== undefined) updates.externalLink = data.externalLink;
-    if (data.status !== undefined) updates.status = data.status;
+    if (data.status !== undefined) {
+      updates.status = data.status;
+      if (data.status === 'closed') updates.closedAt = new Date();
+      if (data.status === 'archived') updates.archivedAt = new Date();
+    }
     
     const [pool] = await db.update(pools).set(updates).where(eq(pools.id, id)).returning();
     return pool;
@@ -250,8 +258,52 @@ export class DatabaseStorage implements IStorage {
     }).where(eq(pools.id, id));
   }
 
-  async updatePoolStatus(id: string, status: 'active' | 'completed' | 'expired' | 'closed' | 'paused'): Promise<void> {
-    await db.update(pools).set({ status }).where(eq(pools.id, id));
+  async updatePoolStatus(id: string, status: 'active' | 'completed' | 'expired' | 'closed' | 'paused' | 'archived'): Promise<void> {
+    const updates: any = { status };
+    if (status === 'closed') updates.closedAt = new Date();
+    if (status === 'archived') updates.archivedAt = new Date();
+    await db.update(pools).set(updates).where(eq(pools.id, id));
+  }
+
+  async archivePool(id: string): Promise<Pool | undefined> {
+    const [pool] = await db.update(pools).set({
+      status: 'archived',
+      archivedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(pools.id, id)).returning();
+    return pool;
+  }
+
+  async unarchivePool(id: string): Promise<Pool | undefined> {
+    const [pool] = await db.update(pools).set({
+      status: 'closed',
+      archivedAt: null,
+      updatedAt: new Date(),
+    }).where(eq(pools.id, id)).returning();
+    return pool;
+  }
+
+  async getArchivedPools(userId: string): Promise<Pool[]> {
+    return await db.select().from(pools)
+      .where(and(eq(pools.creatorId, userId), eq(pools.status, 'archived')))
+      .orderBy(desc(pools.archivedAt));
+  }
+
+  async autoArchiveClosedPools(daysThreshold: number): Promise<number> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysThreshold);
+    
+    const result = await db.update(pools).set({
+      status: 'archived',
+      archivedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(
+      and(
+        eq(pools.status, 'closed'),
+        lte(pools.closedAt, cutoffDate)
+      )
+    ).returning();
+    return result.length;
   }
 
   async getContributionsByPool(poolId: string): Promise<Contribution[]> {
