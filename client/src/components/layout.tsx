@@ -194,6 +194,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <Link href="/profile">My Profile</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
+                      <Link href="/cards" className="flex items-center">
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        My Cards
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
                       <Link href="/payment-methods" className="flex items-center">
                         <CreditCard className="w-4 h-4 mr-2" />
                         Payment Methods

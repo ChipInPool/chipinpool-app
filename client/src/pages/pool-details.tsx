@@ -728,10 +728,10 @@ export default function PoolDetails() {
                       size="lg" 
                       className="w-full h-14 text-lg font-bold bg-gradient-to-r from-primary to-primary/80 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all" 
                       asChild
-                      data-testid="button-spend-pool-funds"
+                      data-testid="button-spend-now-marketplace"
                     >
-                      <Link href={`/pool/${pool.id}/spend`}>
-                        <CreditCard className="w-5 h-5 mr-2" /> Spend Pool Funds
+                      <Link href={`/spend-now?pool=${pool.id}`}>
+                        <ShoppingBag className="w-5 h-5 mr-2" /> Shop Now
                       </Link>
                     </Button>
                     <Button 
@@ -743,17 +743,6 @@ export default function PoolDetails() {
                     >
                       <Link href={`/pool/${pool.id}/analytics`}>
                         <BarChart3 className="w-5 h-5 mr-2" /> View Analytics
-                      </Link>
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      size="lg" 
-                      className="w-full border-white/10 hover:border-primary/30 hover:text-primary transition-colors" 
-                      asChild
-                      data-testid="button-spend-now-marketplace"
-                    >
-                      <Link href={`/spend-now?pool=${pool.id}`}>
-                        <ShoppingBag className="w-5 h-5 mr-2" /> Spend Now Marketplace
                       </Link>
                     </Button>
                     <div className="grid grid-cols-2 gap-2">
@@ -828,23 +817,23 @@ export default function PoolDetails() {
                             disabled={remainingBalance <= 0}
                             data-testid="button-distribute-balance"
                           >
-                            <ArrowDownToLine className="w-4 h-4 mr-2" /> Distribute
+                            <ArrowDownToLine className="w-4 h-4 mr-2" /> Payout
                           </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-lg bg-card border-white/10">
                           <DialogHeader>
-                            <DialogTitle>Distribute Pool Balance</DialogTitle>
+                            <DialogTitle>Payout Pool Balance</DialogTitle>
                             <DialogDescription>
-                              Send custom amounts from the pool to specific wallets.
+                              Send funds from the pool to wallets.
                             </DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4">
                             <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                              <div className="text-sm text-muted-foreground">Available to distribute</div>
+                              <div className="text-sm text-muted-foreground">Available to pay out</div>
                               <div className="text-2xl font-bold font-mono">${remainingBalance.toFixed(2)}</div>
                               {distributions.length > 0 && (
                                 <div className="text-xs text-muted-foreground mt-1">
-                                  Distributing: ${distributions.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0).toFixed(2)}
+                                  Paying out: ${distributions.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0).toFixed(2)}
                                 </div>
                               )}
                             </div>
@@ -855,15 +844,24 @@ export default function PoolDetails() {
                                   <Select
                                     value={dist.userId}
                                     onValueChange={(value) => {
-                                      const contributor = contributors.find((c: any) => c.id === value);
-                                      if (contributor) setDistributionFromContributor(index, contributor);
+                                      if (user && value === user.id) {
+                                        setDistributionFromContributor(index, { id: user.id, name: `${user.firstName} ${user.lastName} (My Wallet)` });
+                                      } else {
+                                        const contributor = contributors.find((c: any) => c.id === value);
+                                        if (contributor) setDistributionFromContributor(index, contributor);
+                                      }
                                     }}
                                   >
                                     <SelectTrigger className="flex-1 bg-white/5 border-white/10" data-testid={`select-distribute-user-${index}`}>
                                       <SelectValue placeholder="Select user" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {contributors.filter((c: any) => c.id).map((c: any) => (
+                                      {user && (
+                                        <SelectItem key={user.id} value={user.id}>
+                                          {user.firstName} {user.lastName} (My Wallet)
+                                        </SelectItem>
+                                      )}
+                                      {contributors.filter((c: any) => c.id && c.id !== user?.id).map((c: any) => (
                                         <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                       ))}
                                     </SelectContent>
@@ -905,7 +903,7 @@ export default function PoolDetails() {
                                 checked={closePoolAfterAction}
                                 onCheckedChange={(checked) => setClosePoolAfterAction(!!checked)}
                               />
-                              <Label htmlFor="close-pool-distribute" className="text-sm">Close pool after distribution</Label>
+                              <Label htmlFor="close-pool-distribute" className="text-sm">Close pool after payout</Label>
                             </div>
 
                             <DialogFooter>
@@ -916,7 +914,7 @@ export default function PoolDetails() {
                                 className="bg-green-600 hover:bg-green-700"
                                 data-testid="button-confirm-distribute"
                               >
-                                {isDistributing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Distributing...</> : 'Distribute Funds'}
+                                {isDistributing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</> : 'Payout Funds'}
                               </Button>
                             </DialogFooter>
                           </div>
@@ -1539,7 +1537,7 @@ export default function PoolDetails() {
                           <DialogTitle>Edit Pool</DialogTitle>
                           <DialogDescription>Update your pool details</DialogDescription>
                         </DialogHeader>
-                        <div className="space-y-4 py-4">
+                        <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
                           <div className="space-y-2">
                             <Label>Pool Image</Label>
                             <div className="relative rounded-xl overflow-hidden border border-white/10 bg-white/5">

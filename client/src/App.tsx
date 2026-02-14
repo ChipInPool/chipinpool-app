@@ -48,6 +48,7 @@ import Rewards from "@/pages/rewards";
 import PaymentMethods from "@/pages/payment-methods";
 import PayMe from "@/pages/pay-me";
 import SpendNow from "@/pages/spend-now";
+import Cards from "@/pages/cards";
 
 function Router() {
   return (
@@ -93,6 +94,7 @@ function Router() {
       <Route path="/transfer/:requestId/accept" component={AcceptTransfer} />
       <Route path="/rewards" component={Rewards} />
       <Route path="/spend-now" component={SpendNow} />
+      <Route path="/cards" component={Cards} />
       <Route path="/@:username/:amount" component={PayMe} />
       <Route path="/@:username" component={PayMe} />
       <Route component={NotFound} />
