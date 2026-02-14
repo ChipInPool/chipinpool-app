@@ -1,0 +1,32 @@
+2026-02-14T16:14:55.7256423Z ##[group]Run npm ci
+2026-02-14T16:14:55.7256725Z [36;1mnpm ci[0m
+2026-02-14T16:14:55.7321361Z shell: /usr/bin/bash -e {0}
+2026-02-14T16:14:55.7321627Z env:
+2026-02-14T16:14:55.7322003Z   EXPO_TOKEN: ***
+2026-02-14T16:14:55.7322205Z ##[endgroup]
+2026-02-14T16:14:58.3488212Z npm error code EUSAGE
+2026-02-14T16:14:58.3510201Z npm error
+2026-02-14T16:14:58.3542474Z npm error `npm ci` can only install packages when your package.json and package-lock.json or npm-shrinkwrap.json are in sync. Please update your lock file with `npm install` before continuing.
+2026-02-14T16:14:58.3544162Z npm error
+2026-02-14T16:14:58.3544748Z npm error Missing: expo-image-picker@16.0.6 from lock file
+2026-02-14T16:14:58.3545594Z npm error Missing: expo-image-loader@5.0.0 from lock file
+2026-02-14T16:14:58.3546161Z npm error
+2026-02-14T16:14:58.3546664Z npm error Clean install a project
+2026-02-14T16:14:58.3547588Z npm error
+2026-02-14T16:14:58.3547899Z npm error Usage:
+2026-02-14T16:14:58.3548226Z npm error npm ci
+2026-02-14T16:14:58.3548598Z npm error
+2026-02-14T16:14:58.3549232Z npm error Options:
+2026-02-14T16:14:58.3550060Z npm error [--install-strategy <hoisted|nested|shallow|linked>] [--legacy-bundling]
+2026-02-14T16:14:58.3551234Z npm error [--global-style] [--omit <dev|optional|peer> [--omit <dev|optional|peer> ...]]
+2026-02-14T16:14:58.3552415Z npm error [--include <prod|dev|optional|peer> [--include <prod|dev|optional|peer> ...]]
+2026-02-14T16:14:58.3553593Z npm error [--strict-peer-deps] [--foreground-scripts] [--ignore-scripts] [--no-audit]
+2026-02-14T16:14:58.3554480Z npm error [--no-bin-links] [--no-fund] [--dry-run]
+2026-02-14T16:14:58.3555408Z npm error [-w|--workspace <workspace-name> [-w|--workspace <workspace-name> ...]]
+2026-02-14T16:14:58.3556477Z npm error [-ws|--workspaces] [--include-workspace-root] [--install-links]
+2026-02-14T16:14:58.3557096Z npm error
+2026-02-14T16:14:58.3557772Z npm error aliases: clean-install, ic, install-clean, isntall-clean
+2026-02-14T16:14:58.3558281Z npm error
+2026-02-14T16:14:58.3558647Z npm error Run "npm help ci" for more info
+2026-02-14T16:14:58.3560148Z npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-02-14T16_14_55_806Z-debug-0.log
+2026-02-14T16:14:58.3685590Z ##[error]Process completed with exit code 1.
