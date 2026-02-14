@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,6 +8,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/theme/ThemeContext';
+import * as SecureStore from 'expo-secure-store';
+import { GuidedTour } from '@/components/GuidedTour';
 
 const getCategoryIcon = (category: string): string => {
   switch (category?.toLowerCase()) {
@@ -29,11 +31,29 @@ const getActivityIcon = (type: string): { name: string; color: string; bg: strin
   }
 };
 
+const TOUR_STORAGE_KEY = '@chipin_tour_completed';
+
 export default function HomeScreen() {
   const { user, refreshUser } = useAuth();
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
   const { colors, isDark } = useTheme();
+  const [showTour, setShowTour] = useState(false);
+
+  useEffect(() => {
+    SecureStore.getItemAsync(TOUR_STORAGE_KEY)
+      .then((val) => {
+        if (val !== 'true') {
+          setTimeout(() => setShowTour(true), 800);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleTourClose = () => {
+    setShowTour(false);
+    SecureStore.setItemAsync(TOUR_STORAGE_KEY, 'true').catch(() => {});
+  };
 
   const { data: pools, refetch, isLoading } = useQuery({
     queryKey: ['pools'],
@@ -86,7 +106,17 @@ export default function HomeScreen() {
       >
         <View style={styles.headerRow}>
           <View>
-            <Text style={[styles.appBrand, { color: colors.mint }]}>CHIPINPOOL</Text>
+            <View style={styles.brandRow}>
+              <Text style={[styles.appBrand, { color: colors.mint }]}>CHIPINPOOL</Text>
+              <TouchableOpacity
+                style={[styles.tourButton, { backgroundColor: `${colors.mint}15`, borderColor: `${colors.mint}30` }]}
+                onPress={() => setShowTour(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="compass-outline" size={14} color={colors.mint} />
+                <Text style={[styles.tourButtonText, { color: colors.mint }]}>Tour</Text>
+              </TouchableOpacity>
+            </View>
             <Text style={[styles.greeting, { color: colors.text }]}>Hello, {user?.firstName} 👋</Text>
             <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>Here's your overview</Text>
           </View>
@@ -279,6 +309,7 @@ export default function HomeScreen() {
 
         <View style={{ height: 24 }} />
       </ScrollView>
+      <GuidedTour isOpen={showTour} onClose={handleTourClose} />
     </SafeAreaView>
   );
 }
@@ -298,11 +329,29 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 14,
   },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 2,
+  },
   appBrand: {
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 2,
-    marginBottom: 2,
+  },
+  tourButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  tourButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   greeting: {
     fontSize: 22,
