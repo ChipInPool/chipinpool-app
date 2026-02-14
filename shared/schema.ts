@@ -79,6 +79,7 @@ export const users = pgTable("users", {
   suspended: boolean("suspended").notNull().default(false),
   suspendedAt: timestamp("suspended_at"),
   suspendedReason: text("suspended_reason"),
+  isPublic: boolean("is_public").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -909,3 +910,18 @@ export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions
 });
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
+
+// ============================================
+// User Following System
+// ============================================
+
+export const userFollows = pgTable("user_follows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  followerId: varchar("follower_id").references(() => users.id).notNull(),
+  followingId: varchar("following_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertUserFollowSchema = createInsertSchema(userFollows).omit({ id: true, createdAt: true });
+export type UserFollow = typeof userFollows.$inferSelect;
+export type InsertUserFollow = z.infer<typeof insertUserFollowSchema>;

@@ -2227,66 +2227,165 @@ export async function registerRoutes(
     }
   });
 
+  // ============================================
+  // User Following System Routes (new userFollows table)
+  // ============================================
+
+  const optionalAuth = (req: any, res: any, next: any) => {
+    next();
+  };
+
+  // Search users - MUST be before :username route
+  app.get("/api/users/search", requireAuth, async (req, res, next) => {
+    try {
+      const q = req.query.q as string;
+      if (!q || q.trim().length === 0) {
+        return res.json([]);
+      }
+      const results = await storage.searchUsers(q.trim());
+      res.json(results);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get user profile by username
+  app.get("/api/users/:username/profile", optionalAuth, async (req, res, next) => {
+    try {
+      const user = await storage.getUserByUsername(req.params.username);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const viewerId = req.session?.userId;
+      const isOwner = viewerId === user.id;
+      const isViewerFollowing = viewerId ? await storage.isFollowingNew(viewerId, user.id) : false;
+
+      if (!user.isPublic && !isOwner && !isViewerFollowing) {
+        return res.json({
+          id: user.id,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          avatar: user.avatar,
+          isPublic: false,
+          isPrivate: true,
+        });
+      }
+
+      const [createdPools, contributedPools, followersCount, followingCount, badges, recentActivity] = await Promise.all([
+        storage.getPoolsByCreator(user.id),
+        storage.getPoolsByContributor(user.id),
+        storage.getFollowersCount(user.id),
+        storage.getFollowingCount(user.id),
+        storage.getUserBadges(user.id),
+        db.select().from(poolActivities).where(eq(poolActivities.userId, user.id)).orderBy(desc(poolActivities.createdAt)).limit(10),
+      ]);
+
+      const totalRaised = createdPools.reduce((sum, pool) => sum + parseFloat(pool.currentAmount || '0'), 0);
+
+      const { password, ...userWithoutPassword } = user;
+      res.json({
+        ...userWithoutPassword,
+        poolsCreated: createdPools.length,
+        poolsJoined: contributedPools.length,
+        totalRaised: totalRaised.toFixed(2),
+        followersCount,
+        followingCount,
+        isFollowing: isViewerFollowing,
+        achievements: badges.length,
+        recentActivity,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Follow a user (new userFollows)
   app.post("/api/users/:id/follow", requireAuth, async (req, res, next) => {
     try {
-      await storage.followUser(req.session.userId!, req.params.id);
-      res.json({ message: "User followed" });
+      const userId = req.session.userId!;
+      const targetId = req.params.id;
+      if (userId === targetId) {
+        return res.status(400).json({ message: "Cannot follow yourself" });
+      }
+      await storage.followUserNew(userId, targetId);
+      res.json({ success: true });
     } catch (error) {
       next(error);
     }
   });
 
+  // Unfollow a user (new userFollows)
   app.delete("/api/users/:id/follow", requireAuth, async (req, res, next) => {
     try {
-      await storage.unfollowUser(req.session.userId!, req.params.id);
-      res.json({ message: "User unfollowed" });
+      await storage.unfollowUserNew(req.session.userId!, req.params.id);
+      res.json({ success: true });
     } catch (error) {
       next(error);
     }
   });
 
-  app.get("/api/users/:id/following", async (req, res, next) => {
+  // Get followers of a user
+  app.get("/api/users/:id/followers", optionalAuth, async (req, res, next) => {
     try {
-      const followingIds = await storage.getFollowing(req.params.id);
-      const followingUsers = await Promise.all(
-        followingIds.map(async (id) => {
-          const user = await storage.getUser(id);
-          if (user) {
-            const { password, ...userWithoutPassword } = user;
-            return userWithoutPassword;
-          }
-          return null;
-        })
-      );
-      res.json({ following: followingUsers.filter(Boolean) });
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const viewerId = req.session?.userId;
+      if (!targetUser.isPublic && viewerId !== targetUser.id) {
+        const isViewerFollowing = viewerId ? await storage.isFollowingNew(viewerId, targetUser.id) : false;
+        if (!isViewerFollowing) {
+          return res.status(403).json({ message: "This profile is private" });
+        }
+      }
+
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const followers = await storage.getFollowersDetailed(req.params.id, limit, offset);
+      res.json(followers);
     } catch (error) {
       next(error);
     }
   });
 
-  app.get("/api/users/:id/followers", async (req, res, next) => {
+  // Get following of a user
+  app.get("/api/users/:id/following", optionalAuth, async (req, res, next) => {
     try {
-      const followerIds = await storage.getFollowers(req.params.id);
-      const followerUsers = await Promise.all(
-        followerIds.map(async (id) => {
-          const user = await storage.getUser(id);
-          if (user) {
-            const { password, ...userWithoutPassword } = user;
-            return userWithoutPassword;
-          }
-          return null;
-        })
-      );
-      res.json({ followers: followerUsers.filter(Boolean) });
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const viewerId = req.session?.userId;
+      if (!targetUser.isPublic && viewerId !== targetUser.id) {
+        const isViewerFollowing = viewerId ? await storage.isFollowingNew(viewerId, targetUser.id) : false;
+        if (!isViewerFollowing) {
+          return res.status(403).json({ message: "This profile is private" });
+        }
+      }
+
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const following = await storage.getFollowingDetailed(req.params.id, limit, offset);
+      res.json(following);
     } catch (error) {
       next(error);
     }
   });
 
-  app.get("/api/users/:id/is-following", requireAuth, async (req, res, next) => {
+  // Update user privacy setting
+  app.patch("/api/user/privacy", requireAuth, async (req, res, next) => {
     try {
-      const isFollowing = await storage.isFollowing(req.session.userId!, req.params.id);
-      res.json({ isFollowing });
+      const { isPublic } = z.object({ isPublic: z.boolean() }).parse(req.body);
+      const updatedUser = await storage.updateUser(req.session.userId!, { isPublic });
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
     } catch (error) {
       next(error);
     }

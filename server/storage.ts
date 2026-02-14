@@ -2,7 +2,7 @@ import { db } from "./db";
 import { 
   users, pools, contributions, comments, notifications, virtualCards, transactions, follows, badges, userBadges, invites, walletDeposits, walletWithdrawals, verificationCodes, bankAccounts, recurringContributions, apiAccessRequests,
   merchants, merchantApiKeys, merchantCheckoutSessions, merchantWebhookDeliveries, merchantPayouts, poolTransferRequests,
-  userPoints, pointTransactions, poolActivities,
+  userPoints, pointTransactions, poolActivities, userFollows,
   type User, type InsertUser, type Pool, type InsertPool, type Contribution, type InsertContribution,
   type Comment, type InsertComment, type Notification, type InsertNotification,
   type VirtualCard, type InsertVirtualCard, type Transaction, type InsertTransaction,
@@ -15,9 +15,10 @@ import {
   type BankAccount, type InsertBankAccount, type PoolTransferRequest, type InsertPoolTransferRequest,
   type Badge, type InsertBadge, type UserBadge, type InsertUserBadge,
   type UserPoints, type InsertUserPoints, type PointTransaction, type InsertPointTransaction,
-  type PoolActivity, type InsertPoolActivity
+  type PoolActivity, type InsertPoolActivity,
+  type UserFollow
 } from "@shared/schema";
-import { eq, desc, and, sql, gt, lte, inArray } from "drizzle-orm";
+import { eq, desc, and, sql, gt, lte, inArray, or, ilike, count } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -85,12 +86,22 @@ export interface IStorage {
   getPointTransactions(userId: string, limit?: number): Promise<PointTransaction[]>;
   getLeaderboard(limit?: number): Promise<any[]>;
   
-  // Follow operations
+  // Follow operations (legacy - uses follows table)
   followUser(followerId: string, followingId: string): Promise<void>;
   unfollowUser(followerId: string, followingId: string): Promise<void>;
   getFollowing(userId: string): Promise<string[]>;
   getFollowers(userId: string): Promise<string[]>;
   isFollowing(followerId: string, followingId: string): Promise<boolean>;
+
+  // User following (new - uses userFollows table)
+  followUserNew(followerId: string, followingId: string): Promise<UserFollow>;
+  unfollowUserNew(followerId: string, followingId: string): Promise<void>;
+  getFollowersDetailed(userId: string, limit?: number, offset?: number): Promise<{id: string; firstName: string; lastName: string; username: string; avatar: string | null; bio: string | null; createdAt: Date}[]>;
+  getFollowingDetailed(userId: string, limit?: number, offset?: number): Promise<{id: string; firstName: string; lastName: string; username: string; avatar: string | null; bio: string | null; createdAt: Date}[]>;
+  getFollowersCount(userId: string): Promise<number>;
+  getFollowingCount(userId: string): Promise<number>;
+  isFollowingNew(followerId: string, followingId: string): Promise<boolean>;
+  searchUsers(query: string, limit?: number): Promise<{id: string; firstName: string; lastName: string; username: string; avatar: string | null; bio: string | null; isPublic: boolean; createdAt: Date}[]>;
   
   // Invite operations
   createInvite(invite: InsertInvite): Promise<Invite>;
@@ -1052,6 +1063,104 @@ export class DatabaseStorage implements IStorage {
 
   async updatePoolSpentAmount(poolId: string, amount: string): Promise<void> {
     await db.update(pools).set({ spentAmount: amount }).where(eq(pools.id, poolId));
+  }
+
+  async followUserNew(followerId: string, followingId: string): Promise<UserFollow> {
+    try {
+      const [result] = await db.insert(userFollows).values({ followerId, followingId }).returning();
+      return result;
+    } catch (error: any) {
+      if (error.code === '23505') {
+        const [existing] = await db.select().from(userFollows).where(
+          and(eq(userFollows.followerId, followerId), eq(userFollows.followingId, followingId))
+        );
+        return existing;
+      }
+      throw error;
+    }
+  }
+
+  async unfollowUserNew(followerId: string, followingId: string): Promise<void> {
+    await db.delete(userFollows).where(
+      and(eq(userFollows.followerId, followerId), eq(userFollows.followingId, followingId))
+    );
+  }
+
+  async getFollowersDetailed(userId: string, limit: number = 20, offset: number = 0): Promise<{id: string; firstName: string; lastName: string; username: string; avatar: string | null; bio: string | null; createdAt: Date}[]> {
+    const result = await db.select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      username: users.username,
+      avatar: users.avatar,
+      bio: users.bio,
+      createdAt: users.createdAt,
+    })
+      .from(userFollows)
+      .innerJoin(users, eq(userFollows.followerId, users.id))
+      .where(eq(userFollows.followingId, userId))
+      .limit(limit)
+      .offset(offset);
+    return result;
+  }
+
+  async getFollowingDetailed(userId: string, limit: number = 20, offset: number = 0): Promise<{id: string; firstName: string; lastName: string; username: string; avatar: string | null; bio: string | null; createdAt: Date}[]> {
+    const result = await db.select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      username: users.username,
+      avatar: users.avatar,
+      bio: users.bio,
+      createdAt: users.createdAt,
+    })
+      .from(userFollows)
+      .innerJoin(users, eq(userFollows.followingId, users.id))
+      .where(eq(userFollows.followerId, userId))
+      .limit(limit)
+      .offset(offset);
+    return result;
+  }
+
+  async getFollowersCount(userId: string): Promise<number> {
+    const [result] = await db.select({ count: count() }).from(userFollows).where(eq(userFollows.followingId, userId));
+    return result?.count ?? 0;
+  }
+
+  async getFollowingCount(userId: string): Promise<number> {
+    const [result] = await db.select({ count: count() }).from(userFollows).where(eq(userFollows.followerId, userId));
+    return result?.count ?? 0;
+  }
+
+  async isFollowingNew(followerId: string, followingId: string): Promise<boolean> {
+    const [result] = await db.select().from(userFollows).where(
+      and(eq(userFollows.followerId, followerId), eq(userFollows.followingId, followingId))
+    );
+    return !!result;
+  }
+
+  async searchUsers(query: string, limit: number = 20): Promise<{id: string; firstName: string; lastName: string; username: string; avatar: string | null; bio: string | null; isPublic: boolean; createdAt: Date}[]> {
+    const searchPattern = `%${query}%`;
+    const result = await db.select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      username: users.username,
+      avatar: users.avatar,
+      bio: users.bio,
+      isPublic: users.isPublic,
+      createdAt: users.createdAt,
+    })
+      .from(users)
+      .where(
+        or(
+          ilike(users.firstName, searchPattern),
+          ilike(users.lastName, searchPattern),
+          ilike(users.username, searchPattern)
+        )
+      )
+      .limit(limit);
+    return result;
   }
 }
 
