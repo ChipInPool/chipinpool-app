@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl || 'https://chipinpool-csekdvghcqepcthm.centralus-01.azurewebsites.net';
+export const API_URL = Constants.expoConfig?.extra?.apiUrl || 'https://chipinpool-csekdvghcqepcthm.centralus-01.azurewebsites.net';
 console.log('[API] Connecting to:', API_URL);
 
 let sessionCookie: string | null = null;
@@ -259,6 +259,10 @@ export const api = {
     },
     update: (poolId: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: string; status?: string }) =>
       fetchApi(`/api/pools/${poolId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    getImageUploadUrl: (poolId: string) =>
+      fetchApi<any>(`/api/pools/${poolId}/image/upload-url`, { method: 'POST' }),
+    confirmImage: (poolId: string, objectPath: string) =>
+      fetchApi<any>(`/api/pools/${poolId}/image/confirm`, { method: 'POST', body: JSON.stringify({ objectPath }) }),
   },
   wallet: {
     getBalance: () => fetchApi<any>('/api/auth/me').then((r: any) => {

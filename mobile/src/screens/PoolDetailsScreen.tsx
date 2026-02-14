@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Share, Modal, TextInput, Linking, Switch, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Share, Modal, TextInput, Linking, Switch, RefreshControl, Image } from 'react-native';
 import { useRoute, RouteProp, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { api } from '@/services/api';
+import { api, API_URL } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/theme/ThemeContext';
 
@@ -107,6 +108,7 @@ export default function PoolDetailsScreen() {
   const [editExternalLink, setEditExternalLink] = useState('');
   const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [showAutoContribute, setShowAutoContribute] = useState(false);
   const [autoContributeAmount, setAutoContributeAmount] = useState('');
   const [autoContributeFrequency, setAutoContributeFrequency] = useState<'weekly' | 'monthly' | 'quarterly'>('monthly');
@@ -303,6 +305,41 @@ export default function PoolDetailsScreen() {
     contributeMutation.mutate(contributeAmount);
   };
 
+  const handlePoolImageUpload = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+      if (result.canceled) return;
+      
+      setUploadingImage(true);
+      const asset = result.assets[0];
+      
+      const uploadUrlRes = await api.pools.getImageUploadUrl(poolId);
+      const { uploadURL, objectPath } = uploadUrlRes;
+      
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+      
+      await fetch(uploadURL, {
+        method: 'PUT',
+        body: blob,
+        headers: { 'Content-Type': asset.mimeType || 'image/jpeg' },
+      });
+      
+      await api.pools.confirmImage(poolId, objectPath);
+      invalidateAllQueries();
+      Alert.alert('Success', 'Pool image updated!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleShare = async () => {
     try {
       await Share.share({
@@ -360,6 +397,13 @@ export default function PoolDetailsScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.mint} />}>
       <View style={styles.header}>
+        {pool?.image && (
+          <Image 
+            source={{ uri: pool.image.startsWith('http') ? pool.image : `${API_URL}/objects/${encodeURIComponent(pool.image.replace(/^\/objects\//, ''))}` }}
+            style={{ width: '100%', height: 160, borderRadius: 16, marginBottom: 16 }}
+            resizeMode="cover"
+          />
+        )}
         {pool?.emoji ? (
           <View style={[styles.iconCircle, { backgroundColor: `${categoryColor}20` }]}>
             <Text style={{ fontSize: 36 }}>{pool.emoji}</Text>
@@ -387,6 +431,24 @@ export default function PoolDetailsScreen() {
             <Ionicons name="open-outline" size={14} color={colors.blue} />
           </TouchableOpacity>
         ) : null}
+        {isCreator && (
+          <TouchableOpacity
+            style={[styles.externalLinkButton, { backgroundColor: `${colors.mint}15`, borderColor: `${colors.mint}30`, marginTop: pool?.externalLink ? 8 : 12 }]}
+            onPress={handlePoolImageUpload}
+            activeOpacity={0.7}
+            disabled={uploadingImage}
+            data-testid="button-upload-pool-image"
+          >
+            {uploadingImage ? (
+              <ActivityIndicator size="small" color={colors.mint} />
+            ) : (
+              <Ionicons name="camera-outline" size={16} color={colors.mint} />
+            )}
+            <Text style={[styles.externalLinkText, { color: colors.mint }]}>
+              {uploadingImage ? 'Uploading...' : (pool?.image ? 'Change Image' : 'Add Cover Image')}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.infoCardsRow}>

@@ -61,7 +61,11 @@ export default function PoolsScreen() {
       >
         <View style={styles.poolHeader}>
           <View style={[styles.categoryCircle, { backgroundColor: color + '20' }]}>
-            <Ionicons name={icon} size={22} color={color} />
+            {pool.emoji ? (
+              <Text style={{ fontSize: 24 }}>{pool.emoji}</Text>
+            ) : (
+              <Ionicons name={icon} size={22} color={color} />
+            )}
           </View>
           <View style={styles.poolInfo}>
             <Text style={[styles.poolTitle, { color: colors.text }]} numberOfLines={1}>{pool.title}</Text>

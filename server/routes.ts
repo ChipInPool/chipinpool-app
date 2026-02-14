@@ -1003,6 +1003,56 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/pools/:id/image/upload-url", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const pool = await storage.getPool(req.params.id);
+      if (!pool) return res.status(404).json({ error: "Pool not found" });
+      if (pool.creatorId !== userId) return res.status(403).json({ error: "Only pool creator can upload images" });
+      
+      let result: { uploadURL: string; objectPath: string } | null = null;
+      let lastError: any = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          result = await fileStorageService.getUploadURL();
+          break;
+        } catch (err) {
+          lastError = err;
+          console.error(`Pool image upload URL attempt ${attempt + 1} failed:`, err instanceof Error ? err.message : err);
+          if (attempt < 2) await new Promise(r => setTimeout(r, 500));
+        }
+      }
+      if (!result) {
+        return res.status(500).json({ error: "Storage service temporarily unavailable" });
+      }
+      res.json({ 
+        uploadURL: result.uploadURL, 
+        objectPath: result.objectPath,
+        constraints: { maxSizeBytes: 10 * 1024 * 1024, allowedTypes: ['image/jpeg', 'image/png', 'image/webp'] }
+      });
+    } catch (error) {
+      console.error("Error generating pool image upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  app.post("/api/pools/:id/image/confirm", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const pool = await storage.getPool(req.params.id);
+      if (!pool) return res.status(404).json({ error: "Pool not found" });
+      if (pool.creatorId !== userId) return res.status(403).json({ error: "Only pool creator can update images" });
+      
+      const { objectPath } = req.body;
+      if (!objectPath) return res.status(400).json({ error: "objectPath required" });
+      
+      await storage.updatePool(pool.id, { image: objectPath });
+      res.json({ success: true, image: objectPath });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Pool routes
   app.get("/api/pools", requireAuth, async (req, res, next) => {
     try {
@@ -1031,7 +1081,14 @@ export async function registerRoutes(
         }
       }
       const userPools = Array.from(poolMap.values());
-      res.json({ pools: userPools });
+      const poolsWithContributorCount = await Promise.all(
+        userPools.map(async (pool) => {
+          const contributions = await storage.getContributionsByPool(pool.id);
+          const uniqueContributors = new Set(contributions.map(c => c.userId).filter(Boolean));
+          return { ...pool, contributorCount: uniqueContributors.size };
+        })
+      );
+      res.json({ pools: poolsWithContributorCount });
     } catch (error) {
       next(error);
     }
