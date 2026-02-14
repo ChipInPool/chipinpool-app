@@ -1,9 +1,9 @@
 import React, { useCallback, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ScrollView, Image } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { api } from '@/services/api';
+import { api, API_URL } from '@/services/api';
 import { PoolsStackParamList } from '@/navigation/AppTabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/theme/ThemeContext';
@@ -163,11 +163,18 @@ export default function PoolsScreen() {
 
     return (
       <TouchableOpacity
-        style={[styles.poolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+        style={[styles.poolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder, ...(pool.image ? { paddingTop: 0 } : {}) }]}
         activeOpacity={0.7}
         onPress={() => navigation.navigate('PoolDetails', { poolId: pool.id })}
         data-testid={`card-pool-${pool.id}`}
       >
+        {pool.image && (
+          <Image
+            source={{ uri: pool.image.startsWith('http') ? pool.image : `${API_URL}/objects/${encodeURIComponent(pool.image.replace(/^\/objects\//, ''))}` }}
+            style={styles.poolImage}
+            resizeMode="cover"
+          />
+        )}
         <View style={styles.poolHeader}>
           <View style={[styles.categoryCircle, { backgroundColor: color + '20' }]}>
             {pool.emoji ? (
@@ -510,6 +517,14 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
+    overflow: 'hidden',
+  },
+  poolImage: {
+    width: '100%',
+    height: 120,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    marginBottom: 12,
   },
   poolHeader: {
     flexDirection: 'row',

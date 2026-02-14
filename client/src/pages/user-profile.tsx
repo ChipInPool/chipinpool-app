@@ -127,12 +127,12 @@ export default function UserProfile() {
                   <div className="relative">
                     <Avatar className="w-20 h-20 md:w-32 md:h-32 border-4 border-background shadow-xl">
                       <AvatarImage src={profileUser.avatar || undefined} />
-                      <AvatarFallback>{profileUser.name?.[0] || 'U'}</AvatarFallback>
+                      <AvatarFallback>{profileUser.firstName?.[0] || 'U'}</AvatarFallback>
                     </Avatar>
                   </div>
                   <div className="pb-2 mb-2">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <h1 className="text-xl md:text-3xl font-display font-bold" data-testid="text-username">{profileUser.name}</h1>
+                      <h1 className="text-xl md:text-3xl font-display font-bold" data-testid="text-username">{profileUser.firstName} {profileUser.lastName}</h1>
                       {badges.length > 0 && (
                         <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary text-xs">
                           {badges[0]?.name || 'Member'}
@@ -314,7 +314,7 @@ export default function UserProfile() {
                       </div>
                     ) : (
                       <div className="text-center py-12 text-muted-foreground">
-                        <p>{profileUser.name} hasn't created any pools yet.</p>
+                        <p>{profileUser.firstName} {profileUser.lastName} hasn't created any pools yet.</p>
                       </div>
                     )}
                   </>
