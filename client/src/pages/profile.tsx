@@ -330,8 +330,8 @@ export default function Profile() {
   const totalContributed = parseFloat(user.totalContributed) || 0;
   const rating = parseFloat(user.rating || '5.0') || 5.0;
 
-  const followers = followersData?.followers || [];
-  const following = followingData?.following || [];
+  const followers = Array.isArray(followersData) ? followersData : (followersData?.followers || []);
+  const following = Array.isArray(followingData) ? followingData : (followingData?.following || []);
 
   return (
     <Layout>

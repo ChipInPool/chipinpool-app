@@ -26,8 +26,16 @@ export default function RegisterScreen() {
   const [verificationCode, setVerificationCode] = useState('');
 
   const handleSendCode = async () => {
-    if (!firstName || !lastName || !email || !phone || !password || !dateOfBirth) {
+    if (!firstName || !lastName || !username || !email || !phone || !password || !dateOfBirth) {
       setError('Please fill in all fields');
+      return;
+    }
+    if (username.length < 3) {
+      setError('Username must be at least 3 characters');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      setError('Username can only contain letters, numbers, and underscores');
       return;
     }
 
@@ -57,7 +65,7 @@ export default function RegisterScreen() {
       await api.auth.register({
         firstName,
         lastName,
-        username: username || `@${firstName.toLowerCase()}${Date.now()}`,
+        username: username.toLowerCase(),
         email,
         phone,
         password,
@@ -107,6 +115,11 @@ export default function RegisterScreen() {
                   <Text style={[styles.label, { color: colors.text }]}>Last Name</Text>
                   <TextInput style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.cardBorder, color: colors.text }]} placeholder="Doe" placeholderTextColor={colors.slate} value={lastName} onChangeText={setLastName} />
                 </View>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={[styles.label, { color: colors.text }]}>Username</Text>
+                <TextInput style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.cardBorder, color: colors.text }]} placeholder="johndoe" placeholderTextColor={colors.slate} value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} />
               </View>
 
               <View style={styles.inputContainer}>
