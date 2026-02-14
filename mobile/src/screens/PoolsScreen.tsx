@@ -224,11 +224,22 @@ export default function PoolsScreen() {
           <Ionicons name="options-outline" size={18} color={colors.mint} />
           <Text style={[styles.filterToggleText, { color: colors.text }]}>Filters & Sort</Text>
         </View>
-        <Ionicons
-          name={filtersExpanded ? 'chevron-up' : 'chevron-down'}
-          size={18}
-          color={colors.textSecondary}
-        />
+        <View style={styles.filterToggleRight}>
+          <TouchableOpacity
+            style={styles.archivedLink}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('ArchivedPools')}
+            data-testid="button-archived-pools"
+          >
+            <Ionicons name="archive-outline" size={16} color={colors.mint} />
+            <Text style={[styles.archivedLinkText, { color: colors.mint }]}>Archived</Text>
+          </TouchableOpacity>
+          <Ionicons
+            name={filtersExpanded ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={colors.textSecondary}
+          />
+        </View>
       </TouchableOpacity>
 
       {filtersExpanded && (
@@ -636,6 +647,20 @@ const styles = StyleSheet.create({
   emptyButtonText: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  filterToggleRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  archivedLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  archivedLinkText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   fab: {
     position: 'absolute',

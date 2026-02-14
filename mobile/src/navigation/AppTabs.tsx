@@ -25,6 +25,7 @@ import PrivacyScreen from '@/screens/PrivacyScreen';
 import HelpCenterScreen from '@/screens/HelpCenterScreen';
 import ContactScreen from '@/screens/ContactScreen';
 import AboutScreen from '@/screens/AboutScreen';
+import ArchivedPoolsScreen from '@/screens/ArchivedPoolsScreen';
 
 export type AppTabParamList = {
   HomeTab: undefined;
@@ -39,6 +40,7 @@ export type PoolsStackParamList = {
   PoolDetails: { poolId: string };
   CreatePool: undefined;
   SpendNow: undefined;
+  ArchivedPools: undefined;
 };
 
 export type ProfileStackParamList = {
@@ -77,6 +79,7 @@ function PoolsStackNavigator() {
       <PoolsStackNav.Screen name="PoolDetails" component={PoolDetailsScreen} options={{ title: 'Pool' }} />
       <PoolsStackNav.Screen name="CreatePool" component={CreatePoolScreen} options={{ title: 'Create Pool' }} />
       <PoolsStackNav.Screen name="SpendNow" component={SpendNowScreen} options={{ title: 'Spend Now' }} />
+      <PoolsStackNav.Screen name="ArchivedPools" component={ArchivedPoolsScreen} options={{ title: 'Archived Pools' }} />
     </PoolsStackNav.Navigator>
   );
 }
