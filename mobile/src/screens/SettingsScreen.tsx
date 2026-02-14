@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Image, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
@@ -199,6 +199,34 @@ export default function SettingsScreen() {
                   </Text>
                 </TouchableOpacity>
               ))}
+            </View>
+          </View>
+
+          <View style={{ marginBottom: 24 }}>
+            <Text style={{ fontSize: 14, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 12, fontWeight: '600' }}>Privacy</Text>
+            <View style={{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.cardBorder, padding: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '500', color: colors.text }}>Public Profile</Text>
+                  <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>When enabled, anyone can see your full profile. When disabled, only followers can see your pools and activity.</Text>
+                </View>
+                <Switch
+                  value={user?.isPublic !== false}
+                  onValueChange={async (value) => {
+                    try {
+                      await api.users.updatePrivacy(value);
+                      queryClient.invalidateQueries({ queryKey: ['user'] });
+                      queryClient.invalidateQueries({ queryKey: ['auth'] });
+                      await refreshUser();
+                      Alert.alert('Updated', value ? 'Your profile is now public' : 'Your profile is now private');
+                    } catch (err: any) {
+                      Alert.alert('Error', err.message || 'Failed to update privacy setting');
+                    }
+                  }}
+                  trackColor={{ false: colors.cardBorder, true: colors.mint }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
             </View>
           </View>
 
