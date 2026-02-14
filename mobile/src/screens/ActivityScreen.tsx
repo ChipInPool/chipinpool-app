@@ -19,6 +19,8 @@ const FILTERS = [
   { key: 'contribution', label: 'Contributions' },
   { key: 'withdrawal', label: 'Withdrawals' },
   { key: 'deposit', label: 'Deposits' },
+  { key: 'spend', label: 'Spending' },
+  { key: 'transfer', label: 'Transfers' },
 ];
 
 function formatDate(dateString: string): string {
@@ -53,25 +55,25 @@ export default function ActivityScreen() {
         return { name: 'arrow-down-circle', color: colors.blue };
       case 'deposit':
         return { name: 'add-circle', color: colors.mint };
+      case 'spend':
+        return { name: 'bag-handle', color: colors.purple };
+      case 'pool_withdrawal':
+        return { name: 'trending-down', color: colors.red };
+      case 'pool_transfer':
+        return { name: 'swap-horizontal', color: colors.amber };
       default:
         return { name: 'ellipse', color: colors.slate };
     }
   }
 
-  function formatAmount(type: string, amount: string | number): { text: string; color: string } {
+  function formatAmount(direction: string, amount: string | number): { text: string; color: string } {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
     const abs = Math.abs(num).toFixed(2);
 
-    switch (type) {
-      case 'contribution':
-        return { text: `-$${abs}`, color: colors.green };
-      case 'withdrawal':
-        return { text: `-$${abs}`, color: colors.blue };
-      case 'deposit':
-        return { text: `+$${abs}`, color: colors.mint };
-      default:
-        return { text: `$${abs}`, color: colors.slate };
+    if (direction === 'in') {
+      return { text: `+$${abs}`, color: colors.green };
     }
+    return { text: `-$${abs}`, color: colors.red };
   }
 
   const {
@@ -80,17 +82,33 @@ export default function ActivityScreen() {
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ['activity-feed'],
-    queryFn: api.activity.feed,
+    queryKey: ['user-activity'],
+    queryFn: api.activity.userActivity,
   });
 
   const activities = useMemo(() => {
-    const items = Array.isArray(activityData)
-      ? activityData
-      : activityData?.activities || activityData?.feed || [];
+    const items = Array.isArray(activityData) ? activityData : [];
     if (activeFilter === 'all') return items;
+    if (activeFilter === 'transfer') {
+      return items.filter((item: any) => item.type === 'pool_transfer' || item.type === 'pool_withdrawal');
+    }
     return items.filter((item: any) => item.type === activeFilter);
   }, [activityData, activeFilter]);
+
+  const summary = useMemo(() => {
+    const items = Array.isArray(activityData) ? activityData : [];
+    let totalIn = 0;
+    let totalOut = 0;
+    items.forEach((item: any) => {
+      const amt = parseFloat(item.amount || '0');
+      if (item.direction === 'in') {
+        totalIn += amt;
+      } else {
+        totalOut += amt;
+      }
+    });
+    return { totalIn, totalOut };
+  }, [activityData]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -106,6 +124,24 @@ export default function ActivityScreen() {
       >
         <Text style={[styles.title, { color: colors.text }]}>Activity</Text>
 
+        <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryLabel, { color: colors.slate }]}>Money In</Text>
+              <Text style={[styles.summaryValue, { color: colors.green }]} data-testid="text-total-in">
+                +${summary.totalIn.toFixed(2)}
+              </Text>
+            </View>
+            <View style={[styles.summaryDivider, { backgroundColor: colors.cardBorder }]} />
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryLabel, { color: colors.slate }]}>Money Out</Text>
+              <Text style={[styles.summaryValue, { color: colors.red }]} data-testid="text-total-out">
+                -${summary.totalOut.toFixed(2)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -115,6 +151,7 @@ export default function ActivityScreen() {
           {FILTERS.map((filter) => (
             <TouchableOpacity
               key={filter.key}
+              data-testid={`button-filter-${filter.key}`}
               style={[
                 styles.filterTab,
                 { backgroundColor: colors.card, borderColor: colors.cardBorder },
@@ -150,20 +187,22 @@ export default function ActivityScreen() {
             />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No activity yet</Text>
             <Text style={[styles.emptySubtitle, { color: colors.slate }]}>
-              Your transactions and contributions will appear here
+              Start by creating a pool or depositing to your wallet
             </Text>
           </View>
         ) : (
           <View style={[styles.activityList, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
             {activities.map((item: any, index: number) => {
               const icon = getActivityIcon(item?.type ?? '');
-              const amount = formatAmount(item?.type ?? '', item?.amount ?? '0');
+              const amount = formatAmount(item?.direction ?? 'out', item?.amount ?? '0');
+              const hasStatus = item?.status && (item.type === 'withdrawal' || item.type === 'pool_withdrawal');
               return (
                 <View
                   key={item.id || index}
+                  data-testid={`card-activity-${item.id || index}`}
                   style={[
                     styles.activityItem,
-                    index < activities.length - 1 && [styles.activityItemBorder, { borderBottomColor: colors.card }],
+                    index < activities.length - 1 && [styles.activityItemBorder, { borderBottomColor: colors.cardBorder }],
                   ]}
                 >
                   <View
@@ -180,11 +219,37 @@ export default function ActivityScreen() {
                   </View>
                   <View style={styles.activityInfo}>
                     <Text style={[styles.activityDescription, { color: colors.text }]} numberOfLines={1}>
-                      {item?.description || item?.title || item?.type || 'Activity'}
+                      {item?.description || item?.type || 'Activity'}
                     </Text>
-                    <Text style={[styles.activityDate, { color: colors.slate }]}>
-                      {formatDate(item?.createdAt || item?.date || item?.timestamp || new Date().toISOString())}
-                    </Text>
+                    {item?.poolTitle ? (
+                      <Text style={[styles.activityPool, { color: colors.mint }]} numberOfLines={1}>
+                        {item.poolTitle}
+                      </Text>
+                    ) : null}
+                    <View style={styles.activityMeta}>
+                      <Text style={[styles.activityDate, { color: colors.slate }]}>
+                        {formatDate(item?.createdAt || new Date().toISOString())}
+                      </Text>
+                      {hasStatus ? (
+                        <View style={[
+                          styles.statusBadge,
+                          {
+                            backgroundColor: item.status === 'completed' ? `${colors.green}20` :
+                              item.status === 'pending' ? `${colors.amber}20` : `${colors.slate}20`,
+                          },
+                        ]}>
+                          <Text style={[
+                            styles.statusText,
+                            {
+                              color: item.status === 'completed' ? colors.green :
+                                item.status === 'pending' ? colors.amber : colors.slate,
+                            },
+                          ]}>
+                            {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
                   <Text style={[styles.activityAmount, { color: amount.color }]}>
                     {amount.text}
@@ -202,7 +267,34 @@ export default function ActivityScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 20 },
+  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 16 },
+  summaryCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 20,
+    marginBottom: 20,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 6,
+  },
+  summaryValue: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  summaryDivider: {
+    width: 1,
+    height: 40,
+  },
   filtersContainer: { marginBottom: 20 },
   filtersContent: { gap: 8 },
   filterTab: {
@@ -223,7 +315,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   activityItemBorder: {
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   activityIconWrap: {
     width: 44,
@@ -234,8 +326,19 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   activityInfo: { flex: 1, marginRight: 12 },
-  activityDescription: { fontSize: 14, fontWeight: '500', marginBottom: 4 },
+  activityDescription: { fontSize: 14, fontWeight: '500', marginBottom: 2 },
+  activityPool: { fontSize: 12, fontWeight: '500', marginBottom: 2 },
+  activityMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
   activityDate: { fontSize: 12 },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
   activityAmount: { fontSize: 15, fontWeight: '700' },
   emptyState: { alignItems: 'center', paddingVertical: 80 },
   emptyTitle: { fontSize: 18, fontWeight: '600', marginTop: 16, marginBottom: 8 },

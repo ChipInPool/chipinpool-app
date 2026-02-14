@@ -41,7 +41,7 @@ export default function WalletScreen() {
     queryFn: api.wallet.getTransactions,
   });
 
-  const balance = parseFloat(user?.walletBalance ?? user?.balance ?? '0') || 0;
+  const balance = parseFloat(user?.balance ?? user?.walletBalance ?? '0') || 0;
 
   const handleRefresh = async () => {
     await refreshUser();

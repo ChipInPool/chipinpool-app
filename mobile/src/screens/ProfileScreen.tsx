@@ -32,7 +32,7 @@ export default function ProfileScreen() {
   };
 
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`;
-  const walletBalance = parseFloat(user?.walletBalance || '0');
+  const walletBalance = parseFloat(user?.balance || user?.walletBalance || '0');
   const formattedBalance = `$${walletBalance.toFixed(2)}`;
   const poolsCount = String(pools?.length || 0);
   const rewardsPoints = String(pointsData?.points || 0);
@@ -150,7 +150,7 @@ export default function ProfileScreen() {
             iconColor={colors.mint}
             iconBg={`${colors.mint}1A`}
             label="Help Center"
-            onPress={() => {}}
+            onPress={() => navigation.navigate('HelpCenter')}
             colors={colors}
           />
           <MenuItem
@@ -158,7 +158,7 @@ export default function ProfileScreen() {
             iconColor={colors.blue}
             iconBg={`${colors.blue}1A`}
             label="Contact Us"
-            onPress={() => {}}
+            onPress={() => navigation.navigate('Contact')}
             colors={colors}
           />
           <MenuItem
@@ -166,7 +166,7 @@ export default function ProfileScreen() {
             iconColor={colors.textSecondary}
             iconBg={`${colors.textSecondary}1A`}
             label="About"
-            onPress={() => {}}
+            onPress={() => navigation.navigate('About')}
             colors={colors}
           />
         </View>

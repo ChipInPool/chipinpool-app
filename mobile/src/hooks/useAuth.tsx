@@ -8,8 +8,8 @@ interface User {
   firstName: string;
   lastName: string;
   username: string;
-  walletBalance: string;
-  balance?: string;
+  walletBalance?: string;
+  balance: string;
   kycStatus: string;
   avatar?: string;
   role?: string;

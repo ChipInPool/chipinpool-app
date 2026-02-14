@@ -20,6 +20,11 @@ import ActivityScreen from '@/screens/ActivityScreen';
 import RewardsScreen from '@/screens/RewardsScreen';
 import NotificationSettingsScreen from '@/screens/NotificationSettingsScreen';
 import RecurringScreen from '@/screens/RecurringScreen';
+import TermsScreen from '@/screens/TermsScreen';
+import PrivacyScreen from '@/screens/PrivacyScreen';
+import HelpCenterScreen from '@/screens/HelpCenterScreen';
+import ContactScreen from '@/screens/ContactScreen';
+import AboutScreen from '@/screens/AboutScreen';
 
 export type AppTabParamList = {
   HomeTab: undefined;
@@ -46,6 +51,11 @@ export type ProfileStackParamList = {
   Activity: undefined;
   Rewards: undefined;
   Recurring: undefined;
+  Terms: undefined;
+  Privacy: undefined;
+  HelpCenter: undefined;
+  Contact: undefined;
+  About: undefined;
 };
 
 const Tab = createBottomTabNavigator();
@@ -89,6 +99,11 @@ function ProfileStackNavigator() {
       <ProfileStackNav.Screen name="Activity" component={ActivityScreen} options={{ title: 'Activity' }} />
       <ProfileStackNav.Screen name="Rewards" component={RewardsScreen} options={{ title: 'Rewards' }} />
       <ProfileStackNav.Screen name="Recurring" component={RecurringScreen} options={{ title: 'Auto-Contribute' }} />
+      <ProfileStackNav.Screen name="Terms" component={TermsScreen} options={{ title: 'Terms of Service' }} />
+      <ProfileStackNav.Screen name="Privacy" component={PrivacyScreen} options={{ title: 'Privacy Policy' }} />
+      <ProfileStackNav.Screen name="HelpCenter" component={HelpCenterScreen} options={{ title: 'Help Center' }} />
+      <ProfileStackNav.Screen name="Contact" component={ContactScreen} options={{ title: 'Contact Us' }} />
+      <ProfileStackNav.Screen name="About" component={AboutScreen} options={{ title: 'About' }} />
     </ProfileStackNav.Navigator>
   );
 }

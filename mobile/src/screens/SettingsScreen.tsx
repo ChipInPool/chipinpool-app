@@ -161,8 +161,8 @@ export default function SettingsScreen() {
               rightElement={<Text style={{ fontSize: 14, color: colors.textSecondary }}>Latest</Text>}
               colors={colors}
             />
-            <MenuItem icon="document-text-outline" label="Terms of Service" onPress={() => {}} colors={colors} />
-            <MenuItem icon="lock-closed-outline" label="Privacy Policy" onPress={() => {}} colors={colors} />
+            <MenuItem icon="document-text-outline" label="Terms of Service" onPress={() => navigation.navigate('Terms')} colors={colors} />
+            <MenuItem icon="lock-closed-outline" label="Privacy Policy" onPress={() => navigation.navigate('Privacy')} colors={colors} />
           </View>
         </ScrollView>
       </SafeAreaView>

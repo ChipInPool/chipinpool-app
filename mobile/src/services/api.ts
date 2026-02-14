@@ -263,7 +263,7 @@ export const api = {
   wallet: {
     getBalance: () => fetchApi<any>('/api/auth/me').then((r: any) => {
       const user = r.user || r;
-      return { balance: user.walletBalance || '0.00' };
+      return { balance: user.balance || user.walletBalance || '0.00' };
     }),
     deposit: (amount: string) =>
       fetchApi<any>('/api/user/deposit', {
@@ -354,6 +354,7 @@ export const api = {
       const result = await fetchApi<any>('/api/activity-feed');
       return result.activities || [];
     },
+    userActivity: () => fetchApi<any>('/api/user/activity').then((r: any) => r.activities || []),
   },
   rewards: {
     badges: () => fetchApi<any>('/api/rewards/badges'),
