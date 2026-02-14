@@ -91,6 +91,7 @@ export default function PoolDetails() {
   const [editImage, setEditImage] = useState("");
   const [editEmoji, setEditEmoji] = useState("");
   const [editExternalLink, setEditExternalLink] = useState("");
+  const [editIsPublic, setEditIsPublic] = useState(true);
   const [isUploadingPoolImage, setIsUploadingPoolImage] = useState(false);
   const poolImageInputRef = useRef<HTMLInputElement>(null);
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
@@ -148,7 +149,7 @@ export default function PoolDetails() {
   });
 
   const updatePoolMutation = useMutation({
-    mutationFn: (data: { title?: string; description?: string; targetAmount?: string; deadline?: string; image?: string; status?: string; emoji?: string; externalLink?: string }) => 
+    mutationFn: (data: { title?: string; description?: string; targetAmount?: string; deadline?: string; image?: string; status?: string; emoji?: string; externalLink?: string; isPublic?: boolean }) => 
       api.pools.update(params?.id || '', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.pool(params?.id || '') });
@@ -456,6 +457,7 @@ export default function PoolDetails() {
       status: editStatus || undefined,
       emoji: editEmoji || undefined,
       externalLink: editExternalLink || undefined,
+      isPublic: editIsPublic,
     });
   };
 
@@ -467,6 +469,7 @@ export default function PoolDetails() {
     setEditImage(pool.image || "");
     setEditEmoji(pool.emoji || "");
     setEditExternalLink(pool.externalLink || "");
+    setEditIsPublic(pool?.isPublic !== false);
     setEditStatus(pool.status || "active");
     setEditDialogOpen(true);
   };
@@ -1592,20 +1595,7 @@ export default function PoolDetails() {
                     <Copy className="w-4 h-4 mr-2" /> Copy Link
                   </Button>
 
-                  {isCreator && ['closed', 'completed', 'expired'].includes(pool.status) && (
-                    <Button
-                      variant="outline"
-                      className="h-12 border-white/10 hover:bg-white/5"
-                      onClick={() => archiveMutation.mutate()}
-                      disabled={archiveMutation.isPending}
-                      data-testid="button-archive-pool"
-                    >
-                      {archiveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Archive className="w-4 h-4 mr-2" />}
-                      Archive Pool
-                    </Button>
-                  )}
-
-                  {isCreator && pool.status === 'archived' && (
+                  {isCreator && pool.status === 'archived' ? (
                     <Button
                       variant="outline"
                       className="h-12 border-white/10 hover:bg-white/5"
@@ -1614,7 +1604,18 @@ export default function PoolDetails() {
                       data-testid="button-unarchive-pool"
                     >
                       {unarchiveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ArchiveRestore className="w-4 h-4 mr-2" />}
-                      Unarchive Pool
+                      Unarchive
+                    </Button>
+                  ) : isCreator && (
+                    <Button
+                      variant="outline"
+                      className="h-12 border-white/10 hover:bg-white/5"
+                      onClick={() => archiveMutation.mutate()}
+                      disabled={archiveMutation.isPending}
+                      data-testid="button-archive-pool"
+                    >
+                      {archiveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Archive className="w-4 h-4 mr-2" />}
+                      Archive
                     </Button>
                   )}
 
@@ -1788,6 +1789,25 @@ export default function PoolDetails() {
                                 />
                                 <Calendar className="w-4 h-4 absolute left-3 top-4 text-muted-foreground" />
                               </div>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Pool Visibility</Label>
+                            <div className="flex items-center justify-between p-3 rounded-lg border">
+                              <div>
+                                <p className="text-sm font-medium">{editIsPublic ? 'Public' : 'Private'}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {editIsPublic ? 'Visible on your profile' : 'Hidden from your profile'}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setEditIsPublic(!editIsPublic)}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editIsPublic ? 'bg-primary' : 'bg-muted'}`}
+                                data-testid="toggle-pool-visibility"
+                              >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editIsPublic ? 'translate-x-6' : 'translate-x-1'}`} />
+                              </button>
                             </div>
                           </div>
                           <div className="space-y-2">

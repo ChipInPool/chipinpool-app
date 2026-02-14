@@ -34,7 +34,7 @@ export interface IStorage {
   getPoolsByCreator(creatorId: string): Promise<Pool[]>;
   getPoolsByContributor(userId: string): Promise<Pool[]>;
   createPool(pool: InsertPool): Promise<Pool>;
-  updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date; image?: string; emoji?: string; externalLink?: string; status?: 'active' | 'completed' | 'expired' | 'closed' | 'paused' | 'archived' }): Promise<Pool | undefined>;
+  updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date; image?: string; emoji?: string; externalLink?: string; isPublic?: boolean; status?: 'active' | 'completed' | 'expired' | 'closed' | 'paused' | 'archived' }): Promise<Pool | undefined>;
   updatePoolAmount(id: string, amount: string): Promise<void>;
   updatePoolStatus(id: string, status: 'active' | 'completed' | 'expired' | 'closed' | 'paused' | 'archived'): Promise<void>;
   archivePool(id: string): Promise<Pool | undefined>;
@@ -232,7 +232,7 @@ export class DatabaseStorage implements IStorage {
     return pool;
   }
 
-  async updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date; image?: string; emoji?: string; externalLink?: string; status?: 'active' | 'completed' | 'expired' | 'closed' | 'paused' | 'archived' }): Promise<Pool | undefined> {
+  async updatePool(id: string, data: { title?: string; description?: string; targetAmount?: string; deadline?: Date; image?: string; emoji?: string; externalLink?: string; isPublic?: boolean; status?: 'active' | 'completed' | 'expired' | 'closed' | 'paused' | 'archived' }): Promise<Pool | undefined> {
     const updates: any = { updatedAt: new Date() };
     if (data.title !== undefined) updates.title = data.title;
     if (data.description !== undefined) updates.description = data.description;
@@ -241,6 +241,7 @@ export class DatabaseStorage implements IStorage {
     if (data.image !== undefined) updates.image = data.image;
     if (data.emoji !== undefined) updates.emoji = data.emoji;
     if (data.externalLink !== undefined) updates.externalLink = data.externalLink;
+    if (data.isPublic !== undefined) updates.isPublic = data.isPublic;
     if (data.status !== undefined) {
       updates.status = data.status;
       if (data.status === 'closed') updates.closedAt = new Date();

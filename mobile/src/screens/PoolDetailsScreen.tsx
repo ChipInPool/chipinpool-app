@@ -105,6 +105,7 @@ export default function PoolDetailsScreen() {
   const [editStatus, setEditStatus] = useState('');
   const [editEmoji, setEditEmoji] = useState('');
   const [editExternalLink, setEditExternalLink] = useState('');
+  const [editIsPublic, setEditIsPublic] = useState(true);
   const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -263,6 +264,7 @@ export default function PoolDetailsScreen() {
       data.status = editStatus;
       data.emoji = editEmoji || null;
       data.externalLink = editExternalLink.trim() || null;
+      data.isPublic = editIsPublic;
       return api.pools.update(poolId, data);
     },
     onSuccess: () => {
@@ -610,6 +612,7 @@ export default function PoolDetailsScreen() {
                 setEditStatus(pool?.status || 'active');
                 setEditEmoji(pool?.emoji || '');
                 setEditExternalLink(pool?.externalLink || '');
+                setEditIsPublic(pool?.isPublic !== false);
                 setShowEditPool(true);
               }}
               activeOpacity={0.7}
@@ -618,9 +621,9 @@ export default function PoolDetailsScreen() {
               <View style={[styles.actionIconWrap, { backgroundColor: `${colors.yellow}26` }]}>
                 <Ionicons name="create-outline" size={20} color={colors.yellow} />
               </View>
-              <Text style={[styles.actionButtonText, { color: colors.text }]}>Edit Pool</Text>
+              <Text style={[styles.actionButtonText, { color: colors.text }]}>Edit</Text>
             </TouchableOpacity>
-            {(['closed', 'completed', 'expired'].includes(pool?.status)) && (
+            {pool?.status !== 'archived' && (
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
                 onPress={handleArchivePool}
@@ -630,7 +633,7 @@ export default function PoolDetailsScreen() {
                 <View style={[styles.actionIconWrap, { backgroundColor: `${colors.blue}26` }]}>
                   <Ionicons name="archive-outline" size={20} color={colors.blue} />
                 </View>
-                <Text style={[styles.actionButtonText, { color: colors.text }]}>Archive Pool</Text>
+                <Text style={[styles.actionButtonText, { color: colors.text }]}>Archive</Text>
               </TouchableOpacity>
             )}
             {pool?.status === 'archived' && (
@@ -643,7 +646,7 @@ export default function PoolDetailsScreen() {
                 <View style={[styles.actionIconWrap, { backgroundColor: `${colors.mint}26` }]}>
                   <Ionicons name="archive-outline" size={20} color={colors.mint} />
                 </View>
-                <Text style={[styles.actionButtonText, { color: colors.text }]}>Unarchive Pool</Text>
+                <Text style={[styles.actionButtonText, { color: colors.text }]}>Unarchive</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -1284,6 +1287,22 @@ export default function PoolDetailsScreen() {
                 autoCapitalize="none"
                 data-testid="input-edit-link"
               />
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
+                <View>
+                  <Text style={[styles.paymentMethodLabel, { color: colors.text, marginBottom: 0 }]}>Pool Visibility</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+                    {editIsPublic ? 'Visible on your profile' : 'Hidden from your profile'}
+                  </Text>
+                </View>
+                <Switch
+                  value={editIsPublic}
+                  onValueChange={setEditIsPublic}
+                  trackColor={{ false: colors.cardBorder, true: colors.mint }}
+                  thumbColor={editIsPublic ? '#FFFFFF' : '#f4f3f4'}
+                  data-testid="switch-edit-visibility"
+                />
+              </View>
 
               <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginTop: 16, marginBottom: 8 }}>Status</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>

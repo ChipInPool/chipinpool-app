@@ -204,6 +204,10 @@ export const api = {
       }),
     registerPushToken: (token: string) =>
       fetchApi<any>('/api/user/push-token', { method: 'POST', body: JSON.stringify({ token, platform: Platform.OS }) }),
+    getAvatarUploadUrl: () =>
+      fetchApi<{ uploadURL: string; objectPath: string }>('/api/user/avatar/upload-url', { method: 'POST' }),
+    confirmAvatar: (objectPath: string) =>
+      fetchApi<any>('/api/user/avatar', { method: 'POST', body: JSON.stringify({ objectPath }) }),
   },
   pools: {
     list: async () => {

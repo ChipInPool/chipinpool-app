@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
-import { api } from '@/services/api';
+import { api, API_URL } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, ThemeMode } from '@/theme/ThemeContext';
@@ -28,9 +28,56 @@ export default function SettingsScreen() {
   const navigation = useNavigation<any>();
   const { user, refreshUser } = useAuth();
   const { colors, isDark, themeMode, setThemeMode } = useTheme();
+  const queryClient = useQueryClient();
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
   const [saved, setSaved] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const handleAvatarUpload = async () => {
+    try {
+      let ImagePicker: any;
+      try {
+        ImagePicker = await import('expo-image-picker');
+      } catch {
+        Alert.alert('Not Available', 'Image picker is not available in this build. Please update the app to use this feature.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (result.canceled) return;
+
+      setUploadingAvatar(true);
+      const asset = result.assets[0];
+
+      const uploadUrlRes = await api.user.getAvatarUploadUrl();
+      const { uploadURL, objectPath } = uploadUrlRes;
+
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+
+      await fetch(uploadURL, {
+        method: 'PUT',
+        body: blob,
+        headers: { 'Content-Type': asset.mimeType || 'image/jpeg' },
+      });
+
+      await api.user.confirmAvatar(objectPath);
+      queryClient.invalidateQueries({ queryKey: ['user'] });
+      queryClient.invalidateQueries({ queryKey: ['auth'] });
+      await refreshUser();
+      Alert.alert('Success', 'Profile photo updated!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to upload photo');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -53,9 +100,21 @@ export default function SettingsScreen() {
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={[]}>
         <ScrollView contentContainerStyle={{ padding: 20 }}>
           <View style={{ alignItems: 'center', marginBottom: 32 }}>
-            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: isDark ? 'rgba(127, 255, 212, 0.2)' : 'rgba(0, 168, 120, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-              <Text style={{ fontSize: 28, fontWeight: 'bold', color: colors.mint }}>{user?.firstName?.[0]}{user?.lastName?.[0]}</Text>
-            </View>
+            <TouchableOpacity onPress={handleAvatarUpload} activeOpacity={0.8} style={{ position: 'relative', marginBottom: 12 }}>
+              {user?.avatar ? (
+                <Image 
+                  source={{ uri: user.avatar.startsWith('http') ? user.avatar : `${API_URL}${user.avatar}` }} 
+                  style={{ width: 80, height: 80, borderRadius: 40, borderWidth: 2, borderColor: colors.mint }} 
+                />
+              ) : (
+                <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: isDark ? 'rgba(127, 255, 212, 0.2)' : 'rgba(0, 168, 120, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 28, fontWeight: 'bold', color: colors.mint }}>{user?.firstName?.[0]}{user?.lastName?.[0]}</Text>
+                </View>
+              )}
+              <View style={{ position: 'absolute', bottom: 2, right: 2, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.mint, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="camera" size={12} color={isDark ? '#001F3F' : '#FFFFFF'} />
+              </View>
+            </TouchableOpacity>
             <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text }}>{user?.firstName} {user?.lastName}</Text>
             <Text style={{ fontSize: 16, color: colors.textSecondary, marginTop: 4 }}>@{user?.username}</Text>
             <Text style={{ fontSize: 14, color: colors.textSecondary, marginTop: 4 }}>{user?.email}</Text>

@@ -159,6 +159,7 @@ export const pools = pgTable("pools", {
   image: text("image"),
   emoji: text("emoji"),
   externalLink: text("external_link"),
+  isPublic: boolean("is_public").notNull().default(true),
   isRecurring: boolean("is_recurring").default(false),
   frequency: frequencyEnum("frequency"),
   closedAt: timestamp("closed_at"),

@@ -1,11 +1,11 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { api } from '@/services/api';
+import { api, API_URL } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/theme/ThemeContext';
 
@@ -13,6 +13,52 @@ export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { user, logout } = useAuth();
   const { colors, isDark } = useTheme();
+  const queryClient = useQueryClient();
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const handleAvatarUpload = async () => {
+    try {
+      let ImagePicker: any;
+      try {
+        ImagePicker = await import('expo-image-picker');
+      } catch {
+        Alert.alert('Not Available', 'Image picker is not available in this build. Please update the app to use this feature.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (result.canceled) return;
+
+      setUploadingAvatar(true);
+      const asset = result.assets[0];
+
+      const uploadUrlRes = await api.user.getAvatarUploadUrl();
+      const { uploadURL, objectPath } = uploadUrlRes;
+
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+
+      await fetch(uploadURL, {
+        method: 'PUT',
+        body: blob,
+        headers: { 'Content-Type': asset.mimeType || 'image/jpeg' },
+      });
+
+      await api.user.confirmAvatar(objectPath);
+      queryClient.invalidateQueries({ queryKey: ['user'] });
+      queryClient.invalidateQueries({ queryKey: ['auth'] });
+      Alert.alert('Success', 'Profile photo updated!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to upload photo');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const { data: pools } = useQuery({
     queryKey: ['pools'],
@@ -41,14 +87,26 @@ export default function ProfileScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.profileHeader}>
-          <LinearGradient
-            colors={[colors.mint, colors.mintDark]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.avatar, { shadowColor: colors.mint }]}
-          >
-            <Text style={[styles.avatarText, { color: isDark ? '#001F3F' : '#FFFFFF' }]}>{initials}</Text>
-          </LinearGradient>
+          <TouchableOpacity onPress={handleAvatarUpload} activeOpacity={0.8} style={styles.avatarContainer}>
+            {user?.avatar ? (
+              <Image 
+                source={{ uri: user.avatar.startsWith('http') ? user.avatar : `${API_URL}${user.avatar}` }} 
+                style={[styles.avatar, { borderColor: colors.mint }]} 
+              />
+            ) : (
+              <LinearGradient
+                colors={[colors.mint, colors.mintDark]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.avatar, { shadowColor: colors.mint }]}
+              >
+                <Text style={[styles.avatarText, { color: isDark ? '#001F3F' : '#FFFFFF' }]}>{initials}</Text>
+              </LinearGradient>
+            )}
+            <View style={[styles.cameraIcon, { backgroundColor: colors.mint }]}>
+              <Ionicons name="camera" size={14} color={isDark ? '#001F3F' : '#FFFFFF'} />
+            </View>
+          </TouchableOpacity>
 
           <Text style={[styles.name, { color: colors.text }]} data-testid="text-user-fullname">
             {user?.firstName} {user?.lastName}
@@ -236,17 +294,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 12,
+  },
   avatar: {
     width: 96,
     height: 96,
     borderRadius: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
+  },
+  cameraIcon: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarText: {
     fontSize: 34,

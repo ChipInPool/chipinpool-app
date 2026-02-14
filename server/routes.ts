@@ -1406,6 +1406,7 @@ export async function registerRoutes(
         image: z.string().nullable().optional(),
         emoji: z.string().nullable().optional(),
         externalLink: z.string().nullable().optional(),
+        isPublic: z.boolean().optional(),
         status: z.enum(['active', 'completed', 'expired', 'closed', 'paused', 'archived']).optional(),
       });
 
@@ -1427,6 +1428,7 @@ export async function registerRoutes(
         deadline: data.deadline ? new Date(data.deadline) : undefined,
         image: data.image ?? undefined,
         emoji: data.emoji ?? undefined,
+        isPublic: data.isPublic,
         externalLink: data.externalLink ?? undefined,
         status: data.status,
       });
