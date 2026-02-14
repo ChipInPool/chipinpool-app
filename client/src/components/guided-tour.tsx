@@ -18,7 +18,7 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     target: '[data-testid="button-start-pool"]',
-    title: "Start Pool Button",
+    title: "Start a Pool",
     description: "Create a new pool to collect money from friends for trips, gifts, events, or shared expenses.",
     desktopOnly: true,
   },
@@ -29,24 +29,29 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     target: '[data-testid="quick-action-deposit"]',
-    title: "Quick Actions - Deposit",
-    description: "Add funds to your wallet using a debit card or bank account. Your balance is used for pool contributions.",
+    title: "Add Funds",
+    description: "Add funds to your wallet using a debit card or bank account. Your balance is used for pool contributions and Spend Now purchases.",
   },
   {
     target: '[data-testid="quick-action-explore"]',
-    title: "Quick Actions - Explore",
-    description: "Discover public pools you can join, or find friends to follow and see what they're contributing to.",
+    title: "Find Friends",
+    description: "Discover public pools to join, find and follow friends, and see what your network is contributing to.",
+  },
+  {
+    target: '[data-testid="quick-action-profile"]',
+    title: "Virtual Cards & Payment Methods",
+    description: "View your virtual Visa cards linked to pools, manage payment methods, and access your profile settings.",
   },
   {
     target: '[data-testid="button-notifications"]',
-    title: "Notifications Bell",
-    description: "Stay up to date with pool contributions, milestones, and other important updates.",
+    title: "Notifications",
+    description: "Stay up to date with pool contributions, milestones, friend activity, and other important updates.",
     desktopOnly: true,
   },
   {
     target: '[data-testid="avatar-user"]',
-    title: "Profile Avatar",
-    description: "Access your profile, payment methods, security settings, and more from your account menu.",
+    title: "Your Profile",
+    description: "Access your profile, security settings, KYC verification, linked bank accounts, and more from your account menu.",
     desktopOnly: true,
   },
 ];

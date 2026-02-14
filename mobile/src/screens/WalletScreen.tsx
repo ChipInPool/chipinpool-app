@@ -16,6 +16,7 @@ export default function WalletScreen() {
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [amount, setAmount] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
   const appState = useRef(AppState.currentState);
 
   useEffect(() => {
@@ -44,8 +45,10 @@ export default function WalletScreen() {
   const balance = parseFloat(user?.balance ?? user?.walletBalance ?? '0') || 0;
 
   const handleRefresh = async () => {
+    setRefreshing(true);
     await refreshUser();
     await refetch();
+    setRefreshing(false);
   };
 
   const depositMutation = useMutation({
@@ -175,7 +178,7 @@ export default function WalletScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={handleRefresh} tintColor={colors.mint} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.mint} />}
       >
         <LinearGradient
           colors={isDark ? ['#0D2B4E', '#1A3A5C'] : [colors.navyLight, colors.navyLight]}
