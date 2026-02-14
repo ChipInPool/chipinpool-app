@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, FlatList, TouchableOpacity, Image, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TextInput, FlatList, TouchableOpacity, Image, ActivityIndicator, StyleSheet, SectionList } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +16,12 @@ export default function FollowersListScreen() {
   const initialTab = route.params?.tab || 'followers';
   const [activeTab, setActiveTab] = useState<'followers' | 'following'>(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const { data: followersData, isLoading: loadingFollowers } = useQuery({
     queryKey: ['followers', userId],
@@ -29,22 +35,107 @@ export default function FollowersListScreen() {
     enabled: !!userId,
   });
 
+  const { data: searchData, isLoading: loadingSearch } = useQuery({
+    queryKey: ['userSearch', debouncedQuery],
+    queryFn: () => api.users.search(debouncedQuery),
+    enabled: debouncedQuery.length >= 2,
+  });
+
+  const updateCacheOptimistically = useCallback((targetId: string, newIsFollowing: boolean) => {
+    const updateList = (old: any) => {
+      if (!old) return old;
+      const list = old?.followers || old?.following || old;
+      if (!Array.isArray(list)) return old;
+      const updated = list.map((u: any) =>
+        u.id === targetId ? { ...u, isFollowing: newIsFollowing } : u
+      );
+      if (old?.followers) return { ...old, followers: updated };
+      if (old?.following) return { ...old, following: updated };
+      return updated;
+    };
+
+    queryClient.setQueryData(['followers', userId], (old: any) => updateList(old));
+    queryClient.setQueryData(['following', userId], (old: any) => {
+      if (!old) return old;
+      if (!newIsFollowing) {
+        const list = old?.following || old;
+        if (Array.isArray(list)) {
+          const filtered = list.filter((u: any) => u.id !== targetId);
+          if (old?.following) return { ...old, following: filtered };
+          return filtered;
+        }
+      }
+      return updateList(old);
+    });
+
+    queryClient.setQueriesData({ queryKey: ['userSearch'] }, (old: any) => {
+      if (!old) return old;
+      const list = old?.users || old;
+      if (!Array.isArray(list)) return old;
+      const updated = list.map((u: any) =>
+        u.id === targetId ? { ...u, isFollowing: newIsFollowing } : u
+      );
+      if (old?.users) return { ...old, users: updated };
+      return updated;
+    });
+  }, [queryClient, userId]);
+
+  const invalidateAll = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['followers', userId] });
+    queryClient.invalidateQueries({ queryKey: ['following', userId] });
+    queryClient.invalidateQueries({ queryKey: ['userProfile'] });
+    queryClient.invalidateQueries({ queryKey: ['userSearch'] });
+  }, [queryClient, userId]);
+
+  const captureSearchCache = () => {
+    const cache: Record<string, any> = {};
+    const queries = queryClient.getQueriesData({ queryKey: ['userSearch'] });
+    queries.forEach(([key, data]) => { cache[JSON.stringify(key)] = data; });
+    return cache;
+  };
+
+  const restoreSearchCache = (cache: Record<string, any>) => {
+    Object.entries(cache).forEach(([keyStr, data]) => {
+      queryClient.setQueryData(JSON.parse(keyStr), data);
+    });
+  };
+
   const followMutation = useMutation({
     mutationFn: (targetId: string) => api.users.follow(targetId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['followers', userId] });
-      queryClient.invalidateQueries({ queryKey: ['following', userId] });
-      queryClient.invalidateQueries({ queryKey: ['userProfile'] });
+    onMutate: async (targetId: string) => {
+      await queryClient.cancelQueries({ queryKey: ['followers', userId] });
+      await queryClient.cancelQueries({ queryKey: ['following', userId] });
+      const prevFollowers = queryClient.getQueryData(['followers', userId]);
+      const prevFollowing = queryClient.getQueryData(['following', userId]);
+      const prevSearch = captureSearchCache();
+      updateCacheOptimistically(targetId, true);
+      return { prevFollowers, prevFollowing, prevSearch };
     },
+    onError: (_err, _targetId, context) => {
+      if (context?.prevFollowers) queryClient.setQueryData(['followers', userId], context.prevFollowers);
+      if (context?.prevFollowing) queryClient.setQueryData(['following', userId], context.prevFollowing);
+      if (context?.prevSearch) restoreSearchCache(context.prevSearch);
+    },
+    onSettled: () => invalidateAll(),
   });
 
   const unfollowMutation = useMutation({
     mutationFn: (targetId: string) => api.users.unfollow(targetId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['followers', userId] });
-      queryClient.invalidateQueries({ queryKey: ['following', userId] });
-      queryClient.invalidateQueries({ queryKey: ['userProfile'] });
+    onMutate: async (targetId: string) => {
+      await queryClient.cancelQueries({ queryKey: ['followers', userId] });
+      await queryClient.cancelQueries({ queryKey: ['following', userId] });
+      const prevFollowers = queryClient.getQueryData(['followers', userId]);
+      const prevFollowing = queryClient.getQueryData(['following', userId]);
+      const prevSearch = captureSearchCache();
+      updateCacheOptimistically(targetId, false);
+      return { prevFollowers, prevFollowing, prevSearch };
     },
+    onError: (_err, _targetId, context) => {
+      if (context?.prevFollowers) queryClient.setQueryData(['followers', userId], context.prevFollowers);
+      if (context?.prevFollowing) queryClient.setQueryData(['following', userId], context.prevFollowing);
+      if (context?.prevSearch) restoreSearchCache(context.prevSearch);
+    },
+    onSettled: () => invalidateAll(),
   });
 
   const followers = (followersData as any)?.followers || followersData || [];
@@ -62,6 +153,11 @@ export default function FollowersListScreen() {
         );
       })
     : list;
+
+  const searchUsers = (searchData as any)?.users || searchData || [];
+  const existingIds = new Set(list.map((u: any) => u.id));
+  const globalSearchResults = searchUsers.filter((u: any) => !existingIds.has(u.id));
+  const showGlobalSearch = debouncedQuery.length >= 2;
 
   const renderUser = ({ item }: { item: any }) => {
     const initials = ((item.firstName?.[0] || '') + (item.lastName?.[0] || '')).toUpperCase();
@@ -106,6 +202,77 @@ export default function FollowersListScreen() {
     );
   };
 
+  const renderListContent = () => {
+    if (isLoading) {
+      return <ActivityIndicator size="large" color={colors.mint} style={{ marginTop: 40 }} />;
+    }
+
+    const hasLocalResults = filteredList.length > 0;
+    const hasGlobalResults = showGlobalSearch && globalSearchResults.length > 0;
+
+    return (
+      <FlatList
+        data={[]}
+        renderItem={null}
+        ListHeaderComponent={
+          <>
+            {filteredList.length > 0 && (
+              <View>
+                {showGlobalSearch && (
+                  <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>
+                    {activeTab === 'followers' ? 'Followers' : 'Following'}
+                  </Text>
+                )}
+                {filteredList.map((item: any) => (
+                  <View key={item.id}>{renderUser({ item })}</View>
+                ))}
+              </View>
+            )}
+
+            {showGlobalSearch && (
+              <View>
+                <View style={[styles.dividerRow, { borderTopColor: colors.cardBorder }]}>
+                  <Ionicons name="globe-outline" size={16} color={colors.mint} />
+                  <Text style={[styles.sectionHeader, { color: colors.mint, marginTop: 0 }]}>
+                    Search all users
+                  </Text>
+                  {loadingSearch && <ActivityIndicator size="small" color={colors.mint} style={{ marginLeft: 8 }} />}
+                </View>
+                {!loadingSearch && globalSearchResults.length > 0 && globalSearchResults.map((item: any) => (
+                  <View key={item.id}>{renderUser({ item })}</View>
+                ))}
+                {!loadingSearch && globalSearchResults.length === 0 && (
+                  <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 12, fontSize: 14 }}>
+                    No additional users found
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {!hasLocalResults && !showGlobalSearch && (
+              <View style={styles.emptyState}>
+                <Ionicons name="people" size={48} color={colors.textSecondary} style={{ opacity: 0.5 }} />
+                <Text style={{ color: colors.textSecondary, marginTop: 12, fontSize: 15 }}>
+                  {searchQuery.length > 0 ? `No results for "${searchQuery}"` : `No ${activeTab} yet`}
+                </Text>
+              </View>
+            )}
+
+            {!hasLocalResults && showGlobalSearch && !hasGlobalResults && !loadingSearch && (
+              <View style={styles.emptyState}>
+                <Ionicons name="people" size={48} color={colors.textSecondary} style={{ opacity: 0.5 }} />
+                <Text style={{ color: colors.textSecondary, marginTop: 12, fontSize: 15 }}>
+                  No results for "{searchQuery}"
+                </Text>
+              </View>
+            )}
+          </>
+        }
+        contentContainerStyle={{ padding: 16 }}
+      />
+    );
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.cardBorder }]}>
@@ -141,7 +308,7 @@ export default function FollowersListScreen() {
         <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
           <Ionicons name="search" size={20} color={colors.textSecondary} />
           <TextInput
-            placeholder="Filter by name or username..."
+            placeholder="Search by name or username..."
             placeholderTextColor={colors.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -154,26 +321,14 @@ export default function FollowersListScreen() {
             </TouchableOpacity>
           )}
         </View>
+        {searchQuery.length > 0 && searchQuery.length < 2 && (
+          <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4, marginLeft: 4, opacity: 0.7 }}>
+            Type 2+ characters to search all users
+          </Text>
+        )}
       </View>
 
-      {isLoading ? (
-        <ActivityIndicator size="large" color={colors.mint} style={{ marginTop: 40 }} />
-      ) : (
-        <FlatList
-          data={filteredList}
-          renderItem={renderUser}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16 }}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="people" size={48} color={colors.textSecondary} style={{ opacity: 0.5 }} />
-              <Text style={{ color: colors.textSecondary, marginTop: 12, fontSize: 15 }}>
-                {searchQuery.length > 0 ? `No results for "${searchQuery}"` : `No ${activeTab} yet`}
-              </Text>
-            </View>
-          }
-        />
-      )}
+      {renderListContent()}
     </View>
   );
 }
@@ -194,4 +349,6 @@ const styles = StyleSheet.create({
   userName: { fontSize: 15, fontWeight: '600' },
   actionButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
   actionButtonText: { fontSize: 13, fontWeight: '600' },
+  sectionHeader: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 8, marginBottom: 8 },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 16, marginTop: 8, borderTopWidth: 1 },
 });
