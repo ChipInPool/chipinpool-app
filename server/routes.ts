@@ -2184,7 +2184,10 @@ export async function registerRoutes(
   // User profile routes
   app.get("/api/users/:id/profile", requireAuth, async (req, res, next) => {
     try {
-      const user = await storage.getUser(req.params.id);
+      let user = await storage.getUser(req.params.id);
+      if (!user) {
+        user = await storage.getUserByUsername(req.params.id);
+      }
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -2356,7 +2359,10 @@ export async function registerRoutes(
   // Get followers of a user
   app.get("/api/users/:id/followers", optionalAuth, async (req, res, next) => {
     try {
-      const targetUser = await storage.getUser(req.params.id);
+      let targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        targetUser = await storage.getUserByUsername(req.params.id);
+      }
       if (!targetUser) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -2371,7 +2377,7 @@ export async function registerRoutes(
 
       const limit = parseInt(req.query.limit as string) || 20;
       const offset = parseInt(req.query.offset as string) || 0;
-      const followers = await storage.getFollowersDetailed(req.params.id, limit, offset);
+      const followers = await storage.getFollowersDetailed(targetUser.id, limit, offset);
       res.json(followers);
     } catch (error) {
       next(error);
@@ -2381,7 +2387,10 @@ export async function registerRoutes(
   // Get following of a user
   app.get("/api/users/:id/following", optionalAuth, async (req, res, next) => {
     try {
-      const targetUser = await storage.getUser(req.params.id);
+      let targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        targetUser = await storage.getUserByUsername(req.params.id);
+      }
       if (!targetUser) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -2396,7 +2405,7 @@ export async function registerRoutes(
 
       const limit = parseInt(req.query.limit as string) || 20;
       const offset = parseInt(req.query.offset as string) || 0;
-      const following = await storage.getFollowingDetailed(req.params.id, limit, offset);
+      const following = await storage.getFollowingDetailed(targetUser.id, limit, offset);
       res.json(following);
     } catch (error) {
       next(error);
