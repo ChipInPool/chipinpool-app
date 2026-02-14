@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3, RefreshCw, Building2, ImagePlus, Upload, X, Activity, ArrowUpRight, ArrowDownLeft, ShoppingBag, Undo2, ArrowDownToLine, Plus, ExternalLink } from "lucide-react";
+import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3, RefreshCw, Building2, ImagePlus, Upload, X, Activity, ArrowUpRight, ArrowDownLeft, ShoppingBag, Undo2, ArrowDownToLine, Plus, ExternalLink, Archive, ArchiveRestore } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useRoute, useLocation } from "wouter";
@@ -194,6 +194,48 @@ export default function PoolDetails() {
         description: error.message || "Could not send invites",
         variant: "destructive",
       });
+    },
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/pools/${params?.id}/archive`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Failed to archive pool');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pool', params?.id] });
+      toast({ title: 'Pool archived', description: 'This pool has been moved to your archive.' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const unarchiveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/pools/${params?.id}/unarchive`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Failed to unarchive pool');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pool', params?.id] });
+      toast({ title: 'Pool restored', description: 'This pool has been restored from archive.' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -576,6 +618,9 @@ export default function PoolDetails() {
                   <h1 className="text-2xl md:text-4xl font-display font-bold text-foreground dark:text-white break-words">{pool.title}</h1>
                   {pool.status === 'completed' && pool.category === 'Purchase' && (
                     <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Purchased</Badge>
+                  )}
+                  {pool.status === 'archived' && (
+                    <Badge className="bg-slate-500/20 text-slate-400 border-slate-500/30" data-testid="badge-archived">Archived</Badge>
                   )}
                 </div>
                 <Link 
@@ -1546,6 +1591,32 @@ export default function PoolDetails() {
                   <Button variant="outline" className="h-12 border-white/10 hover:bg-white/5" onClick={copyLink} data-testid="button-copy-link">
                     <Copy className="w-4 h-4 mr-2" /> Copy Link
                   </Button>
+
+                  {isCreator && ['closed', 'completed', 'expired'].includes(pool.status) && (
+                    <Button
+                      variant="outline"
+                      className="h-12 border-white/10 hover:bg-white/5"
+                      onClick={() => archiveMutation.mutate()}
+                      disabled={archiveMutation.isPending}
+                      data-testid="button-archive-pool"
+                    >
+                      {archiveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Archive className="w-4 h-4 mr-2" />}
+                      Archive Pool
+                    </Button>
+                  )}
+
+                  {isCreator && pool.status === 'archived' && (
+                    <Button
+                      variant="outline"
+                      className="h-12 border-white/10 hover:bg-white/5"
+                      onClick={() => unarchiveMutation.mutate()}
+                      disabled={unarchiveMutation.isPending}
+                      data-testid="button-unarchive-pool"
+                    >
+                      {unarchiveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ArchiveRestore className="w-4 h-4 mr-2" />}
+                      Unarchive Pool
+                    </Button>
+                  )}
 
                   {isCreator && (
                     <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

@@ -17,7 +17,7 @@ import {
   type UserPoints, type InsertUserPoints, type PointTransaction, type InsertPointTransaction,
   type PoolActivity, type InsertPoolActivity
 } from "@shared/schema";
-import { eq, desc, and, sql, gt, inArray } from "drizzle-orm";
+import { eq, desc, and, sql, gt, lte, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations

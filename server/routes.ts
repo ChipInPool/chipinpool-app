@@ -1094,6 +1094,15 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/pools/archived", requireAuth, async (req, res, next) => {
+    try {
+      const archivedPools = await storage.getArchivedPools(req.session.userId!);
+      res.json({ pools: archivedPools });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Public pool viewing - no auth required for shared links
   app.get("/api/pools/:id/public", async (req, res, next) => {
     try {
@@ -1397,7 +1406,7 @@ export async function registerRoutes(
         image: z.string().nullable().optional(),
         emoji: z.string().nullable().optional(),
         externalLink: z.string().nullable().optional(),
-        status: z.enum(['active', 'completed', 'expired', 'closed', 'paused']).optional(),
+        status: z.enum(['active', 'completed', 'expired', 'closed', 'paused', 'archived']).optional(),
       });
 
       const data = updateSchema.parse(req.body);
@@ -1423,6 +1432,60 @@ export async function registerRoutes(
       });
 
       res.json({ pool: updatedPool });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/pools/:id/archive", requireAuth, async (req, res, next) => {
+    try {
+      const pool = await storage.getPool(req.params.id);
+      if (!pool) {
+        return res.status(404).json({ message: "Pool not found" });
+      }
+
+      if (pool.creatorId !== req.session.userId) {
+        return res.status(403).json({ message: "Only the pool creator can archive this pool" });
+      }
+
+      if (!['closed', 'completed', 'expired'].includes(pool.status)) {
+        return res.status(400).json({ message: "Only closed, completed, or expired pools can be archived" });
+      }
+
+      const archivedPool = await storage.archivePool(pool.id);
+
+      await storage.createNotification({
+        userId: req.session.userId!,
+        type: 'pool_invite',
+        title: 'Pool Archived',
+        message: `Your pool "${pool.title}" has been archived.`,
+        link: `/pool/${pool.id}`,
+      });
+
+      res.json({ pool: archivedPool });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/pools/:id/unarchive", requireAuth, async (req, res, next) => {
+    try {
+      const pool = await storage.getPool(req.params.id);
+      if (!pool) {
+        return res.status(404).json({ message: "Pool not found" });
+      }
+
+      if (pool.creatorId !== req.session.userId) {
+        return res.status(403).json({ message: "Only the pool creator can unarchive this pool" });
+      }
+
+      if (pool.status !== 'archived') {
+        return res.status(400).json({ message: "Only archived pools can be unarchived" });
+      }
+
+      const unarchivedPool = await storage.unarchivePool(pool.id);
+
+      res.json({ pool: unarchivedPool });
     } catch (error) {
       next(error);
     }

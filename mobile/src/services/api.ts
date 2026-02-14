@@ -263,6 +263,10 @@ export const api = {
       fetchApi<any>(`/api/pools/${poolId}/image/upload-url`, { method: 'POST' }),
     confirmImage: (poolId: string, objectPath: string) =>
       fetchApi<any>(`/api/pools/${poolId}/image/confirm`, { method: 'POST', body: JSON.stringify({ objectPath }) }),
+    archive: (poolId: string) =>
+      fetchApi<any>(`/api/pools/${poolId}/archive`, { method: 'POST' }),
+    unarchive: (poolId: string) =>
+      fetchApi<any>(`/api/pools/${poolId}/unarchive`, { method: 'POST' }),
   },
   wallet: {
     getBalance: () => fetchApi<any>('/api/auth/me').then((r: any) => {

@@ -318,9 +318,6 @@ export function startCronJobs(): void {
   
   cron.schedule('0 * * * *', () => {
     processRecurringContributions();
-  }, {
-    scheduled: true,
-    timezone: 'America/New_York'
   });
 
   console.log('[Cron] Recurring contributions job scheduled to run every hour.');
@@ -328,4 +325,16 @@ export function startCronJobs(): void {
   setTimeout(() => {
     processRecurringContributions();
   }, 10000);
+
+  cron.schedule('0 2 * * *', async () => {
+    console.log('[Cron] Running auto-archive for closed pools...');
+    try {
+      const archivedCount = await storage.autoArchiveClosedPools(30);
+      console.log(`[Cron] Auto-archived ${archivedCount} pools that were closed for 30+ days.`);
+    } catch (error) {
+      console.error('[Cron] Error in auto-archive job:', error);
+    }
+  });
+
+  console.log('[Cron] Auto-archive job scheduled to run daily at 2:00 AM.');
 }

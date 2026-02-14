@@ -356,6 +356,40 @@ export default function PoolDetailsScreen() {
     } catch (error) {}
   };
 
+  const handleArchivePool = async () => {
+    Alert.alert(
+      'Archive Pool',
+      'Are you sure you want to archive this pool? You can unarchive it later.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Archive',
+          onPress: async () => {
+            try {
+              await api.pools.archive(poolId);
+              queryClient.invalidateQueries({ queryKey: ['pool', poolId] });
+              queryClient.invalidateQueries({ queryKey: ['pools'] });
+              Alert.alert('Success', 'Pool has been archived.');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to archive pool');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleUnarchivePool = async () => {
+    try {
+      await api.pools.unarchive(poolId);
+      queryClient.invalidateQueries({ queryKey: ['pool', poolId] });
+      queryClient.invalidateQueries({ queryKey: ['pools'] });
+      Alert.alert('Success', 'Pool has been restored from archive.');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to unarchive pool');
+    }
+  };
+
   const openContributeModal = () => {
     setContributeStep(1);
     setContributeAmount('');
@@ -476,12 +510,12 @@ export default function PoolDetailsScreen() {
           </Text>
         </View>
         <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-          <View style={[styles.infoIconWrap, { backgroundColor: pool?.status === 'active' ? `${colors.mint}26` : `${colors.yellow}26` }]}>
-            <Ionicons name="flag-outline" size={16} color={pool?.status === 'active' ? colors.mint : colors.yellow} />
+          <View style={[styles.infoIconWrap, { backgroundColor: pool?.status === 'active' ? `${colors.mint}26` : pool?.status === 'archived' ? '#94A3B826' : `${colors.yellow}26` }]}>
+            <Ionicons name={pool?.status === 'archived' ? 'archive-outline' : 'flag-outline'} size={16} color={pool?.status === 'active' ? colors.mint : pool?.status === 'archived' ? '#94A3B8' : colors.yellow} />
           </View>
           <Text style={[styles.infoCardLabel, { color: colors.textSecondary }]}>Status</Text>
-          <View style={[styles.statusBadge, { backgroundColor: pool?.status === 'active' ? `${colors.mint}26` : `${colors.yellow}26` }]}>
-            <Text style={[styles.statusText, { color: pool?.status === 'active' ? colors.mint : colors.yellow }]} data-testid="text-pool-status">
+          <View style={[styles.statusBadge, { backgroundColor: pool?.status === 'active' ? `${colors.mint}26` : pool?.status === 'archived' ? '#94A3B826' : `${colors.yellow}26` }]}>
+            <Text style={[styles.statusText, { color: pool?.status === 'active' ? colors.mint : pool?.status === 'archived' ? '#94A3B8' : colors.yellow }]} data-testid="text-pool-status">
               {pool?.status || 'Active'}
             </Text>
           </View>
@@ -586,6 +620,32 @@ export default function PoolDetailsScreen() {
               </View>
               <Text style={[styles.actionButtonText, { color: colors.text }]}>Edit Pool</Text>
             </TouchableOpacity>
+            {(['closed', 'completed', 'expired'].includes(pool?.status)) && (
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+                onPress={handleArchivePool}
+                activeOpacity={0.7}
+                data-testid="button-archive-pool"
+              >
+                <View style={[styles.actionIconWrap, { backgroundColor: `${colors.blue}26` }]}>
+                  <Ionicons name="archive-outline" size={20} color={colors.blue} />
+                </View>
+                <Text style={[styles.actionButtonText, { color: colors.text }]}>Archive Pool</Text>
+              </TouchableOpacity>
+            )}
+            {pool?.status === 'archived' && (
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+                onPress={handleUnarchivePool}
+                activeOpacity={0.7}
+                data-testid="button-unarchive-pool"
+              >
+                <View style={[styles.actionIconWrap, { backgroundColor: `${colors.mint}26` }]}>
+                  <Ionicons name="archive-outline" size={20} color={colors.mint} />
+                </View>
+                <Text style={[styles.actionButtonText, { color: colors.text }]}>Unarchive Pool</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       )}

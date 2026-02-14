@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { PoolCard } from "@/components/pool-card";
-import { ArrowRight, Plus, Wallet, TrendingUp, Users, CreditCard, Bell, Clock, DollarSign, Activity, Expand, Compass, Sparkles } from "lucide-react";
+import { ArrowRight, Plus, Wallet, TrendingUp, Users, CreditCard, Bell, Clock, DollarSign, Activity, Expand, Compass, Sparkles, Archive } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery } from "@tanstack/react-query";
@@ -47,7 +47,7 @@ export default function Home() {
     staleTime: 60 * 1000,
   });
 
-  const pools = poolsData?.pools || [];
+  const pools = (poolsData?.pools || []).filter((p: any) => p.status !== 'archived');
   const notifications = notificationsData?.notifications || [];
   const activities = activityData?.activities || [];
 
@@ -222,9 +222,14 @@ export default function Home() {
 
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg md:text-xl font-display font-bold tracking-tight">Your Pools</h2>
-            <Button variant="ghost" size="sm" className="text-muted-foreground/60 hover:text-primary text-xs" asChild>
-              <Link href="/explore">View All <ArrowRight className="w-3.5 h-3.5 ml-1" /></Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" className="text-muted-foreground/60 hover:text-primary text-xs" asChild data-testid="link-archived-pools">
+                <Link href="/archived"><Archive className="w-3.5 h-3.5 mr-1" /> Archived</Link>
+              </Button>
+              <Button variant="ghost" size="sm" className="text-muted-foreground/60 hover:text-primary text-xs" asChild>
+                <Link href="/explore">View All <ArrowRight className="w-3.5 h-3.5 ml-1" /></Link>
+              </Button>
+            </div>
           </div>
 
           {poolsLoading ? (

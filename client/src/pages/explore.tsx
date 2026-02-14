@@ -3,7 +3,7 @@ import { Layout } from "@/components/layout";
 import { PoolCard } from "@/components/pool-card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, TrendingUp, Users, ArrowRight } from "lucide-react";
+import { Search, Filter, TrendingUp, Users, ArrowRight, Archive } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -40,7 +40,7 @@ export default function Explore() {
     return null;
   }
 
-  const pools = poolsData?.pools || [];
+  const pools = (poolsData?.pools || []).filter((p: any) => p.status !== 'archived');
   const following = followingData?.following || [];
   const followingIds = following.map((u: any) => u.id);
   
@@ -58,9 +58,14 @@ export default function Explore() {
     <Layout>
       <div className="mb-12">
         <h1 className="text-4xl font-display font-bold mb-4">Explore Pools</h1>
-        <p className="text-muted-foreground text-lg max-w-2xl">
-          Discover public pools, join community causes, or get inspired by what others are chipping in for.
-        </p>
+        <div className="flex items-center gap-4">
+          <p className="text-muted-foreground text-lg max-w-2xl">
+            Discover public pools, join community causes, or get inspired by what others are chipping in for.
+          </p>
+        </div>
+        <Button variant="ghost" size="sm" className="text-muted-foreground/60 hover:text-primary text-sm mt-2" asChild data-testid="link-archived-pools">
+          <Link href="/archived"><Archive className="w-4 h-4 mr-1.5" /> View Archived Pools</Link>
+        </Button>
       </div>
 
       {following.length > 0 && (
