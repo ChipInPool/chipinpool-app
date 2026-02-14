@@ -11,7 +11,7 @@ export default function ContactScreen() {
   const [message, setMessage] = useState('');
 
   const copyEmail = async () => {
-    await Clipboard.setStringAsync('support@chipinpool.com');
+    await Clipboard.setStringAsync('mail@chipinpool.com');
     Alert.alert('Copied', 'Email address copied to clipboard.');
   };
 
@@ -49,7 +49,7 @@ export default function ContactScreen() {
           </View>
           <View style={styles.infoTextWrap}>
             <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Email</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>support@chipinpool.com</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>mail@chipinpool.com</Text>
           </View>
           <Ionicons name="copy-outline" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
@@ -121,12 +121,12 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 4,
     paddingBottom: 40,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 16,
   },
   title: {
     fontSize: 24,

@@ -115,12 +115,12 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 4,
     paddingBottom: 40,
   },
   logoArea: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   logoCircle: {
     width: 72,

@@ -23,9 +23,8 @@ export default function TermsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
-      <ScrollView contentContainerStyle={{ padding: 20 }}>
-        <Text style={{ fontSize: 26, fontWeight: 'bold', color: colors.text, marginBottom: 4 }}>Terms of Service</Text>
-        <Text style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 24 }}>Last updated: January 1, 2026</Text>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 40 }}>
+        <Text style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 16 }}>Last updated: January 1, 2026</Text>
 
         <Section title="1. Acceptance of Terms" colors={colors}>
           <Body colors={colors}>
