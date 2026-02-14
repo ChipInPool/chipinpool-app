@@ -71,7 +71,8 @@
         }
       ],
       "expo-font",
-      "expo-asset"
+      "expo-asset",
+      "expo-image-picker"
     ],
     "owner": "chipinpool",
     "runtimeVersion": {
