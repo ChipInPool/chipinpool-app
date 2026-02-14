@@ -6122,11 +6122,10 @@ export async function registerRoutes(
       
       const followingIds = followingList.map(f => f.followingId);
       
-      if (followingIds.length === 0) {
-        return res.json({ activities: [] });
-      }
+      // Include the user's own activity plus followed users
+      const feedUserIds = [userId, ...followingIds];
 
-      // Get recent contributions from followed users
+      // Get recent contributions from self and followed users
       const recentContributions = await db.select({
         id: contributions.id,
         amount: contributions.amount,
@@ -6135,7 +6134,7 @@ export async function registerRoutes(
         poolId: contributions.poolId,
       })
       .from(contributions)
-      .where(inArray(contributions.userId, followingIds))
+      .where(inArray(contributions.userId, feedUserIds))
       .orderBy(desc(contributions.createdAt))
       .limit(50);
 
