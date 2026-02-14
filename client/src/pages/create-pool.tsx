@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Gift, Plane, ShoppingBag, Calendar, ImagePlus, RefreshCw, Loader2, Sparkles, PartyPopper, Home, GraduationCap, Heart, Coffee, Shield, AlertTriangle, Upload, X, Wand2 } from "lucide-react";
+import { ArrowLeft, Gift, Plane, ShoppingBag, Calendar, ImagePlus, RefreshCw, Loader2, Sparkles, PartyPopper, Home, GraduationCap, Heart, Coffee, Shield, AlertTriangle, Upload, X, Wand2, LinkIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Link, useLocation, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +15,13 @@ import { api, queryKeys } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
+const POOL_EMOJIS = [
+  '🎂', '🎉', '✈️', '🏖️', '🎁', '🛒', '🏠', '🎓',
+  '💍', '🚗', '🏕️', '🎯', '🏢', '🔁', '💰', '🍕',
+  '🎮', '⚽', '🎵', '📱', '🐶', '🌴', '🎄', '❤️',
+  '🥳', '🍽️', '🎬', '🧳', '💐', '🎊', '🏆', '🌟',
+];
 
 const categoryGradients: Record<string, string> = {
   gift: "from-pink-500/10 to-rose-500/5",
@@ -66,6 +74,9 @@ export default function CreatePool() {
   const [showImageDialog, setShowImageDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
+  const [emoji, setEmoji] = useState("");
+  const [externalLink, setExternalLink] = useState("");
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
 
   const uploadImageMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -199,7 +210,7 @@ export default function CreatePool() {
       other: "Other",
     };
 
-    createPoolMutation.mutate({
+    const payload: any = {
       title,
       category: categoryMap[category] || "Other",
       targetAmount,
@@ -208,7 +219,11 @@ export default function CreatePool() {
       isRecurring,
       frequency: isRecurring ? frequency : null,
       image: coverImage || null,
-    });
+    };
+    if (emoji) payload.emoji = emoji;
+    if (externalLink.trim()) payload.externalLink = externalLink.trim();
+
+    createPoolMutation.mutate(payload);
   };
 
   const templates = [
@@ -349,6 +364,50 @@ export default function CreatePool() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <Label>Pool Icon</Label>
+              <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-full h-12 px-4 rounded-md bg-white/5 border border-white/10 flex items-center gap-3 hover:bg-white/10 transition-colors text-left"
+                    data-testid="button-emoji-picker"
+                  >
+                    <span className="text-2xl">{emoji || '💰'}</span>
+                    <span className="text-sm text-muted-foreground flex-1">
+                      {emoji ? 'Tap to change' : 'Choose an emoji (default: 💰)'}
+                    </span>
+                    {emoji && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setEmoji(""); }}
+                        className="p-1 rounded-full hover:bg-white/10 transition-colors"
+                        data-testid="button-clear-emoji"
+                      >
+                        <X className="w-3.5 h-3.5 text-muted-foreground" />
+                      </button>
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[340px] p-3" align="start">
+                  <div className="mb-2 text-sm font-medium">Choose Pool Icon</div>
+                  <div className="grid grid-cols-8 gap-1">
+                    {POOL_EMOJIS.map((e) => (
+                      <button
+                        key={e}
+                        type="button"
+                        onClick={() => { setEmoji(e); setEmojiPickerOpen(false); }}
+                        className={`w-9 h-9 flex items-center justify-center rounded-md text-lg hover:bg-white/10 transition-colors ${emoji === e ? 'bg-primary/20 ring-2 ring-primary' : ''}`}
+                        data-testid={`button-emoji-${e}`}
+                      >
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+
             {isRecurring && (
               <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 animate-in fade-in slide-in-from-top-2">
                 <h3 className="font-semibold text-sm mb-3 text-primary flex items-center gap-2">
@@ -395,6 +454,25 @@ export default function CreatePool() {
                 onChange={(e) => setDescription(e.target.value)}
                 data-testid="input-description"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="externalLink">External Link (Optional)</Label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  <LinkIcon className="w-4 h-4" />
+                </div>
+                <Input
+                  id="externalLink"
+                  type="url"
+                  placeholder="https://example.com"
+                  className="h-12 bg-white/5 border-white/10 pl-10"
+                  value={externalLink}
+                  onChange={(e) => setExternalLink(e.target.value)}
+                  data-testid="input-external-link"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground ml-1">Add a link to a wishlist, event page, or related website</p>
             </div>
           </div>
 

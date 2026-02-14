@@ -61,7 +61,11 @@ export function PoolCard({ pool }: PoolCardProps) {
               <div className={`h-36 w-full overflow-hidden relative bg-gradient-to-br ${config.gradient}`}>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/10">
-                    <CategoryIcon className="w-8 h-8 text-foreground/50" />
+                    {pool.emoji ? (
+                      <span className="text-3xl" data-testid={`emoji-pool-${pool.id}`}>{pool.emoji}</span>
+                    ) : (
+                      <CategoryIcon className="w-8 h-8 text-foreground/50" />
+                    )}
                   </div>
                 </div>
                 <div className="absolute top-3 right-3 z-20">

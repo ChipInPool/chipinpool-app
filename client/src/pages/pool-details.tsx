@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3, RefreshCw, Building2, ImagePlus, Upload, X, Activity, ArrowUpRight, ArrowDownLeft, ShoppingBag, Undo2, ArrowDownToLine, Plus } from "lucide-react";
+import { ArrowLeft, Clock, Share2, Copy, Wallet, Loader2, CreditCard, ShieldCheck, Pencil, Mail, MessageSquare, Calendar, Users, Phone, Send, UserPlus, Link as LinkIcon, Check, BarChart3, RefreshCw, Building2, ImagePlus, Upload, X, Activity, ArrowUpRight, ArrowDownLeft, ShoppingBag, Undo2, ArrowDownToLine, Plus, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useRoute, useLocation } from "wouter";
@@ -24,6 +24,14 @@ import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+const POOL_EMOJIS = [
+  '🎂', '🎉', '✈️', '🏖️', '🎁', '🛒', '🏠', '🎓',
+  '💍', '🚗', '🏕️', '🎯', '🏢', '🔁', '💰', '🍕',
+  '🎮', '⚽', '🎵', '📱', '🐶', '🌴', '🎄', '❤️',
+  '🥳', '🍽️', '🎬', '🧳', '💐', '🎊', '🏆', '🌟',
+];
 
 export default function PoolDetails() {
   const [, params] = useRoute("/pool/:id");
@@ -81,6 +89,8 @@ export default function PoolDetails() {
   const [startImmediately, setStartImmediately] = useState(true);
   const [autoPaymentMethod, setAutoPaymentMethod] = useState<'wallet' | string>('wallet');
   const [editImage, setEditImage] = useState("");
+  const [editEmoji, setEditEmoji] = useState("");
+  const [editExternalLink, setEditExternalLink] = useState("");
   const [isUploadingPoolImage, setIsUploadingPoolImage] = useState(false);
   const poolImageInputRef = useRef<HTMLInputElement>(null);
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
@@ -138,7 +148,7 @@ export default function PoolDetails() {
   });
 
   const updatePoolMutation = useMutation({
-    mutationFn: (data: { title?: string; description?: string; targetAmount?: string; deadline?: string; image?: string; status?: string }) => 
+    mutationFn: (data: { title?: string; description?: string; targetAmount?: string; deadline?: string; image?: string; status?: string; emoji?: string; externalLink?: string }) => 
       api.pools.update(params?.id || '', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.pool(params?.id || '') });
@@ -402,6 +412,8 @@ export default function PoolDetails() {
       deadline: editDeadline ? new Date(editDeadline).toISOString() : undefined,
       image: editImage || undefined,
       status: editStatus || undefined,
+      emoji: editEmoji || undefined,
+      externalLink: editExternalLink || undefined,
     });
   };
 
@@ -411,6 +423,8 @@ export default function PoolDetails() {
     setEditTargetAmount(pool.targetAmount || "");
     setEditDeadline(pool.deadline ? format(new Date(pool.deadline), 'yyyy-MM-dd') : "");
     setEditImage(pool.image || "");
+    setEditEmoji(pool.emoji || "");
+    setEditExternalLink(pool.externalLink || "");
     setEditStatus(pool.status || "active");
     setEditDialogOpen(true);
   };
@@ -558,6 +572,7 @@ export default function PoolDetails() {
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 mb-2 md:mb-3">
+                  {pool.emoji && <span className="text-3xl" data-testid="text-pool-emoji">{pool.emoji}</span>}
                   <h1 className="text-2xl md:text-4xl font-display font-bold text-foreground dark:text-white break-words">{pool.title}</h1>
                   {pool.status === 'completed' && pool.category === 'Purchase' && (
                     <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Purchased</Badge>
@@ -582,6 +597,18 @@ export default function PoolDetails() {
               <p className="text-muted-foreground leading-relaxed">
                 {pool.description || "No description provided."}
               </p>
+              {pool.externalLink && (
+                <a
+                  href={pool.externalLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2 flex items-center gap-2 hover:bg-blue-500/20 transition-colors w-fit text-sm"
+                  data-testid="link-pool-external"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  {pool.externalLink.replace(/^https?:\/\//, '').split('/')[0]}
+                </a>
+              )}
             </div>
 
             <div className="p-3 md:p-6 rounded-2xl bg-card border border-white/5">
@@ -1241,7 +1268,7 @@ export default function PoolDetails() {
                       </Button>
                       <Button 
                         onClick={() => autoContributeMutation.mutate()}
-                        disabled={!autoContributeAmount || parseFloat(autoContributeAmount) <= 0 || autoContributeMutation.isPending || (autoPaymentMethod === 'wallet' && startImmediately && user && parseFloat(autoContributeAmount) > parseFloat(user.balance))}
+                        disabled={!autoContributeAmount || parseFloat(autoContributeAmount) <= 0 || autoContributeMutation.isPending || (autoPaymentMethod === 'wallet' && startImmediately && !!user && parseFloat(autoContributeAmount) > parseFloat(user.balance))}
                         data-testid="button-confirm-auto-contribute"
                       >
                         {autoContributeMutation.isPending ? (
@@ -1584,6 +1611,62 @@ export default function PoolDetails() {
                               className="hidden"
                               onChange={handlePoolImageUpload}
                               data-testid="input-pool-image-file"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Emoji</Label>
+                            <div className="flex items-center gap-3">
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-12 w-12 text-2xl bg-white/5 border-white/10"
+                                    data-testid="button-edit-emoji"
+                                  >
+                                    {editEmoji || '😀'}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-72 p-3" align="start">
+                                  <div className="grid grid-cols-8 gap-1">
+                                    {POOL_EMOJIS.map((emoji) => (
+                                      <button
+                                        key={emoji}
+                                        type="button"
+                                        onClick={() => setEditEmoji(emoji)}
+                                        className={`text-xl p-1.5 rounded-md hover:bg-white/10 transition-colors ${editEmoji === emoji ? 'bg-primary/20 ring-1 ring-primary' : ''}`}
+                                        data-testid={`button-emoji-${emoji}`}
+                                      >
+                                        {emoji}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {editEmoji && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setEditEmoji("")}
+                                  className="text-muted-foreground"
+                                  data-testid="button-clear-emoji"
+                                >
+                                  <X className="w-4 h-4 mr-1" /> Clear
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit-external-link">External Link</Label>
+                            <Input
+                              id="edit-external-link"
+                              type="url"
+                              value={editExternalLink}
+                              onChange={(e) => setEditExternalLink(e.target.value)}
+                              placeholder="https://example.com"
+                              className="h-12 bg-white/5 border-white/10"
+                              data-testid="input-edit-external-link"
                             />
                           </div>
                           <div className="space-y-2">

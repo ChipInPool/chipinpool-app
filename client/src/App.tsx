@@ -49,6 +49,7 @@ import PaymentMethods from "@/pages/payment-methods";
 import PayMe from "@/pages/pay-me";
 import SpendNow from "@/pages/spend-now";
 import Cards from "@/pages/cards";
+import Notifications from "@/pages/notifications";
 
 function Router() {
   return (
@@ -95,6 +96,7 @@ function Router() {
       <Route path="/rewards" component={Rewards} />
       <Route path="/spend-now" component={SpendNow} />
       <Route path="/cards" component={Cards} />
+      <Route path="/notifications" component={Notifications} />
       <Route path="/@:username/:amount" component={PayMe} />
       <Route path="/@:username" component={PayMe} />
       <Route component={NotFound} />

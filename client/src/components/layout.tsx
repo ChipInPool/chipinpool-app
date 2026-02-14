@@ -1,10 +1,9 @@
 import { Link, useLocation } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/lib/auth-context";
 import { api, queryKeys } from "@/lib/api";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Plus, Wallet, Menu, Bell, Moon, Sun, LogOut, Shield, Settings, CreditCard, ShoppingBag } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
@@ -20,7 +19,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const { setTheme } = useTheme();
   const { user, isLoading, isAuthenticated, logout } = useAuth();
-  const queryClient = useQueryClient();
 
   const { data: notificationsData } = useQuery({
     queryKey: queryKeys.notifications,
@@ -32,32 +30,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const notifications = notificationsData?.notifications || [];
   const unreadCount = notifications.filter((n: any) => !n.read).length;
 
-  const markAllRead = async () => {
-    try {
-      await api.notifications.markAllRead();
-      queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
-      toast({ description: "All notifications marked as read" });
-    } catch (e) {
-      toast({ description: "Failed to mark notifications as read", variant: "destructive" });
-    }
-  };
-
   const handleLogout = async () => {
     await logout();
     setLocation("/login");
     toast({ description: "Logged out successfully" });
-  };
-
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 60) return `${diffMins}m ago`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    return `${diffDays}d ago`;
   };
 
   return (
@@ -129,39 +105,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-primary" data-testid="button-notifications">
-                      <Bell className="w-5 h-5" />
-                      {unreadCount > 0 && (
-                        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" className="w-80 p-0 bg-card border-white/10 shadow-xl">
-                    <div className="flex items-center justify-between p-4 border-b border-white/5">
-                      <h4 className="font-semibold text-sm">Notifications</h4>
-                      <button onClick={markAllRead} className="text-xs text-primary hover:underline">Mark all read</button>
-                    </div>
-                    <div className="max-h-[300px] overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <div className="p-4 text-center text-sm text-muted-foreground">No notifications yet</div>
-                      ) : (
-                        notifications.map((notification: any) => (
-                          <Link key={notification.id} href={notification.link || '#'}>
-                            <div className={`p-4 hover:bg-white/5 transition-colors cursor-pointer border-b border-white/5 last:border-0 ${!notification.read ? 'bg-primary/5' : ''}`}>
-                              <div className="flex justify-between items-start mb-1">
-                                <p className="font-medium text-sm text-foreground">{notification.title}</p>
-                                <span className="text-[10px] text-muted-foreground">{formatTimeAgo(notification.createdAt)}</span>
-                              </div>
-                              <p className="text-xs text-muted-foreground line-clamp-2">{notification.message}</p>
-                            </div>
-                          </Link>
-                        ))
-                      )}
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-primary" data-testid="button-notifications" asChild>
+                  <Link href="/notifications">
+                    <Bell className="w-5 h-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
+                    )}
+                  </Link>
+                </Button>
 
                 <Button size="sm" className="font-semibold shadow-lg shadow-primary/20" data-testid="button-start-pool" asChild>
                   <Link href="/create"><Plus className="w-4 h-4 mr-1.5" /> Start Pool</Link>
@@ -270,6 +221,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <Link href="/rewards" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Rewards</Link>
                     <Link href="/profile" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>My Profile</Link>
                     <Link href="/payment-methods" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}><CreditCard className="w-5 h-5" /> Payment Methods</Link>
+                    <Link href="/notifications" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
+                      <Bell className="w-5 h-5" /> Notifications
+                      {unreadCount > 0 && <span className="ml-auto text-xs bg-red-500 text-white rounded-full px-1.5 py-0.5">{unreadCount}</span>}
+                    </Link>
                     <Link href="/settings" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Settings</Link>
                     <Link href="/api-docs" className="text-lg font-medium p-2 hover:bg-white/5 rounded-md transition-colors" onClick={() => setIsMobileMenuOpen(false)}>For Developers</Link>
                     
