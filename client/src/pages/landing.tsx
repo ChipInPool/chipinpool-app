@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Sparkles, Zap, ShieldCheck, Users, CreditCard, Code, ArrowRight, CheckCircle, RefreshCw, Bell, Globe, Sun, Moon } from "lucide-react";
+import { Sparkles, Zap, ShieldCheck, Users, CreditCard, Code, ArrowRight, CheckCircle, RefreshCw, Bell, Sun, Moon } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 
 export default function Landing() {
@@ -9,6 +9,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
       <style>{`
+        html { scroll-behavior: smooth; }
         @keyframes float {
           0%, 100% { transform: translateY(0) rotate(0deg); }
           33% { transform: translateY(-20px) rotate(1deg); }
@@ -49,6 +50,7 @@ export default function Landing() {
             <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors" data-testid="link-features">Features</a>
             <a href="#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors" data-testid="link-how-it-works">How It Works</a>
             <a href="#developers" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors" data-testid="link-developers">Developers</a>
+            <a href="#get-started" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors" data-testid="link-get-started">Get Started</a>
           </div>
 
           <div className="flex items-center gap-3">
@@ -103,50 +105,10 @@ export default function Landing() {
               </Button>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-10 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="text-social-proof-users">
-                <div className="flex -space-x-2">
-                  {[...Array(4)].map((_, i) => (
-                    <div key={i} className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/60 to-accent/60 border-2 border-background flex items-center justify-center text-[10px] font-bold text-white">
-                      {['JP', 'AK', 'ML', 'SR'][i]}
-                    </div>
-                  ))}
-                </div>
-                <span className="font-medium">Trusted by 10,000+ users</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="text-social-proof-rating">
-                <div className="flex gap-0.5">
-                  {[...Array(5)].map((_, i) => (
-                    <svg key={i} className="w-4 h-4 text-yellow-400 fill-yellow-400" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-                <span className="font-medium">4.9/5 from 2,000+ reviews</span>
-              </div>
-            </div>
           </div>
         </div>
       </section>
 
-      <section className="py-6 sm:py-8 border-y border-border/50 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-center gap-6 sm:gap-10 md:gap-16 text-muted-foreground flex-wrap">
-            <div className="flex items-center gap-2 text-xs sm:text-sm font-medium whitespace-nowrap">
-              <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-primary" /> Bank-Level Security
-            </div>
-            <div className="flex items-center gap-2 text-xs sm:text-sm font-medium whitespace-nowrap">
-              <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-primary" /> Visa Cards
-            </div>
-            <div className="flex items-center gap-2 text-xs sm:text-sm font-medium whitespace-nowrap">
-              <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-primary" /> Works Worldwide
-            </div>
-            <div className="hidden md:flex items-center gap-2 text-sm font-medium whitespace-nowrap">
-              <RefreshCw className="w-5 h-5 text-primary" /> Instant Transfers
-            </div>
-          </div>
-        </div>
-      </section>
 
       <section id="features" className="py-16 sm:py-24 md:py-32">
         <div className="container mx-auto px-4">
@@ -284,7 +246,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-24 md:py-32 bg-gradient-to-b from-transparent via-primary/5 to-primary/10 relative overflow-hidden">
+      <section id="get-started" className="py-16 sm:py-24 md:py-32 bg-gradient-to-b from-transparent via-primary/5 to-primary/10 relative overflow-hidden">
         <div className="absolute inset-0">
           <div className="hero-orb-2 absolute top-0 right-[20%] w-64 h-64 rounded-full bg-accent/10 blur-3xl" />
           <div className="hero-orb-1 absolute bottom-0 left-[20%] w-64 h-64 rounded-full bg-primary/10 blur-3xl" />
