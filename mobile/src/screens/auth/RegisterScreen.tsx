@@ -62,6 +62,8 @@ export default function RegisterScreen() {
     setError('');
 
     try {
+      await api.auth.verifyPhoneCode(phone, verificationCode);
+
       await api.auth.register({
         firstName,
         lastName,
