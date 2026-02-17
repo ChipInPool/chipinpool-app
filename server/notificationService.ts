@@ -169,10 +169,15 @@ export async function sendSMS(to: string, message: string): Promise<boolean> {
     const result = await response.json();
     
     if (response.ok && result.response_code === 'SUCCESS') {
-      console.log('[SMS] Sent to', phoneNumber, result);
+      const msgStatus = result?.data?.messages?.[0]?.status;
+      if (msgStatus && msgStatus !== 'SUCCESS') {
+        console.error('[SMS] Message rejected:', phoneNumber, msgStatus, JSON.stringify(result.data?.messages?.[0]));
+        return false;
+      }
+      console.log('[SMS] Sent to', phoneNumber);
       return true;
     } else {
-      console.error('[SMS] API error:', result);
+      console.error('[SMS] API error:', response.status, JSON.stringify(result));
       return false;
     }
   } catch (error: any) {
@@ -303,7 +308,11 @@ export async function sendVerificationEmail(email: string, code: string): Promis
 }
 
 export async function sendVerificationSMS(phone: string, code: string): Promise<boolean> {
-  return sendSMS(phone, `Your ChipIn verification code is: ${code}. Expires in 10 minutes.`);
+  const result = await sendSMS(phone, `Your ChipIn verification code is: ${code}. Expires in 10 minutes.`);
+  if (!result) {
+    throw new Error('Failed to send SMS verification code. Please check your phone number and try again.');
+  }
+  return result;
 }
 
 export async function sendPasswordResetEmail(email: string, resetLink: string): Promise<boolean> {
