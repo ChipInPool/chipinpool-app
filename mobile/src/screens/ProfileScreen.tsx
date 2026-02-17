@@ -268,7 +268,7 @@ export default function ProfileScreen() {
           <Text style={[styles.logoutText, { color: colors.red }]}>Logout</Text>
         </TouchableOpacity>
 
-        <Text style={[styles.version, { color: colors.textSecondary }]} data-testid="text-version">ChipInPool v2.0.1 (Build 12)</Text>
+        <Text style={[styles.version, { color: colors.textSecondary }]} data-testid="text-version">ChipInPool v2.0.2 (Build 13)</Text>
       </ScrollView>
     </SafeAreaView>
   );

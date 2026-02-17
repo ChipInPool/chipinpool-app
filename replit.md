@@ -61,7 +61,7 @@ Preferred communication style: Simple, everyday language.
 - **API Connection**: Connects to the same backend API, persisting session cookies via SecureStore.
 - **Screens**: Home (dashboard with activity preview, notifications badge, quick actions), Pools (list, details with contribute modal, share, Spend Now link), Wallet (balance, transactions), Cards (virtual Visa cards), Profile (settings, security, activity, rewards, notifications links), Spend Now Marketplace (category filters, pool/wallet selector, partner cards), Activity Feed (filtered transaction history), Notifications (real-time alerts with mark-all-read), Rewards (badges, points history, leaderboard tabs), Settings (profile editing, theme toggle, preferences), Security (KYC status).
 - **Theme System**: Dynamic theming with System/Light/Dark modes. Preference persisted via SecureStore. All screens use `useTheme()` hook for dynamic colors (navy/mint dark theme, light fintech theme).
-- **Version**: 1.1.0
+- **Version**: 2.0.2 (Build 13)
 
 ## External Dependencies
 
