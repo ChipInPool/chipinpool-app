@@ -30,7 +30,7 @@ export default function AboutScreen() {
             Chip<Text style={{ color: colors.mint }}>In</Text>Pool
           </Text>
           <Text style={[styles.version, { color: colors.textSecondary }]} data-testid="text-app-version">
-            Version 2.0.2 (Build 13)
+            Version 2.0.3 (Build 14)
           </Text>
         </View>
 
