@@ -99,15 +99,21 @@ export default function ActivityScreen() {
     const items = Array.isArray(activityData) ? activityData : [];
     let totalIn = 0;
     let totalOut = 0;
+    let totalPending = 0;
     items.forEach((item: any) => {
       const amt = parseFloat(item.amount || '0');
       if (item.direction === 'in') {
         totalIn += amt;
       } else {
+        const status = item.status;
+        if (status === 'failed' || status === 'rejected') return;
+        if (status === 'pending' || status === 'pending_review') {
+          totalPending += amt;
+        }
         totalOut += amt;
       }
     });
-    return { totalIn, totalOut };
+    return { totalIn, totalOut, totalPending };
   }, [activityData]);
 
   return (
@@ -138,6 +144,14 @@ export default function ActivityScreen() {
               </Text>
             </View>
           </View>
+          {summary.totalPending > 0 && (
+            <View style={[styles.pendingRow, { borderTopColor: colors.cardBorder }]}>
+              <Text style={[styles.pendingLabel, { color: colors.amber }]}>Pending</Text>
+              <Text style={[styles.pendingValue, { color: colors.amber }]} data-testid="text-total-pending">
+                ${summary.totalPending.toFixed(2)}
+              </Text>
+            </View>
+          )}
         </View>
 
         <ScrollView
@@ -233,17 +247,20 @@ export default function ActivityScreen() {
                           styles.statusBadge,
                           {
                             backgroundColor: item.status === 'completed' ? `${colors.green}20` :
-                              item.status === 'pending' ? `${colors.amber}20` : `${colors.slate}20`,
+                              (item.status === 'pending' || item.status === 'pending_review') ? `${colors.amber}20` :
+                              (item.status === 'failed' || item.status === 'rejected') ? `${colors.red}20` : `${colors.slate}20`,
                           },
                         ]}>
                           <Text style={[
                             styles.statusText,
                             {
                               color: item.status === 'completed' ? colors.green :
-                                item.status === 'pending' ? colors.amber : colors.slate,
+                                (item.status === 'pending' || item.status === 'pending_review') ? colors.amber :
+                                (item.status === 'failed' || item.status === 'rejected') ? colors.red : colors.slate,
                             },
                           ]}>
-                            {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                            {item.status === 'pending_review' ? 'Pending' :
+                              item.status.charAt(0).toUpperCase() + item.status.slice(1)}
                           </Text>
                         </View>
                       ) : null}
@@ -291,6 +308,22 @@ const styles = StyleSheet.create({
   summaryDivider: {
     width: 1,
     height: 40,
+  },
+  pendingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    marginTop: 14,
+    paddingTop: 12,
+  },
+  pendingLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  pendingValue: {
+    fontSize: 16,
+    fontWeight: '700',
   },
   filtersContainer: { marginBottom: 20 },
   filtersContent: { gap: 8 },
