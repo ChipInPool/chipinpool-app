@@ -1,4 +1,4 @@
-import { getStripeSync, getUncachableStripeClient } from './stripeClient';
+import { getStripeSync, getUncachableStripeClient, isReplitEnvironment } from './stripeClient';
 import { storage } from './storage';
 import { sendPoolContributionNotification, sendWalletActivityNotification, sendPoolCompletedNotification } from './notificationService';
 import { sendPushNotification } from './pushService';
@@ -14,32 +14,44 @@ export class WebhookHandlers {
       );
     }
 
-    // First, let stripe-replit-sync handle its sync
-    const sync = await getStripeSync();
-    await sync.processWebhook(payload, signature);
+    if (isReplitEnvironment()) {
+      const sync = await getStripeSync();
+      await sync.processWebhook(payload, signature);
 
-    // Then handle our custom checkout.session.completed events
-    try {
-      const stripe = await getUncachableStripeClient();
-      const webhookSecret = await sync.getManagedWebhookSecret();
-      
-      if (webhookSecret) {
-        const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
-        
-        if (event.type === 'checkout.session.completed') {
-          await WebhookHandlers.handleCheckoutCompleted(event.data.object);
-        } else if (event.type === 'identity.verification_session.verified') {
-          await WebhookHandlers.handleIdentityVerified(event.data.object);
-        } else if (event.type === 'identity.verification_session.requires_input') {
-          await WebhookHandlers.handleIdentityFailed(event.data.object);
-        } else if (event.type === 'financial_connections.account.created') {
-          await WebhookHandlers.handleFinancialConnectionsAccountCreated(event.data.object);
-        } else if (event.type === 'financial_connections.account.refreshed_ownership') {
-          await WebhookHandlers.handleFinancialConnectionsAccountUpdated(event.data.object);
+      try {
+        const stripe = await getUncachableStripeClient();
+        const webhookSecret = await sync.getManagedWebhookSecret();
+
+        if (webhookSecret) {
+          const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+          await WebhookHandlers.routeEvent(event);
         }
+      } catch (err: any) {
+        console.error('Custom webhook handler error:', err.message);
       }
-    } catch (err: any) {
-      console.error('Custom webhook handler error:', err.message);
+    } else {
+      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      if (!webhookSecret) {
+        throw new Error('STRIPE_WEBHOOK_SECRET environment variable not set');
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+      await WebhookHandlers.routeEvent(event);
+    }
+  }
+
+  static async routeEvent(event: any): Promise<void> {
+    if (event.type === 'checkout.session.completed') {
+      await WebhookHandlers.handleCheckoutCompleted(event.data.object);
+    } else if (event.type === 'identity.verification_session.verified') {
+      await WebhookHandlers.handleIdentityVerified(event.data.object);
+    } else if (event.type === 'identity.verification_session.requires_input') {
+      await WebhookHandlers.handleIdentityFailed(event.data.object);
+    } else if (event.type === 'financial_connections.account.created') {
+      await WebhookHandlers.handleFinancialConnectionsAccountCreated(event.data.object);
+    } else if (event.type === 'financial_connections.account.refreshed_ownership') {
+      await WebhookHandlers.handleFinancialConnectionsAccountUpdated(event.data.object);
     }
   }
 

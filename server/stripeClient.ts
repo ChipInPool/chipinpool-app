@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 
 let connectionSettings: any;
 
-function isReplitEnvironment() {
+export function isReplitEnvironment() {
   return !!(process.env.REPLIT_CONNECTORS_HOSTNAME && (process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL));
 }
 
