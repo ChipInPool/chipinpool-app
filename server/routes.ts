@@ -51,6 +51,14 @@ declare module "express-session" {
   }
 }
 
+function normalizePhone(phone: string): string {
+  let digits = phone.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    digits = digits.substring(1);
+  }
+  return digits;
+}
+
 // Helper to get client IP address from request (handles proxies like Azure)
 function getClientIp(req: express.Request): string {
   // Check x-forwarded-for header (common for proxies/load balancers)
@@ -205,7 +213,8 @@ export async function registerRoutes(
   // Phone verification routes - rate limited to prevent abuse
   app.post("/api/auth/send-phone-code", authRateLimiter, async (req, res, next) => {
     try {
-      const { phone } = sendPhoneCodeSchema.parse(req.body);
+      const { phone: rawPhone } = sendPhoneCodeSchema.parse(req.body);
+      const phone = normalizePhone(rawPhone);
       
       // Generate 6-digit code
       const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -237,7 +246,8 @@ export async function registerRoutes(
 
   app.post("/api/auth/verify-phone-code", authRateLimiter, async (req, res, next) => {
     try {
-      const { phone, code } = verifyPhoneCodeSchema.parse(req.body);
+      const { phone: rawPhone, code } = verifyPhoneCodeSchema.parse(req.body);
+      const phone = normalizePhone(rawPhone);
       
       const [verification] = await db.select()
         .from(phoneVerificationCodes)
@@ -307,10 +317,11 @@ export async function registerRoutes(
   // Check if phone is available
   app.post("/api/auth/check-phone", async (req, res, next) => {
     try {
-      const { phone } = req.body;
-      if (!phone || typeof phone !== 'string') {
+      const { phone: rawPhone } = req.body;
+      if (!rawPhone || typeof rawPhone !== 'string') {
         return res.status(400).json({ available: false, message: "Phone is required" });
       }
+      const phone = normalizePhone(rawPhone);
       
       const existing = await storage.getUserByPhone(phone);
       res.json({ 
@@ -341,9 +352,10 @@ export async function registerRoutes(
       }
       
       // Verify phone code was validated
+      const normalizedPhone = normalizePhone(data.phone);
       const [phoneVerification] = await db.select()
         .from(phoneVerificationCodes)
-        .where(eq(phoneVerificationCodes.phone, data.phone))
+        .where(eq(phoneVerificationCodes.phone, normalizedPhone))
         .limit(1);
       
       if (!phoneVerification || !phoneVerification.verified || phoneVerification.code !== data.phoneVerificationCode) {
@@ -357,7 +369,7 @@ export async function registerRoutes(
         lastName: data.lastName,
         username: data.username,
         email: data.email,
-        phone: data.phone,
+        phone: normalizedPhone,
         dateOfBirth: new Date(data.dateOfBirth),
         password: hashedPassword,
         authProvider: 'email',
@@ -369,7 +381,7 @@ export async function registerRoutes(
       await db.update(users).set({ phoneVerified: true }).where(eq(users.id, user.id));
       
       // Clean up verification code
-      await db.delete(phoneVerificationCodes).where(eq(phoneVerificationCodes.phone, data.phone));
+      await db.delete(phoneVerificationCodes).where(eq(phoneVerificationCodes.phone, normalizedPhone));
 
       req.session.userId = user.id;
       
@@ -517,9 +529,10 @@ export async function registerRoutes(
   app.post("/api/auth/phone-login/send", authRateLimiter, async (req, res, next) => {
     try {
       const data = phoneLoginSchema.parse(req.body);
+      const phone = normalizePhone(data.phone);
       
       // Check if user exists with this phone
-      const user = await storage.getUserByPhone(data.phone);
+      const user = await storage.getUserByPhone(phone);
       if (!user) {
         return res.status(404).json({ message: "No account found with this phone number" });
       }
@@ -527,14 +540,14 @@ export async function registerRoutes(
       const code = generateOTP();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min expiry
 
-      await db.delete(phoneVerificationCodes).where(eq(phoneVerificationCodes.phone, data.phone));
+      await db.delete(phoneVerificationCodes).where(eq(phoneVerificationCodes.phone, phone));
       await db.insert(phoneVerificationCodes).values({
-        phone: data.phone,
+        phone,
         code,
         expiresAt,
       });
 
-      await sendVerificationSMS(data.phone, code);
+      await sendVerificationSMS(phone, code);
       res.json({ message: "Login code sent to your phone" });
     } catch (error) {
       next(error);
@@ -545,10 +558,11 @@ export async function registerRoutes(
   app.post("/api/auth/phone-login/verify", authRateLimiter, async (req, res, next) => {
     try {
       const data = verifyPhoneLoginSchema.parse(req.body);
+      const phone = normalizePhone(data.phone);
       
       const [verification] = await db.select()
         .from(phoneVerificationCodes)
-        .where(eq(phoneVerificationCodes.phone, data.phone))
+        .where(eq(phoneVerificationCodes.phone, phone))
         .orderBy(desc(phoneVerificationCodes.createdAt))
         .limit(1);
 
@@ -564,7 +578,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Code expired. Please request a new code." });
       }
 
-      const user = await storage.getUserByPhone(data.phone);
+      const user = await storage.getUserByPhone(phone);
       if (!user) {
         return res.status(404).json({ message: "No account found with this phone number" });
       }
@@ -604,7 +618,7 @@ export async function registerRoutes(
         deliveryTarget = user.email;
         deliveryMethod = 'email';
       } else if (isPhone) {
-        user = await storage.getUserByPhone(identifier);
+        user = await storage.getUserByPhone(normalizePhone(identifier));
         if (!user) return res.status(404).json({ message: "No account found with this phone number" });
         deliveryTarget = user.phone!;
         deliveryMethod = 'phone';
@@ -5885,7 +5899,8 @@ export async function registerRoutes(
   // Send phone verification code
   app.post("/api/security/phone/send", requireAuth, async (req, res, next) => {
     try {
-      const { phone } = z.object({ phone: z.string().min(10) }).parse(req.body);
+      const { phone: rawPhone } = z.object({ phone: z.string().min(10) }).parse(req.body);
+      const phone = normalizePhone(rawPhone);
       const userId = req.session.userId!;
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
