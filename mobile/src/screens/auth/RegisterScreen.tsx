@@ -25,6 +25,14 @@ export default function RegisterScreen() {
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
 
+  const validatePassword = (pw: string): string | null => {
+    if (pw.length < 8) return 'Password must be at least 8 characters';
+    if (!/[A-Z]/.test(pw)) return 'Password must contain at least one uppercase letter';
+    if (!/[a-z]/.test(pw)) return 'Password must contain at least one lowercase letter';
+    if (!/[0-9]/.test(pw)) return 'Password must contain at least one number';
+    return null;
+  };
+
   const handleSendCode = async () => {
     if (!firstName || !lastName || !username || !email || !phone || !password || !dateOfBirth) {
       setError('Please fill in all fields');
@@ -38,11 +46,35 @@ export default function RegisterScreen() {
       setError('Username can only contain letters, numbers, and underscores');
       return;
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
 
     setIsLoading(true);
     setError('');
 
     try {
+      const emailCheck = await api.auth.checkEmail(email);
+      if (emailCheck.exists) {
+        setError('This email is already registered. Try signing in instead.');
+        setIsLoading(false);
+        return;
+      }
+
+      const phoneCheck = await api.auth.checkPhone(phone);
+      if (phoneCheck.exists) {
+        setError('This phone number is already registered. Try signing in instead.');
+        setIsLoading(false);
+        return;
+      }
+
       await api.auth.sendPhoneCode(phone);
       setStep('verify');
     } catch (err: any) {
@@ -142,6 +174,9 @@ export default function RegisterScreen() {
               <View style={styles.inputContainer}>
                 <Text style={[styles.label, { color: colors.text }]}>Password</Text>
                 <TextInput style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.cardBorder, color: colors.text }]} placeholder="••••••••" placeholderTextColor={colors.slate} value={password} onChangeText={setPassword} secureTextEntry />
+                <Text style={[styles.passwordHint, { color: colors.slate }]}>
+                  Min 8 characters, with uppercase, lowercase, and a number
+                </Text>
               </View>
 
               <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.mint }]} onPress={handleSendCode} disabled={isLoading}>
@@ -186,6 +221,7 @@ const styles = StyleSheet.create({
   inputContainer: { gap: 8 },
   label: { fontSize: 14, fontWeight: '500' },
   input: { borderWidth: 1, borderRadius: 12, padding: 16, fontSize: 16 },
+  passwordHint: { fontSize: 12, marginTop: 4 },
   primaryButton: { paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
   primaryButtonText: { fontSize: 18, fontWeight: '600' },
   resendButton: { alignItems: 'center', marginTop: 8 },

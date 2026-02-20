@@ -158,6 +158,16 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    checkEmail: (email: string) =>
+      fetchApi<{ exists: boolean; message: string }>('/api/auth/check-email', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }),
+    checkPhone: (phone: string) =>
+      fetchApi<{ exists: boolean; message: string }>('/api/auth/check-phone', {
+        method: 'POST',
+        body: JSON.stringify({ phone }),
+      }),
     sendPhoneCode: (phone: string) =>
       fetchApi<any>('/api/auth/send-phone-code', {
         method: 'POST',
