@@ -90,7 +90,9 @@ app.post(
       await WebhookHandlers.processWebhook(req.body as Buffer, sig);
       res.status(200).json({ received: true });
     } catch (error: any) {
-      console.error('Webhook error:', error.message);
+      const isSignatureError = error.message?.includes('signature') || error.message?.includes('No signatures found');
+      const isSecretError = error.message?.includes('STRIPE_WEBHOOK_SECRET');
+      console.error(`Webhook error [${isSignatureError ? 'SIGNATURE' : isSecretError ? 'CONFIG' : 'HANDLER'}]:`, error.message);
       res.status(400).json({ error: 'Webhook processing error' });
     }
   }

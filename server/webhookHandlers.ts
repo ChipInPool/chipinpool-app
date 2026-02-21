@@ -42,6 +42,8 @@ export class WebhookHandlers {
   }
 
   static async routeEvent(event: any): Promise<void> {
+    console.log(`[Webhook] Processing event: ${event.type} (${event.id})`);
+    
     if (event.type === 'checkout.session.completed') {
       await WebhookHandlers.handleCheckoutCompleted(event.data.object);
     } else if (event.type === 'identity.verification_session.verified') {
@@ -52,6 +54,12 @@ export class WebhookHandlers {
       await WebhookHandlers.handleFinancialConnectionsAccountCreated(event.data.object);
     } else if (event.type === 'financial_connections.account.refreshed_ownership') {
       await WebhookHandlers.handleFinancialConnectionsAccountUpdated(event.data.object);
+    } else if (event.type === 'payout.paid') {
+      await WebhookHandlers.handlePayoutPaid(event.data.object);
+    } else if (event.type === 'payout.failed') {
+      await WebhookHandlers.handlePayoutFailed(event.data.object);
+    } else {
+      console.log(`[Webhook] Unhandled event type: ${event.type}`);
     }
   }
 
@@ -190,16 +198,17 @@ export class WebhookHandlers {
               link: `/pool/${pool.id}`,
             });
             
-            if (poolCreator) {
+            const creator = await storage.getUser(pool.creatorId);
+            if (creator) {
               sendPoolCompletedNotification(
-                poolCreator.email,
-                poolCreator.phone,
-                `${poolCreator.firstName} ${poolCreator.lastName}`,
+                creator.email,
+                creator.phone,
+                `${creator.firstName} ${creator.lastName}`,
                 pool.id,
                 pool.title,
                 pool.targetAmount,
-                poolCreator.notifyEmail,
-                poolCreator.notifySMS
+                creator.notifyEmail,
+                creator.notifySMS
               ).catch(err => console.error('[Notification] Pool completed notification failed:', err));
               
               sendPushNotification(
@@ -399,5 +408,23 @@ export class WebhookHandlers {
     } catch (err: any) {
       console.error('[FC Webhook] Error processing account update:', err.message);
     }
+  }
+
+  static async handlePayoutPaid(payout: any): Promise<void> {
+    const payoutId = payout.id;
+    const amount = (payout.amount / 100).toFixed(2);
+    const currency = (payout.currency || 'usd').toUpperCase();
+    const arrivalDate = payout.arrival_date ? new Date(payout.arrival_date * 1000) : null;
+
+    console.log(`[Payout Webhook] Payout paid: ${payoutId}, $${amount} ${currency}, arrival: ${arrivalDate?.toISOString() || 'unknown'}, destination: ${payout.destination || 'unknown'}`);
+  }
+
+  static async handlePayoutFailed(payout: any): Promise<void> {
+    const payoutId = payout.id;
+    const amount = (payout.amount / 100).toFixed(2);
+    const failureMessage = payout.failure_message || 'Unknown failure';
+    const failureCode = payout.failure_code || 'unknown';
+
+    console.error(`[Payout Webhook] Payout FAILED: ${payoutId}, $${amount}, code: ${failureCode}, message: ${failureMessage}`);
   }
 }
