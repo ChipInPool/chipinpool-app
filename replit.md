@@ -40,7 +40,7 @@ Preferred communication style: Simple, everyday language.
 - **Pay Me Back Links**: Public payment pages for easy fund collection.
 - **Push Notifications**: Real-time browser notifications for key activities (contributions, milestones).
 - **Auto-Contributions**: Scheduled recurring payments to pools from wallet balance.
-- **Wallet & Withdrawals**: User wallets for funds, with admin-processed withdrawals to linked bank accounts via Stripe Financial Connections.
+- **Wallet & Withdrawals**: User wallets for funds, with admin-processed withdrawals to linked bank accounts via Stripe Financial Connections. Deposits track Stripe status (pending → completed/failed); balance only increases on successful Stripe confirmation. Withdrawals deduct balance immediately when pending; rejected withdrawals refund the balance.
 - **KYC Verification**: Identity verification via Stripe Identity for pool creation and withdrawals.
 - **Virtual Cards**: Stripe Issuing virtual cards linked to pools.
 - **Admin Portal**: Comprehensive interface for user, pool, transaction management, and audit logging.

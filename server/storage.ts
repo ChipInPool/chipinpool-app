@@ -489,26 +489,48 @@ export class DatabaseStorage implements IStorage {
     return result.map(r => r.user);
   }
 
-  async createWalletDeposit(userId: string, amount: string, sessionId: string): Promise<boolean> {
+  async createPendingWalletDeposit(userId: string, amount: string, sessionId: string): Promise<boolean> {
+    const [existing] = await db.select().from(walletDeposits).where(eq(walletDeposits.stripeSessionId, sessionId));
+    if (existing) {
+      console.log(`Wallet deposit already exists for session ${sessionId}`);
+      return false;
+    }
+
+    await db.insert(walletDeposits).values({
+      userId,
+      amount,
+      stripeSessionId: sessionId,
+      status: 'pending',
+    });
+
+    return true;
+  }
+
+  async completeWalletDeposit(sessionId: string): Promise<boolean> {
     return await db.transaction(async (tx) => {
-      const [existing] = await tx.select().from(walletDeposits).where(eq(walletDeposits.stripeSessionId, sessionId));
-      if (existing) {
-        console.log(`Wallet deposit already exists for session ${sessionId}`);
+      const [updated] = await tx.update(walletDeposits)
+        .set({ status: 'completed' })
+        .where(and(
+          eq(walletDeposits.stripeSessionId, sessionId),
+          eq(walletDeposits.status, 'pending')
+        ))
+        .returning();
+
+      if (!updated) {
+        console.log(`Wallet deposit not updated for session ${sessionId} (not found or not pending)`);
         return false;
       }
 
-      await tx.insert(walletDeposits).values({
-        userId,
-        amount,
-        stripeSessionId: sessionId,
-      });
-
       await tx.update(users).set({ 
-        balance: sql`${users.balance} + ${amount}`
-      }).where(eq(users.id, userId));
+        balance: sql`${users.balance} + ${updated.amount}`
+      }).where(eq(users.id, updated.userId));
 
       return true;
     });
+  }
+
+  async updateWalletDepositStatus(sessionId: string, status: string): Promise<void> {
+    await db.update(walletDeposits).set({ status }).where(eq(walletDeposits.stripeSessionId, sessionId));
   }
 
   async createWalletWithdrawal(

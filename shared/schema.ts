@@ -274,6 +274,7 @@ export const walletDeposits = pgTable("wallet_deposits", {
   userId: varchar("user_id").references(() => users.id).notNull(),
   stripeSessionId: varchar("stripe_session_id").notNull().unique(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  status: varchar("status", { length: 50 }).notNull().default("pending"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

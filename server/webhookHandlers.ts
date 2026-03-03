@@ -46,6 +46,8 @@ export class WebhookHandlers {
     
     if (event.type === 'checkout.session.completed') {
       await WebhookHandlers.handleCheckoutCompleted(event.data.object);
+    } else if (event.type === 'checkout.session.expired') {
+      await WebhookHandlers.handleCheckoutExpired(event.data.object);
     } else if (event.type === 'identity.verification_session.verified') {
       await WebhookHandlers.handleIdentityVerified(event.data.object);
     } else if (event.type === 'identity.verification_session.requires_input') {
@@ -82,9 +84,10 @@ export class WebhookHandlers {
       }
 
       try {
-        const success = await storage.createWalletDeposit(userId, amount, sessionId);
+        await storage.createPendingWalletDeposit(userId, amount, sessionId);
+        const success = await storage.completeWalletDeposit(sessionId);
         if (success) {
-          console.log(`Wallet deposit processed: $${amount} for user ${userId} (session: ${sessionId})`);
+          console.log(`Wallet deposit completed: $${amount} for user ${userId} (session: ${sessionId})`);
           
           // Send wallet deposit notification
           const user = await storage.getUser(userId);
@@ -286,6 +289,20 @@ export class WebhookHandlers {
       console.log(`[Webhook] Delivered ${eventType} to ${merchant.webhookUrl}: ${response.status}`);
     } catch (err: any) {
       console.error(`[Webhook] Failed to deliver ${eventType}:`, err.message);
+    }
+  }
+
+  static async handleCheckoutExpired(session: any): Promise<void> {
+    const { type } = session.metadata || {};
+    const sessionId = session.id;
+
+    if (type === 'wallet_deposit') {
+      try {
+        await storage.updateWalletDepositStatus(sessionId, 'failed');
+        console.log(`Wallet deposit expired/failed for session ${sessionId}`);
+      } catch (err: any) {
+        console.error('Error marking wallet deposit as failed:', err.message);
+      }
     }
   }
 

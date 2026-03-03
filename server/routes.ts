@@ -1838,27 +1838,8 @@ export async function registerRoutes(
   });
 
   // User deposit/withdraw routes
-  app.post("/api/user/deposit", requireAuth, async (req, res, next) => {
-    try {
-      const { amount } = z.object({ amount: z.string() }).parse(req.body);
-      const depositAmount = parseFloat(amount);
-      
-      if (isNaN(depositAmount) || depositAmount <= 0) {
-        return res.status(400).json({ message: "Invalid amount" });
-      }
-
-      const user = await storage.getUser(req.session.userId!);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      const newBalance = (parseFloat(user.balance) + depositAmount).toFixed(2);
-      await storage.updateUserBalance(user.id, newBalance);
-
-      res.json({ message: "Deposit successful", balance: newBalance });
-    } catch (error) {
-      next(error);
-    }
+  app.post("/api/user/deposit", requireAuth, async (_req, res) => {
+    return res.status(400).json({ message: "Direct deposits are not supported. Use /api/user/deposit/checkout for Stripe-based deposits." });
   });
 
   app.post("/api/user/withdraw", requireAuth, async (req, res, next) => {
@@ -1901,13 +1882,12 @@ export async function registerRoutes(
       const userId = req.session.userId!;
       const history = await storage.getWalletHistory(userId);
       
-      // Combine and format for frontend
       const transactions = [
         ...history.deposits.map(d => ({
           id: d.id,
           type: 'deposit' as const,
           amount: d.amount,
-          status: 'completed',
+          status: d.status || 'completed',
           createdAt: d.createdAt,
           stripeSessionId: d.stripeSessionId,
         })),
@@ -1979,6 +1959,8 @@ export async function registerRoutes(
           amount,
         },
       });
+
+      await storage.createPendingWalletDeposit(user.id, amount, session.id);
 
       res.json({ url: session.url });
     } catch (error) {
@@ -7779,7 +7761,8 @@ export async function registerRoutes(
         const { type, userId, amount, poolId } = session.metadata || {};
         
         if (type === 'wallet_deposit' && userId && amount) {
-          const success = await storage.createWalletDeposit(userId, amount, session.id);
+          await storage.createPendingWalletDeposit(userId, amount, session.id);
+          const success = await storage.completeWalletDeposit(session.id);
           if (success) synced++;
         }
         
@@ -7911,7 +7894,8 @@ export async function registerRoutes(
         const { type, userId: sessionUserId, amount } = session.metadata || {};
         
         if (type === 'wallet_deposit' && sessionUserId === userId && amount) {
-          const success = await storage.createWalletDeposit(userId, amount, session.id);
+          await storage.createPendingWalletDeposit(userId, amount, session.id);
+          const success = await storage.completeWalletDeposit(session.id);
           if (success) {
             synced++;
             console.log(`Synced wallet deposit for user ${userId}: $${amount}`);
