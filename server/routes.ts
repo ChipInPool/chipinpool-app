@@ -7642,7 +7642,12 @@ export async function registerRoutes(
       if (!['approved', 'rejected'].includes(status)) {
         return res.status(400).json({ error: "Status must be 'approved' or 'rejected'" });
       }
-      
+
+      const [request] = await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, id));
+      if (!request) {
+        return res.status(404).json({ error: "API access request not found" });
+      }
+
       await db.update(apiAccessRequests)
         .set({ status })
         .where(eq(apiAccessRequests.id, id));
@@ -7653,9 +7658,72 @@ export async function registerRoutes(
         action: `${status}_api_request`,
         targetType: 'api_access_request',
         targetId: id,
-        details: JSON.stringify({ status }),
+        details: JSON.stringify({ status, companyName: request.companyName }),
       });
-      
+
+      if (status === 'approved') {
+        const user = await storage.getUser(request.userId);
+        if (!user) {
+          return res.status(404).json({ error: "User not found for this request" });
+        }
+
+        // Create merchant record if one doesn't already exist
+        let merchant = await storage.getMerchantByUserId(request.userId);
+        if (!merchant) {
+          merchant = await storage.createMerchant({
+            userId: request.userId,
+            companyName: request.companyName,
+            website: request.website,
+            businessType: 'api_developer',
+            contactEmail: user.email,
+          });
+        }
+        if (merchant.status !== 'approved') {
+          await storage.updateMerchant(merchant.id, { status: 'approved' });
+          merchant = { ...merchant, status: 'approved' as const };
+        }
+
+        // Generate API key
+        const crypto = await import('crypto');
+        const keyPrefix = `cpay_${crypto.randomBytes(4).toString('hex')}`;
+        const keySecret = crypto.randomBytes(24).toString('hex');
+        const fullKey = `${keyPrefix}_${keySecret}`;
+        const keyHash = crypto.createHash('sha256').update(fullKey).digest('hex');
+
+        await storage.createMerchantApiKey({
+          merchantId: merchant.id,
+          name: `${request.companyName} - Default Key`,
+          keyPrefix,
+          keyHash,
+        });
+
+        // Email the user their API key (shown only once)
+        try {
+          const { sendEmail } = await import('./notificationService');
+          const { emailWrapper, emailHeading, emailText, emailInfoCard, emailButton } = await import('./emailTemplates');
+          const body = [
+            emailHeading('Your ChipInPay API Key is Ready'),
+            emailText(`Hi ${user.firstName},`),
+            emailText(`Your API access request for <strong>${request.companyName}</strong> has been approved. Here is your API key:`),
+            emailInfoCard([
+              { label: 'API Key', value: `<code style="font-family:monospace;word-break:break-all;font-size:13px;">${fullKey}</code>` },
+              { label: 'Important', value: 'This key will not be shown again. Store it somewhere safe.' },
+            ]),
+            emailText('You can manage your keys and view usage in the Merchant Dashboard.'),
+            emailButton('Go to Merchant Dashboard', `${process.env.APP_URL || 'https://www.chipinpool.com'}/merchant`),
+            emailText('If you did not request API access, please contact us immediately at mail@chipinpool.com.', { muted: true, small: true }),
+          ].join('');
+          const html = emailWrapper({ body, preheaderText: `Your ChipInPay API key for ${request.companyName}` });
+
+          sendEmail(user.email, '🔑 Your ChipInPay API Key - ChipIn', html)
+            .catch(err => console.error('[API Approval] Failed to send API key email:', err));
+        } catch (emailErr: any) {
+          console.error('[API Approval] Email send error:', emailErr.message);
+        }
+
+        return res.json({ success: true, message: 'API access request approved and API key generated', merchantId: merchant.id });
+      }
+
       res.json({ success: true, message: `API access request ${status}` });
     } catch (error) {
       next(error);
