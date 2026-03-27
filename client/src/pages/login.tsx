@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,13 +8,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
-import { Loader2, Shield, CheckCircle2, ArrowRight, Phone, Mail, Calendar, User, AlertCircle, Check, ArrowLeft } from "lucide-react";
+import { Loader2, Shield, CheckCircle2, ArrowRight, Phone, Mail, Calendar, User, AlertCircle, Check, ArrowLeft, Key, Lock } from "lucide-react";
 
 type LoginMethod = 'email' | 'username' | 'phone';
 type ForgotMethod = 'email' | 'phone';
 
 export default function Login() {
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const { login, register, isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -25,12 +26,18 @@ export default function Login() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotPhone, setForgotPhone] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
+  const [betaRestricted, setBetaRestricted] = useState(false);
 
   const [loginForm, setLoginForm] = useState({ email: "", username: "", phone: "", password: "" });
   const [phoneOtpCode, setPhoneOtpCode] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
   
+  const urlInviteCode = new URLSearchParams(searchString).get('invite')?.toUpperCase() || "";
+  const [inviteCode, setInviteCode] = useState(urlInviteCode);
+  const [inviteCodeValid, setInviteCodeValid] = useState<boolean | null>(urlInviteCode ? null : null);
+  const [inviteCodeChecking, setInviteCodeChecking] = useState(false);
+
   const [registerForm, setRegisterForm] = useState({
     firstName: "",
     lastName: "",
@@ -141,11 +148,33 @@ export default function Login() {
     setActiveTab("login");
   };
 
+  const checkInviteCode = useCallback(async (code: string) => {
+    if (!code || code.length < 4) { setInviteCodeValid(null); return; }
+    setInviteCodeChecking(true);
+    try {
+      const res = await fetch(`/api/beta/invite/${encodeURIComponent(code.trim().toUpperCase())}`);
+      const data = await res.json();
+      setInviteCodeValid(data.valid === true);
+    } catch {
+      setInviteCodeValid(null);
+    } finally {
+      setInviteCodeChecking(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!authLoading && isAuthenticated && !showKycPrompt) {
       setLocation("/");
     }
   }, [authLoading, isAuthenticated, showKycPrompt, setLocation]);
+
+  // Auto-switch to register tab and validate invite code if URL has ?invite=
+  useEffect(() => {
+    if (urlInviteCode) {
+      setActiveTab("register");
+      checkInviteCode(urlInviteCode);
+    }
+  }, [urlInviteCode, checkInviteCode]);
 
   if (authLoading) {
     return (
@@ -170,6 +199,7 @@ export default function Login() {
         body: JSON.stringify({ email: loginForm.email, password: loginForm.password }),
       });
       const data = await res.json();
+      if (res.status === 403 && data.betaRestricted) { setBetaRestricted(true); return; }
       if (!res.ok) throw new Error(data.message);
       
       toast({ description: "Welcome back!" });
@@ -195,6 +225,7 @@ export default function Login() {
         }),
       });
       const data = await res.json();
+      if (res.status === 403 && data.betaRestricted) { setBetaRestricted(true); return; }
       if (!res.ok) throw new Error(data.message);
       
       toast({ description: "Welcome back!" });
@@ -244,6 +275,7 @@ export default function Login() {
         body: JSON.stringify({ phone: loginForm.phone, code: phoneOtpCode }),
       });
       const data = await res.json();
+      if (res.status === 403 && data.betaRestricted) { setBetaRestricted(true); return; }
       if (!res.ok) throw new Error(data.message);
       
       toast({ description: "Welcome back!" });
@@ -361,6 +393,11 @@ export default function Login() {
       return;
     }
 
+    if (!inviteCode.trim()) {
+      toast({ description: "Please enter your invite code to register.", variant: "destructive" });
+      return;
+    }
+
     setIsLoading(true);
     try {
       await register({
@@ -369,6 +406,7 @@ export default function Login() {
         email: registerForm.email.toLowerCase(),
         phoneVerificationCode: verificationCode,
         acceptTerms: true,
+        inviteCode: inviteCode.trim().toUpperCase(),
       });
       toast({ description: "Account created successfully!" });
       setShowKycPrompt(true);
@@ -439,6 +477,34 @@ export default function Login() {
               <p className="text-[10px] text-center text-muted-foreground">
                 You can complete verification later in Settings. Some features will be limited until verified.
               </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (betaRestricted) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <Card className="border-white/10 bg-card/50 backdrop-blur text-center">
+            <CardHeader>
+              <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-8 h-8 text-yellow-500" />
+              </div>
+              <CardTitle className="text-xl font-display">ChipIn is in Private Beta</CardTitle>
+              <CardDescription>
+                Your account is pending beta access. Join the waitlist and we'll send you an invite when a spot opens up.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 pb-6">
+              <Button className="w-full" onClick={() => setLocation("/waitlist")} data-testid="button-join-waitlist">
+                Join the Waitlist
+              </Button>
+              <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => setBetaRestricted(false)} data-testid="button-back-to-login">
+                Back to Login
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -753,6 +819,47 @@ export default function Login() {
               <TabsContent value="register">
                 {step === 'form' ? (
                   <div className="space-y-4">
+                    {/* Invite Code */}
+                    <div className="space-y-2">
+                      <Label htmlFor="register-inviteCode" className="flex items-center gap-1">
+                        <Key className="w-3.5 h-3.5" /> Invite Code <span className="text-red-500">*</span>
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="register-inviteCode"
+                          type="text"
+                          placeholder="XXXXXXXX"
+                          value={inviteCode}
+                          onChange={(e) => {
+                            const v = e.target.value.toUpperCase();
+                            setInviteCode(v);
+                            if (v.length >= 4) checkInviteCode(v);
+                            else setInviteCodeValid(null);
+                          }}
+                          className={`font-mono tracking-widest uppercase pr-10 ${inviteCodeValid === true ? 'border-green-500' : inviteCodeValid === false ? 'border-red-500' : ''}`}
+                          required
+                          data-testid="input-invite-code"
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          {inviteCodeChecking && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                          {!inviteCodeChecking && inviteCodeValid === true && <Check className="w-4 h-4 text-green-500" />}
+                          {!inviteCodeChecking && inviteCodeValid === false && <AlertCircle className="w-4 h-4 text-red-500" />}
+                        </div>
+                      </div>
+                      {inviteCodeValid === false && (
+                        <p className="text-xs text-red-500">Invalid or expired invite code.</p>
+                      )}
+                      {inviteCodeValid === true && (
+                        <p className="text-xs text-green-600">Invite code accepted!</p>
+                      )}
+                      <p className="text-[11px] text-muted-foreground">
+                        ChipIn is invite-only. Don't have a code?{" "}
+                        <button type="button" className="underline text-primary" onClick={() => setLocation("/waitlist")}>
+                          Join the waitlist
+                        </button>
+                      </p>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <Label htmlFor="register-firstName">First Name</Label>

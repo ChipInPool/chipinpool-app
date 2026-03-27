@@ -52,6 +52,8 @@ import Cards from "@/pages/cards";
 import Notifications from "@/pages/notifications";
 import ArchivedPools from "@/pages/archived-pools";
 import UserSearch from "@/pages/user-search";
+import Waitlist from "@/pages/waitlist";
+import AdminBeta from "@/pages/admin/beta";
 
 function Router() {
   return (
@@ -102,6 +104,9 @@ function Router() {
       <Route path="/notifications" component={Notifications} />
       <Route path="/archived" component={ArchivedPools} />
       <Route path="/search/users" component={UserSearch} />
+      <Route path="/waitlist" component={Waitlist} />
+      <Route path="/register" component={Login} />
+      <Route path="/admin/beta" component={AdminBeta} />
       <Route path="/@:username/:amount" component={PayMe} />
       <Route path="/@:username" component={PayMe} />
       <Route component={NotFound} />

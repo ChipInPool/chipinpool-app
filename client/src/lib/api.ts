@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 
-async function fetchApi(url: string, options?: RequestInit) {
+export async function fetchApi(url: string, options?: RequestInit) {
   const response = await fetch(url, {
     ...options,
     credentials: "include",
@@ -35,6 +35,7 @@ export const api = {
       dateOfBirth: string;
       phoneVerificationCode: string;
       acceptTerms: boolean;
+      inviteCode?: string;
     }) =>
       fetchApi("/api/auth/register", {
         method: "POST",

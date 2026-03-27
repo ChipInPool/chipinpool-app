@@ -80,6 +80,8 @@ export const users = pgTable("users", {
   suspendedAt: timestamp("suspended_at"),
   suspendedReason: text("suspended_reason"),
   isPublic: boolean("is_public").notNull().default(true),
+  betaApproved: boolean("beta_approved").notNull().default(false),
+  betaInviteCode: varchar("beta_invite_code"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -341,6 +343,30 @@ export const apiAccessRequests = pgTable("api_access_requests", {
   useCase: text("use_case").notNull(),
   monthlyVolume: text("monthly_volume").notNull(),
   status: text("status").notNull().default('pending'),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const betaInvites = pgTable("beta_invites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code", { length: 32 }).notNull().unique(),
+  email: text("email"),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  usedBy: varchar("used_by").references(() => users.id),
+  maxUses: integer("max_uses").notNull().default(1),
+  useCount: integer("use_count").notNull().default(0),
+  note: text("note"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const waitlist = pgTable("waitlist", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  phone: text("phone"),
+  invitedAt: timestamp("invited_at"),
+  inviteCode: varchar("invite_code"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

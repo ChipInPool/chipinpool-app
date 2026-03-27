@@ -48,6 +48,7 @@ Preferred communication style: Simple, everyday language.
 - **Spend Now Marketplace**: Curated partner storefront where users browse partnered businesses and shop directly using pool funds via ChipInPay. Admin manages partnerships (categories, featured status, promo text, discount offers) through the merchant admin portal.
 - **Email Template System**: Centralized email template engine (`server/emailTemplates.ts`) with consistent branding (navy/mint green theme), responsive layout, and reusable components (headings, buttons, info cards, alerts, verification codes).
 - **Authentication**: Session-based, bcrypt hashed passwords, OTP login (email/phone), username/password login. User registration includes SMS verification.
+- **Beta Invite System**: ChipIn is invite-only. New registrations require a valid `betaInvites` code. Existing users without `betaApproved=true` are blocked from all login endpoints (email, username, phone, OTP). Admins bypass the check. A public `/waitlist` page lets users request access. Admin manages invites and waitlist at `/admin/beta`.
 - **Pools Visibility**: GET /api/pools returns only pools the user created or contributed to (not all pools).
 - **Pool Archiving**: Users can manually archive closed/completed/expired pools. Auto-archive cron job runs daily at 2 AM to archive pools closed for 30+ days. Archived pools are hidden from main views and accessible via /archived page. Unarchive restores pool to 'closed' status.
 - **Spend Now**: Supports spending from wallet balance or pool funds at partnered merchants.

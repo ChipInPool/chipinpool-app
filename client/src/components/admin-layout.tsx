@@ -13,7 +13,8 @@ import {
   AlertTriangle,
   Loader2,
   Banknote,
-  Key
+  Key,
+  Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -30,6 +31,7 @@ const navItems = [
   { href: "/admin/merchants", icon: Store, label: "Merchants" },
   { href: "/admin/api-requests", icon: Key, label: "API Requests" },
   { href: "/admin/fraud", icon: AlertTriangle, label: "Fraud Detection" },
+  { href: "/admin/beta", icon: Lock, label: "Beta Access" },
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {

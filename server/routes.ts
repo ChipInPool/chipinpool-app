@@ -7,7 +7,7 @@ import cors from "cors";
 import cookieSignature from "cookie-signature";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { fileStorageService, isAzureStorage } from "./fileStorage";
-import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, walletDeposits, bankAccounts, merchantPayouts, payMeTransactions, apiAccessRequests, poolActivities, invites } from "@shared/schema";
+import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, walletDeposits, bankAccounts, merchantPayouts, payMeTransactions, apiAccessRequests, poolActivities, invites, betaInvites, waitlist } from "@shared/schema";
 import express from "express";
 import { db } from "./db";
 import { eq, desc, sql, inArray, and, lt, isNull, or } from "drizzle-orm";
@@ -339,6 +339,24 @@ export async function registerRoutes(
     try {
       const data = registerSchema.parse(req.body);
       
+      // Validate beta invite code
+      const inviteCode = (req.body.inviteCode as string | undefined)?.trim().toUpperCase();
+      if (!inviteCode) {
+        return res.status(403).json({ message: "An invite code is required to join ChipIn.", inviteRequired: true });
+      }
+      const [invite] = await db.select().from(betaInvites)
+        .where(eq(betaInvites.code, inviteCode))
+        .limit(1);
+      if (!invite) {
+        return res.status(403).json({ message: "Invalid invite code.", inviteRequired: true });
+      }
+      if (invite.useCount >= invite.maxUses) {
+        return res.status(403).json({ message: "This invite code has already been used.", inviteRequired: true });
+      }
+      if (invite.expiresAt && new Date() > invite.expiresAt) {
+        return res.status(403).json({ message: "This invite code has expired.", inviteRequired: true });
+      }
+
       // Check if email already exists
       const existingEmail = await storage.getUserByEmail(data.email);
       if (existingEmail) {
@@ -375,10 +393,17 @@ export async function registerRoutes(
         authProvider: 'email',
         termsAcceptedAt: now,
         privacyAcceptedAt: now,
+        betaApproved: true,
+        betaInviteCode: inviteCode,
       });
       
       // Mark phone as verified
       await db.update(users).set({ phoneVerified: true }).where(eq(users.id, user.id));
+      
+      // Record invite use
+      await db.update(betaInvites)
+        .set({ useCount: invite.useCount + 1, usedBy: user.id })
+        .where(eq(betaInvites.id, invite.id));
       
       // Clean up verification code
       await db.delete(phoneVerificationCodes).where(eq(phoneVerificationCodes.phone, normalizedPhone));
@@ -424,6 +449,11 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
+      // Beta access check — admins always pass
+      if (user.role !== 'admin' && !user.betaApproved) {
+        return res.status(403).json({ message: "beta_restricted", betaRestricted: true });
+      }
+
       // Check if MFA is enabled
       if (user.twoFactorEnabled) {
         // Store user ID in session temporarily for MFA verification
@@ -460,6 +490,11 @@ export async function registerRoutes(
       const validPassword = await bcrypt.compare(data.password, user.password);
       if (!validPassword) {
         return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Beta access check — admins always pass
+      if (user.role !== 'admin' && !user.betaApproved) {
+        return res.status(403).json({ message: "beta_restricted", betaRestricted: true });
       }
 
       // Check if MFA is enabled
@@ -581,6 +616,11 @@ export async function registerRoutes(
       const user = await storage.getUserByPhone(phone);
       if (!user) {
         return res.status(404).json({ message: "No account found with this phone number" });
+      }
+
+      // Beta access check — admins always pass
+      if (user.role !== 'admin' && !user.betaApproved) {
+        return res.status(403).json({ message: "beta_restricted", betaRestricted: true });
       }
 
       // Check if MFA is enabled - phone OTP counts as first factor, still need TOTP
@@ -724,6 +764,11 @@ export async function registerRoutes(
       }
 
       await db.delete(phoneVerificationCodes).where(eq(phoneVerificationCodes.id, verification.id));
+
+      // Beta access check — admins always pass
+      if (user.role !== 'admin' && !user.betaApproved) {
+        return res.status(403).json({ message: "beta_restricted", betaRestricted: true });
+      }
 
       if (user.twoFactorEnabled) {
         req.session.pendingMfaUserId = user.id;
@@ -9178,6 +9223,180 @@ export async function registerRoutes(
       await removePushSubscription(endpoint);
 
       res.json({ message: "Push subscription removed" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ── PUBLIC BETA ROUTES ──────────────────────────────────────────────────────
+
+  // Validate an invite code (public)
+  app.get("/api/beta/invite/:code", async (req, res, next) => {
+    try {
+      const code = req.params.code.trim().toUpperCase();
+      const [invite] = await db.select().from(betaInvites).where(eq(betaInvites.code, code)).limit(1);
+      if (!invite || invite.useCount >= invite.maxUses || (invite.expiresAt && new Date() > invite.expiresAt)) {
+        return res.status(404).json({ valid: false, message: "Invalid or expired invite code." });
+      }
+      res.json({ valid: true, code: invite.code });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Join the waitlist (public)
+  app.post("/api/beta/waitlist", async (req, res, next) => {
+    try {
+      const data = z.object({
+        email: z.string().email(),
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+        phone: z.string().optional(),
+      }).parse(req.body);
+      const existing = await db.select().from(waitlist).where(eq(waitlist.email, data.email.toLowerCase())).limit(1);
+      if (existing.length > 0) {
+        return res.status(409).json({ message: "You are already on the waitlist." });
+      }
+      await db.insert(waitlist).values({
+        email: data.email.toLowerCase(),
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+      });
+      res.json({ message: "You've been added to the waitlist! We'll reach out when a spot opens up." });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ── ADMIN BETA MANAGEMENT ROUTES ─────────────────────────────────────────────
+
+  // List all beta invites
+  app.get("/api/admin/beta/invites", requireAdmin, async (req, res, next) => {
+    try {
+      const invites = await db.select().from(betaInvites).orderBy(desc(betaInvites.createdAt));
+      res.json(invites);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Create a beta invite
+  app.post("/api/admin/beta/invites", requireAdmin, async (req: any, res, next) => {
+    try {
+      const data = z.object({
+        email: z.string().email().optional(),
+        maxUses: z.number().int().min(1).max(100).default(1),
+        note: z.string().optional(),
+        expiresInDays: z.number().int().min(1).max(365).optional(),
+      }).parse(req.body);
+      const code = Math.random().toString(36).substring(2, 8).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
+      const expiresAt = data.expiresInDays ? new Date(Date.now() + data.expiresInDays * 86400000) : null;
+      const [invite] = await db.insert(betaInvites).values({
+        code,
+        email: data.email,
+        createdBy: req.user!.id,
+        maxUses: data.maxUses,
+        note: data.note,
+        expiresAt: expiresAt ?? undefined,
+      }).returning();
+      res.json(invite);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Delete a beta invite
+  app.delete("/api/admin/beta/invites/:id", requireAdmin, async (req, res, next) => {
+    try {
+      await db.delete(betaInvites).where(eq(betaInvites.id, req.params.id));
+      res.json({ message: "Invite deleted." });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // List waitlist entries
+  app.get("/api/admin/beta/waitlist", requireAdmin, async (req, res, next) => {
+    try {
+      const entries = await db.select().from(waitlist).orderBy(desc(waitlist.createdAt));
+      res.json(entries);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Remove a waitlist entry
+  app.delete("/api/admin/beta/waitlist/:id", requireAdmin, async (req, res, next) => {
+    try {
+      await db.delete(waitlist).where(eq(waitlist.id, req.params.id));
+      res.json({ message: "Waitlist entry removed." });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Send invite to a waitlist person (creates an invite code and emails them)
+  app.post("/api/admin/beta/waitlist/:id/invite", requireAdmin, async (req: any, res, next) => {
+    try {
+      const [entry] = await db.select().from(waitlist).where(eq(waitlist.id, req.params.id)).limit(1);
+      if (!entry) return res.status(404).json({ message: "Waitlist entry not found." });
+
+      const code = Math.random().toString(36).substring(2, 8).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
+      const expiresAt = new Date(Date.now() + 30 * 86400000); // 30 days
+      const [invite] = await db.insert(betaInvites).values({
+        code,
+        email: entry.email,
+        createdBy: req.user!.id,
+        maxUses: 1,
+        note: `Invited from waitlist: ${entry.firstName} ${entry.lastName}`,
+        expiresAt,
+      }).returning();
+
+      await db.update(waitlist).set({ invitedAt: new Date(), inviteCode: code }).where(eq(waitlist.id, entry.id));
+
+      // Send invite email
+      const { sendEmail, emailWrapper, emailButton } = await import('./emailTemplates.js');
+      const body = `
+        <h2 style="color:#001F3F;margin:0 0 16px">You're invited to ChipIn! 🎉</h2>
+        <p>Hi ${entry.firstName},</p>
+        <p>Great news — you've been selected from our waitlist to join ChipIn Beta. Use the code below during sign-up to get access:</p>
+        <div style="background:#f0fdf8;border:2px solid #7FFFD4;border-radius:12px;padding:24px;text-align:center;margin:24px 0;">
+          <p style="margin:0;font-size:13px;color:#64748b;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Your Invite Code</p>
+          <p style="margin:8px 0 0;font-size:32px;font-weight:800;letter-spacing:6px;color:#001F3F;font-family:monospace;">${code}</p>
+        </div>
+        <p>This code expires in 30 days and can only be used once. Head to chipinpool.com to create your account.</p>
+        ${emailButton('Create My Account', 'https://chipinpool.com/register?invite=' + code)}
+      `;
+      await sendEmail({
+        to: entry.email,
+        subject: "You're invited to ChipIn Beta!",
+        html: emailWrapper({ body, preheaderText: `Your ChipIn Beta invite code: ${code}` }),
+      });
+
+      res.json({ message: `Invite sent to ${entry.email}`, invite });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Approve an existing user for beta access
+  app.post("/api/admin/beta/users/:userId/approve", requireAdmin, async (req, res, next) => {
+    try {
+      await db.update(users).set({ betaApproved: true }).where(eq(users.id, req.params.userId));
+      res.json({ message: "User approved for beta access." });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Revoke an existing user's beta access
+  app.post("/api/admin/beta/users/:userId/revoke", requireAdmin, async (req, res, next) => {
+    try {
+      const user = await storage.getUser(req.params.userId);
+      if (user?.role === 'admin') return res.status(400).json({ message: "Cannot revoke beta access from admins." });
+      await db.update(users).set({ betaApproved: false }).where(eq(users.id, req.params.userId));
+      res.json({ message: "Beta access revoked." });
     } catch (error) {
       next(error);
     }
