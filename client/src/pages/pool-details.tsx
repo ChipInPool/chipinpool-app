@@ -327,6 +327,14 @@ export default function PoolDetails() {
 
   // Guest contribution handler
   const handleGuestContribute = async () => {
+    // Payments are paused
+    toast({
+      title: "Payments Paused",
+      description: "Pool payments are temporarily paused. Please check back soon.",
+      variant: "destructive",
+    });
+    return;
+
     if (!chipInAmount || parseFloat(chipInAmount) < 1) {
       toast({ title: "Invalid amount", description: "Please enter at least $1", variant: "destructive" });
       return;
@@ -385,6 +393,14 @@ export default function PoolDetails() {
   const remainingBalance = parseFloat(pool?.currentAmount || '0');
 
   const handleChipIn = async () => {
+    // Payments are paused — reject all contributions
+    toast({
+      title: "Payments Paused",
+      description: "Pool payments are temporarily paused. Please check back soon.",
+      variant: "destructive",
+    });
+    return;
+
     setIsChippingIn(true);
     try {
       if (paymentMethod === 'stripe') {

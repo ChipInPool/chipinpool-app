@@ -1294,6 +1294,7 @@ export async function registerRoutes(
 
   // Guest contribution via Stripe (no auth required)
   app.post("/api/pools/:id/contribute-guest", async (req, res, next) => {
+    return res.status(503).json({ message: "Payments are temporarily paused. Please check back soon." });
     try {
       const { amount, email, name } = z.object({ 
         amount: z.string().refine(val => {
@@ -1615,6 +1616,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/pools/:id/contribute", requireAuth, async (req, res, next) => {
+    return res.status(503).json({ message: "Payments are temporarily paused. Please check back soon." });
     try {
       const { amount } = z.object({ amount: z.string() }).parse(req.body);
       const pool = await storage.getPool(req.params.id);
@@ -1953,6 +1955,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/user/deposit/checkout", requireAuth, async (req, res, next) => {
+    return res.status(503).json({ message: "Deposits are temporarily paused. You can still withdraw your existing balance." });
     try {
       const { amount } = z.object({ amount: z.string() }).parse(req.body);
       const depositAmount = parseFloat(amount);
@@ -2701,6 +2704,7 @@ export async function registerRoutes(
 
   // Contribute to pool using linked bank account (ACH)
   app.post("/api/pools/:id/contribute-bank", requireAuth, async (req, res, next) => {
+    return res.status(503).json({ error: "Payments are temporarily paused. Please check back soon." });
     try {
       const { amount, bankAccountId } = z.object({ 
         amount: z.string(),
@@ -7244,6 +7248,7 @@ export async function registerRoutes(
 
   // Start ChipInPay checkout - create pool for the session
   app.post("/api/chipinpay/checkout/:sessionId/start", requireAuth, async (req, res, next) => {
+    return res.status(503).json({ error: "Payments are temporarily paused. Please check back soon." });
     try {
       const session = await storage.getMerchantCheckoutSession(req.params.sessionId);
       if (!session) {
