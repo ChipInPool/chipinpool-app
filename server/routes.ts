@@ -1996,7 +1996,7 @@ export async function registerRoutes(
           quantity: 1,
         }],
         mode: 'payment',
-        success_url: `${baseUrl}/profile?deposit=success`,
+        success_url: `${baseUrl}/deposit-success`,
         cancel_url: `${baseUrl}/profile`,
         metadata: {
           type: 'wallet_deposit',

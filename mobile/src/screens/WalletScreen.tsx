@@ -18,17 +18,54 @@ export default function WalletScreen() {
   const [amount, setAmount] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const appState = useRef(AppState.currentState);
+  const depositPending = useRef(false);
 
+  // Call wallet sync and refresh balance
+  const syncWallet = useCallback(async (showAlert = false) => {
+    try {
+      const res = await api.wallet.sync();
+      if (res?.synced > 0) {
+        await refreshUser();
+        queryClient.invalidateQueries({ queryKey: ['walletTransactions'] });
+        if (showAlert) {
+          Alert.alert('Deposit Complete', `Your wallet has been updated to $${parseFloat(res.balance || '0').toFixed(2)}.`);
+        }
+      } else {
+        await refreshUser();
+        queryClient.invalidateQueries({ queryKey: ['walletTransactions'] });
+      }
+    } catch {
+      // silent
+    }
+  }, [refreshUser, queryClient]);
+
+  // Listen for chipinpool://deposit-success deep link (fired by the web success page)
+  useEffect(() => {
+    const sub = Linking.addEventListener('url', ({ url }) => {
+      if (url.includes('deposit-success')) {
+        depositPending.current = false;
+        syncWallet(true);
+      }
+    });
+    return () => sub.remove();
+  }, [syncWallet]);
+
+  // When app comes back to foreground after a deposit, sync wallet
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-        refreshUser();
-        queryClient.invalidateQueries({ queryKey: ['walletTransactions'] });
+        if (depositPending.current) {
+          depositPending.current = false;
+          syncWallet(true);
+        } else {
+          refreshUser();
+          queryClient.invalidateQueries({ queryKey: ['walletTransactions'] });
+        }
       }
       appState.current = nextAppState;
     });
     return () => subscription.remove();
-  }, []);
+  }, [syncWallet, refreshUser, queryClient]);
 
   useFocusEffect(
     useCallback(() => {
@@ -58,6 +95,7 @@ export default function WalletScreen() {
       setAmount('');
       const checkoutUrl = response?.url || response?.checkoutUrl;
       if (checkoutUrl) {
+        depositPending.current = true;
         Linking.openURL(checkoutUrl);
       } else {
         Alert.alert('Success', 'Deposit initiated successfully');

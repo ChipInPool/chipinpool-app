@@ -315,6 +315,8 @@ export const api = {
       const result = await fetchApi<any>('/api/user/wallet-history');
       return result.transactions || result.history || [];
     },
+    sync: () =>
+      fetchApi<any>('/api/wallet/sync', { method: 'POST' }),
   },
   bankAccounts: {
     list: () => fetchApi<any>('/api/bank-accounts'),

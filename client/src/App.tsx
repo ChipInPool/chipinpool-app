@@ -54,6 +54,7 @@ import ArchivedPools from "@/pages/archived-pools";
 import UserSearch from "@/pages/user-search";
 import Waitlist from "@/pages/waitlist";
 import AdminBeta from "@/pages/admin/beta";
+import DepositSuccess from "@/pages/deposit-success";
 
 function Router() {
   return (
@@ -107,6 +108,7 @@ function Router() {
       <Route path="/waitlist" component={Waitlist} />
       <Route path="/register" component={Login} />
       <Route path="/admin/beta" component={AdminBeta} />
+      <Route path="/deposit-success" component={DepositSuccess} />
       <Route path="/@:username/:amount" component={PayMe} />
       <Route path="/@:username" component={PayMe} />
       <Route component={NotFound} />
