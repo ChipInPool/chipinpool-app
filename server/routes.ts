@@ -7837,6 +7837,50 @@ export async function registerRoutes(
     }
   });
 
+  // Admin: Force-complete all pending wallet deposits by cross-checking against Stripe
+  app.post("/api/admin/wallet/fix-pending-deposits", requireAdmin, async (req: any, res, next) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+
+      // Get every deposit that is still pending in our DB — no date filter
+      const pendingDeposits = await db
+        .select()
+        .from(walletDeposits)
+        .where(eq(walletDeposits.status, 'pending'));
+
+      let fixed = 0;
+      let skipped = 0;
+      const details: { sessionId: string; userId: string; amount: string; result: string }[] = [];
+
+      for (const deposit of pendingDeposits) {
+        try {
+          const session = await stripe.checkout.sessions.retrieve(deposit.stripeSessionId);
+          if (session.payment_status === 'paid') {
+            const success = await storage.completeWalletDeposit(deposit.stripeSessionId);
+            if (success) {
+              fixed++;
+              details.push({ sessionId: deposit.stripeSessionId, userId: deposit.userId, amount: deposit.amount, result: 'completed' });
+              console.log(`[AdminFix] Completed deposit ${deposit.stripeSessionId} for user ${deposit.userId}: $${deposit.amount}`);
+            } else {
+              skipped++;
+              details.push({ sessionId: deposit.stripeSessionId, userId: deposit.userId, amount: deposit.amount, result: 'already_processed' });
+            }
+          } else {
+            skipped++;
+            details.push({ sessionId: deposit.stripeSessionId, userId: deposit.userId, amount: deposit.amount, result: `stripe_status:${session.payment_status}` });
+          }
+        } catch (err: any) {
+          skipped++;
+          details.push({ sessionId: deposit.stripeSessionId, userId: deposit.userId, amount: deposit.amount, result: `error:${err.message}` });
+        }
+      }
+
+      res.json({ success: true, total: pendingDeposits.length, fixed, skipped, details });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Admin: Get real-time balance and payouts from Stripe
   app.get("/api/admin/stripe/balance", requireAdmin, async (req: any, res, next) => {
     try {
@@ -7995,10 +8039,11 @@ export async function registerRoutes(
       const userId = req.session.userId;
       const stripe = await getUncachableStripeClient();
       
-      // Get all paid checkout sessions for this user
+      // Get all paid checkout sessions for this user — look back 180 days to catch
+      // any old pending deposits that were never completed via webhook
       const sessions = await stripe.checkout.sessions.list({
         limit: 100,
-        created: { gte: Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60) }, // Last 30 days
+        created: { gte: Math.floor(Date.now() / 1000) - (180 * 24 * 60 * 60) },
       });
 
       let synced = 0;

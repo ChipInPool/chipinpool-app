@@ -71,7 +71,15 @@ export default function WalletScreen() {
     useCallback(() => {
       refreshUser();
       queryClient.invalidateQueries({ queryKey: ['walletTransactions'] });
-    }, [])
+      // If there are any pending deposits, silently sync with Stripe to resolve them
+      const currentTransactions: any[] = queryClient.getQueryData(['walletTransactions']) || [];
+      const hasPending = currentTransactions.some(
+        (tx: any) => tx.type === 'deposit' && tx.status === 'pending'
+      );
+      if (hasPending) {
+        syncWallet(false);
+      }
+    }, [syncWallet])
   );
 
   const { data: transactions, isLoading, refetch } = useQuery({

@@ -1,8 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/admin-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Layers, DollarSign, Clock, AlertTriangle, UserPlus, CreditCard, CheckCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, Layers, DollarSign, Clock, AlertTriangle, UserPlus, CreditCard, CheckCircle, Wrench } from "lucide-react";
 import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface AdminStats {
   totalUsers: number;
@@ -62,6 +64,8 @@ async function fetchStripeData(): Promise<StripeData> {
 }
 
 export default function AdminDashboard() {
+  const { toast } = useToast();
+
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
     queryKey: ["admin", "stats"],
     queryFn: fetchAdminStats,
@@ -70,7 +74,31 @@ export default function AdminDashboard() {
   const { data: stripeData, isLoading: stripeLoading } = useQuery({
     queryKey: ["admin", "stripe", "all"],
     queryFn: fetchStripeData,
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
+  });
+
+  const fixDepositsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/wallet/fix-pending-deposits", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to run fix");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.fixed > 0) {
+        toast({
+          title: `Fixed ${data.fixed} deposit${data.fixed !== 1 ? 's' : ''}`,
+          description: `${data.fixed} pending deposit${data.fixed !== 1 ? 's' : ''} completed. ${data.skipped} skipped.`,
+        });
+      } else {
+        toast({ description: `No pending deposits needed fixing (${data.total} checked).` });
+      }
+    },
+    onError: () => {
+      toast({ description: "Failed to run deposit fix", variant: "destructive" });
+    },
   });
 
   if (statsLoading) {
@@ -125,6 +153,36 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Tools */}
+      <div className="mt-8">
+        <h2 className="text-xl font-display font-bold mb-4 flex items-center gap-2">
+          <Wrench className="w-5 h-5" /> Maintenance Tools
+        </h2>
+        <Card className="bg-amber-500/10 border-amber-500/20">
+          <CardContent className="pt-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <p className="font-semibold">Fix Stuck Pending Deposits</p>
+              <p className="text-sm text-muted-foreground">
+                Scans every pending deposit in the database, checks its status against Stripe,
+                and completes any that Stripe already shows as paid.
+              </p>
+            </div>
+            <Button
+              onClick={() => fixDepositsMutation.mutate()}
+              disabled={fixDepositsMutation.isPending}
+              className="shrink-0"
+              data-testid="button-fix-deposits"
+            >
+              {fixDepositsMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Running…</>
+              ) : (
+                <><Wrench className="w-4 h-4 mr-2" /> Run Fix Now</>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Real-time Stripe Data */}
