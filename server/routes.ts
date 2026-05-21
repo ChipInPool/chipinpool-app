@@ -7849,6 +7849,7 @@ export async function registerRoutes(
         .where(eq(walletDeposits.status, 'pending'));
 
       let fixed = 0;
+      let failed = 0;
       let skipped = 0;
       const details: { sessionId: string; userId: string; amount: string; result: string }[] = [];
 
@@ -7856,6 +7857,7 @@ export async function registerRoutes(
         try {
           const session = await stripe.checkout.sessions.retrieve(deposit.stripeSessionId);
           if (session.payment_status === 'paid') {
+            // Stripe confirms paid — complete the deposit
             const success = await storage.completeWalletDeposit(deposit.stripeSessionId);
             if (success) {
               fixed++;
@@ -7866,16 +7868,21 @@ export async function registerRoutes(
               details.push({ sessionId: deposit.stripeSessionId, userId: deposit.userId, amount: deposit.amount, result: 'already_processed' });
             }
           } else {
-            skipped++;
-            details.push({ sessionId: deposit.stripeSessionId, userId: deposit.userId, amount: deposit.amount, result: `stripe_status:${session.payment_status}` });
+            // Stripe says unpaid/expired — mark as failed so it stops showing as pending
+            await storage.updateWalletDepositStatus(deposit.stripeSessionId, 'failed');
+            failed++;
+            details.push({ sessionId: deposit.stripeSessionId, userId: deposit.userId, amount: deposit.amount, result: `failed:stripe_status_${session.payment_status}` });
+            console.log(`[AdminFix] Marked deposit ${deposit.stripeSessionId} as failed (Stripe status: ${session.payment_status})`);
           }
         } catch (err: any) {
-          skipped++;
-          details.push({ sessionId: deposit.stripeSessionId, userId: deposit.userId, amount: deposit.amount, result: `error:${err.message}` });
+          // Session not found in Stripe (too old or invalid) — also mark failed
+          await storage.updateWalletDepositStatus(deposit.stripeSessionId, 'failed').catch(() => {});
+          failed++;
+          details.push({ sessionId: deposit.stripeSessionId, userId: deposit.userId, amount: deposit.amount, result: `failed:not_found_in_stripe` });
         }
       }
 
-      res.json({ success: true, total: pendingDeposits.length, fixed, skipped, details });
+      res.json({ success: true, total: pendingDeposits.length, fixed, failed, skipped, details });
     } catch (error) {
       next(error);
     }

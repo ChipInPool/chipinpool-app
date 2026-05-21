@@ -87,14 +87,16 @@ export default function AdminDashboard() {
       return res.json();
     },
     onSuccess: (data) => {
-      if (data.fixed > 0) {
-        toast({
-          title: `Fixed ${data.fixed} deposit${data.fixed !== 1 ? 's' : ''}`,
-          description: `${data.fixed} pending deposit${data.fixed !== 1 ? 's' : ''} completed. ${data.skipped} skipped.`,
-        });
-      } else {
-        toast({ description: `No pending deposits needed fixing (${data.total} checked).` });
-      }
+      const parts = [];
+      if (data.fixed > 0) parts.push(`${data.fixed} completed`);
+      if (data.failed > 0) parts.push(`${data.failed} marked failed`);
+      if (data.skipped > 0) parts.push(`${data.skipped} skipped`);
+      toast({
+        title: data.fixed > 0 || data.failed > 0 ? "Deposits cleaned up" : "All clear",
+        description: data.total === 0
+          ? "No pending deposits found."
+          : parts.join(", ") + ` (${data.total} checked).`,
+      });
     },
     onError: () => {
       toast({ description: "Failed to run deposit fix", variant: "destructive" });
