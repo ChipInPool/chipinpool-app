@@ -202,11 +202,18 @@ export default function ChipInPayCheckout() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="flex flex-col items-center gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
-                    <span className="text-2xl">⏸</span>
-                    <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Payments are temporarily paused</p>
-                    <p className="text-xs text-muted-foreground">ChipInPay checkout is unavailable right now. Please check back soon.</p>
-                  </div>
+                  <p className="text-center text-muted-foreground">
+                    Start a pool to split this purchase with friends. Everyone chips in, and once fully funded, the payment goes through!
+                  </p>
+                  <Button 
+                    className="w-full" 
+                    onClick={() => startCheckoutMutation.mutate()}
+                    disabled={startCheckoutMutation.isPending}
+                    data-testid="button-start-pool"
+                  >
+                    {startCheckoutMutation.isPending ? "Creating Pool..." : "Start Pool & Invite Friends"}
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
                 </div>
               )}
             </CardContent>

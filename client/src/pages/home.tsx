@@ -137,7 +137,9 @@ export default function Home() {
           </CardHeader>
           <CardContent className="p-4 pt-1 md:p-6 md:pt-1">
             <div className="text-2xl md:text-3xl font-bold font-mono tracking-tight">${parseFloat(user?.balance || '0').toLocaleString()}</div>
-            <p className="text-xs text-amber-500/80 mt-2 font-medium cursor-default">Deposits paused</p>
+            <Link href="/profile?action=deposit">
+              <p className="text-xs text-primary/80 hover:text-primary hover:underline cursor-pointer mt-2 font-medium">+ Add funds</p>
+            </Link>
           </CardContent>
         </Card>
 
@@ -201,15 +203,14 @@ export default function Home() {
                 <span className="text-xs md:text-sm font-semibold">New Pool</span>
               </div>
             </Link>
-            <div className="relative p-5 md:p-6 rounded-2xl bg-gradient-to-br from-green-500/5 to-green-500/5 border border-green-500/10 text-center cursor-not-allowed opacity-50" title="Deposits paused" data-testid="quick-action-deposit">
-              <div className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-green-400/20 to-green-400/5 flex items-center justify-center">
-                <Wallet className="w-5 h-5 md:w-6 md:h-6 text-green-400/50" />
+            <Link href="/profile?action=deposit">
+              <div className="group relative p-5 md:p-6 rounded-2xl bg-gradient-to-br from-green-500/15 to-green-500/5 border border-green-500/20 hover:border-green-500/40 hover:from-green-500/25 hover:to-green-500/10 hover:shadow-lg hover:shadow-green-500/5 transition-all duration-300 cursor-pointer text-center hover:-translate-y-0.5" data-testid="quick-action-deposit">
+                <div className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-green-400/30 to-green-400/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                  <Wallet className="w-5 h-5 md:w-6 md:h-6 text-green-400" />
+                </div>
+                <span className="text-xs md:text-sm font-semibold">Deposit</span>
               </div>
-              <span className="text-xs md:text-sm font-semibold text-muted-foreground">Deposit</span>
-              <div className="absolute bottom-1.5 left-0 right-0 text-center">
-                <span className="text-[9px] text-amber-500 font-medium">Paused</span>
-              </div>
-            </div>
+            </Link>
             <Link href="/explore">
               <div className="group relative p-5 md:p-6 rounded-2xl bg-gradient-to-br from-accent/15 to-accent/5 border border-accent/20 hover:border-accent/40 hover:from-accent/25 hover:to-accent/10 hover:shadow-lg hover:shadow-accent/5 transition-all duration-300 cursor-pointer text-center hover:-translate-y-0.5" data-testid="quick-action-explore">
                 <div className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-accent/30 to-accent/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">

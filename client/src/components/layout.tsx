@@ -263,22 +263,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
-      {/* Payment pause notice — shown to all authenticated users */}
-      {isAuthenticated && (
-        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2.5 text-center">
-          <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-400 flex items-center justify-center gap-2">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>
-              <strong>Payments & deposits are temporarily paused.</strong> You can still{" "}
-              <Link href="/profile" className="underline font-semibold hover:text-amber-500">
-                withdraw your balance
-              </Link>{" "}
-              at any time.
-            </span>
-          </p>
-        </div>
-      )}
-
       <main className="flex-1 container mx-auto px-4 py-8">
         {children}
       </main>

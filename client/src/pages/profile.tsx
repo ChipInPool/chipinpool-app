@@ -532,9 +532,8 @@ export default function Profile() {
               </div>
               <div className="flex gap-2 mb-3">
                 <Button 
-                  className="flex-1 opacity-50 cursor-not-allowed"
-                  disabled
-                  title="Deposits are temporarily paused"
+                  className="flex-1" 
+                  onClick={() => setDepositDialogOpen(true)}
                   data-testid="button-add-funds"
                 >
                   <Plus className="w-4 h-4 mr-2" /> Add Funds
