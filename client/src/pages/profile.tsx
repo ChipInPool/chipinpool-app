@@ -96,6 +96,21 @@ export default function Profile() {
     }
   };
 
+  // Auto-sync once on page load for any paid-but-pending deposits (covers Apple Pay
+  // and any case where the Stripe webhook didn't fire before the user returned)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetch("/api/wallet/sync", { method: "POST", credentials: "include" })
+      .then(res => res.json())
+      .then(data => {
+        if (data.synced > 0) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.user });
+          toast({ description: `Your wallet has been updated: $${parseFloat(data.balance).toFixed(2)} available.` });
+        }
+      })
+      .catch(() => {/* silent — don't bother the user if sync fails */});
+  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const params = new URLSearchParams(searchString);
     if (params.get('deposit') === 'success') {
