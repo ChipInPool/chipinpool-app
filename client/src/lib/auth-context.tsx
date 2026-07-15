@@ -21,6 +21,8 @@ interface User {
   kycStatus?: string;
   phoneVerified?: boolean;
   role?: string;
+  hasTransactionPin?: boolean;
+  has2FA?: boolean;
   badges?: Array<{ id: string; name: string; icon: string; color: string; description?: string }>;
 }
 

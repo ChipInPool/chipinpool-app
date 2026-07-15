@@ -96,6 +96,7 @@ export default function PoolDetails() {
   const poolImageInputRef = useRef<HTMLInputElement>(null);
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
   const [distributeDialogOpen, setDistributeDialogOpen] = useState(false);
+  const [distributePin, setDistributePin] = useState("");
   const [distributions, setDistributions] = useState<{userId: string, name: string, amount: string}[]>([]);
   const [closePoolAfterAction, setClosePoolAfterAction] = useState(false);
   const [isRefunding, setIsRefunding] = useState(false);
@@ -519,15 +520,20 @@ export default function PoolDetails() {
       toast({ title: "No Distributions", description: "Please add at least one distribution", variant: "destructive" });
       return;
     }
+    if (user?.hasTransactionPin && !/^\d{4}$/.test(distributePin)) {
+      toast({ title: "PIN required", description: "Enter your 4-digit transaction PIN to authorize this payout.", variant: "destructive" });
+      return;
+    }
     setIsDistributing(true);
     try {
       const res = await fetch(`/api/pools/${params?.id}/distribute`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           distributions: validDistributions.map(d => ({ userId: d.userId, amount: d.amount })),
           closePool: closePoolAfterAction,
+          ...(user?.hasTransactionPin ? { pin: distributePin } : {}),
         }),
       });
       const data = await res.json();
@@ -535,6 +541,7 @@ export default function PoolDetails() {
       toast({ title: "Funds Distributed", description: data.message });
       setDistributeDialogOpen(false);
       setDistributions([]);
+      setDistributePin("");
       setClosePoolAfterAction(false);
       queryClient.invalidateQueries({ queryKey: queryKeys.pool(params?.id || '') });
       queryClient.invalidateQueries({ queryKey: queryKeys.pools });
@@ -989,19 +996,35 @@ export default function PoolDetails() {
                             </Button>
 
                             <div className="flex items-center gap-2">
-                              <Checkbox 
-                                id="close-pool-distribute" 
+                              <Checkbox
+                                id="close-pool-distribute"
                                 checked={closePoolAfterAction}
                                 onCheckedChange={(checked) => setClosePoolAfterAction(!!checked)}
                               />
                               <Label htmlFor="close-pool-distribute" className="text-sm">Close pool after payout</Label>
                             </div>
 
+                            {user?.hasTransactionPin && (
+                              <div className="space-y-1.5">
+                                <Label htmlFor="distribute-pin" className="text-sm">Transaction PIN</Label>
+                                <Input
+                                  id="distribute-pin"
+                                  type="password"
+                                  inputMode="numeric"
+                                  maxLength={4}
+                                  placeholder="••••"
+                                  value={distributePin}
+                                  onChange={(e) => setDistributePin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                  autoComplete="off"
+                                />
+                              </div>
+                            )}
+
                             <DialogFooter>
                               <Button variant="outline" onClick={() => setDistributeDialogOpen(false)}>Cancel</Button>
-                              <Button 
-                                onClick={handleDistribute} 
-                                disabled={isDistributing || distributions.length === 0}
+                              <Button
+                                onClick={handleDistribute}
+                                disabled={isDistributing || distributions.length === 0 || (user?.hasTransactionPin && !/^\d{4}$/.test(distributePin))}
                                 className="bg-green-600 hover:bg-green-700"
                                 data-testid="button-confirm-distribute"
                               >

@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
 import cookieSignature from "cookie-signature";
@@ -9,7 +10,7 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { fileStorageService, isAzureStorage } from "./fileStorage";
 import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, walletDeposits, bankAccounts, merchantPayouts, payMeTransactions, apiAccessRequests, poolActivities, invites, betaInvites, waitlist } from "@shared/schema";
 import express from "express";
-import { db } from "./db";
+import { db, pool as pgPool } from "./db";
 import { eq, desc, sql, inArray, and, lt, isNull, or } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { z } from "zod";
@@ -172,9 +173,18 @@ export async function registerRoutes(
   // Trust proxy for secure cookies behind Replit's/Azure's reverse proxy
   app.set('trust proxy', 1);
 
-  // Session middleware
+  // Session middleware — persist sessions in Postgres so they survive restarts,
+  // don't leak memory, and work across multiple instances (the default
+  // MemoryStore does none of these and is unsafe for production).
+  const PgSession = connectPgSimple(session);
+  const sessionStore = new PgSession({
+    pool: pgPool as any,
+    tableName: 'user_sessions',
+    createTableIfMissing: true,
+  });
   app.use(
     session({
+      store: sessionStore,
       secret: sessionSecret || 'dev-only-insecure-secret-do-not-use-in-production',
       resave: false,
       saveUninitialized: false,
@@ -258,6 +268,22 @@ export async function registerRoutes(
     createdAt: user.createdAt,
     ...(isOwner ? { email: user.email, phone: user.phone } : {}),
   });
+
+  // Enforce the transaction PIN on money-movement routes. If the user has set a
+  // PIN, a valid one must accompany the request; users who never set a PIN are
+  // unaffected (backward compatible). Returns ok=false with a status to send.
+  const enforceTransactionPin = async (
+    user: { transactionPin?: string | null } | undefined,
+    providedPin: unknown,
+  ): Promise<{ ok: true } | { ok: false; status: number; error: string }> => {
+    if (!user?.transactionPin) return { ok: true };
+    if (typeof providedPin !== 'string' || !/^\d{4}$/.test(providedPin)) {
+      return { ok: false, status: 400, error: 'Transaction PIN required' };
+    }
+    const valid = await verifyTransactionPin(providedPin, user.transactionPin);
+    if (!valid) return { ok: false, status: 401, error: 'Incorrect transaction PIN' };
+    return { ok: true };
+  };
 
   // Phone verification routes - rate limited to prevent abuse
   app.post("/api/auth/send-phone-code", authRateLimiter, async (req, res, next) => {
@@ -956,8 +982,16 @@ export async function registerRoutes(
       }
 
       const badges = await storage.getUserBadges(user.id);
-      const { password, ...userWithoutPassword } = user;
-      res.json({ user: { ...userWithoutPassword, badges } });
+      // Never send secrets to the client; expose booleans instead of the values
+      const { password, transactionPin, twoFactorSecret, plaidAccessToken, ...safeUser } = user as any;
+      res.json({
+        user: {
+          ...safeUser,
+          badges,
+          hasTransactionPin: !!transactionPin,
+          has2FA: !!twoFactorSecret,
+        },
+      });
     } catch (error) {
       next(error);
     }
@@ -1938,12 +1972,13 @@ export async function registerRoutes(
 
   app.post("/api/user/withdraw", requireAuth, async (req, res, next) => {
     try {
-      const { amount, bankAccountId } = z.object({ 
+      const { amount, bankAccountId, pin } = z.object({
         amount: z.string(),
-        bankAccountId: z.string().optional()
+        bankAccountId: z.string().optional(),
+        pin: z.string().optional(),
       }).parse(req.body);
       const withdrawAmount = parseFloat(amount);
-      
+
       if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
         return res.status(400).json({ message: "Invalid amount" });
       }
@@ -1952,6 +1987,10 @@ export async function registerRoutes(
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      // Require the transaction PIN if the user has set one
+      const pinCheck = await enforceTransactionPin(user, pin);
+      if (!pinCheck.ok) return res.status(pinCheck.status).json({ message: pinCheck.error });
 
       // Atomic guarded debit prevents concurrent double-withdrawal
       const debited = await storage.atomicDebitUserBalance(user.id, withdrawAmount);
@@ -3598,11 +3637,16 @@ export async function registerRoutes(
   // Initiate withdrawal to bank
   app.post("/api/plaid/withdraw", requireAuth, async (req, res, next) => {
     try {
-      const { amount } = z.object({ amount: z.string() }).parse(req.body);
+      const { amount, pin } = z.object({ amount: z.string(), pin: z.string().optional() }).parse(req.body);
       const userId = req.session.userId!;
       const user = await storage.getUser(userId);
-      
+
       if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Require the transaction PIN if the user has set one
+      const pinCheck = await enforceTransactionPin(user, pin);
+      if (!pinCheck.ok) return res.status(pinCheck.status).json({ error: pinCheck.error });
+
       if (!user.plaidAccessToken || !user.plaidAccountId) {
         return res.status(400).json({ error: "No bank account linked" });
       }
@@ -3651,14 +3695,19 @@ export async function registerRoutes(
   // Wallet withdrawal endpoint - creates pending request for manual admin processing
   app.post("/api/wallet/withdraw", requireAuth, async (req, res, next) => {
     try {
-      const { amount, savedMethodId } = z.object({
+      const { amount, savedMethodId, pin } = z.object({
         amount: z.string(),
         savedMethodId: z.string({ required_error: "Please select a verified bank account" }),
+        pin: z.string().optional(),
       }).parse(req.body);
 
       const userId = req.session.userId!;
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Require the transaction PIN if the user has set one
+      const pinCheck = await enforceTransactionPin(user, pin);
+      if (!pinCheck.ok) return res.status(pinCheck.status).json({ error: pinCheck.error });
 
       // Require KYC verification for withdrawals
       if (user.kycStatus !== 'verified') {
@@ -4931,15 +4980,21 @@ export async function registerRoutes(
         notes: z.string().optional(),
         bankAccountId: z.string().optional(),
         payoutSpeed: z.enum(['standard', 'instant']).optional().default('standard'),
+        pin: z.string().optional(),
       });
 
       const data = transferSchema.parse(req.body);
       const pool = await storage.getPool(poolId);
-      
+
       if (!pool) return res.status(404).json({ error: "Pool not found" });
       if (pool.creatorId !== userId) {
         return res.status(403).json({ error: "Only pool creator can initiate transfers" });
       }
+
+      // Require the transaction PIN if the user has set one
+      const transferUser = await storage.getUser(userId);
+      const transferPinCheck = await enforceTransactionPin(transferUser, data.pin);
+      if (!transferPinCheck.ok) return res.status(transferPinCheck.status).json({ error: transferPinCheck.error });
 
       const transferAmount = parseFloat(data.amount);
       const poolBalance = parseFloat(pool.currentAmount);
@@ -5378,6 +5433,7 @@ export async function registerRoutes(
           }, "Distribution amount must be a positive number"),
         })).min(1),
         closePool: z.boolean().optional(),
+        pin: z.string().optional(),
       });
 
       const data = distributeSchema.parse(req.body);
@@ -5390,6 +5446,11 @@ export async function registerRoutes(
       if (pool.creatorId !== userId) {
         return res.status(403).json({ message: "Only the pool creator can distribute funds" });
       }
+
+      // Require the transaction PIN if the user has set one
+      const distributeUser = await storage.getUser(userId);
+      const distributePinCheck = await enforceTransactionPin(distributeUser, data.pin);
+      if (!distributePinCheck.ok) return res.status(distributePinCheck.status).json({ error: distributePinCheck.error });
 
       const distributions: { userId: string; name: string; amount: string }[] = [];
 
