@@ -22,6 +22,10 @@ function getVapidKeys(): { publicKey: string; privateKey: string; email: string 
     console.log(`VAPID_PUBLIC_KEY=${publicKey}`);
   }
 
+  if (!publicKey || !privateKey) {
+    throw new Error('[Push] VAPID keys are not available');
+  }
+
   return { publicKey, privateKey, email };
 }
 

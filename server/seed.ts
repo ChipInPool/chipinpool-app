@@ -21,7 +21,11 @@ async function seed() {
   const [demoUser] = await db
     .insert(users)
     .values({
-      name: "Alex Rivera",
+      firstName: "Alex",
+      lastName: "Rivera",
+      username: "alexrivera",
+      phone: "+15550000001",
+      dateOfBirth: new Date("1995-06-15"),
       email: "demo@chipin.com",
       password: hashedPassword,
       avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=faces",
@@ -45,21 +49,33 @@ async function seed() {
   // Create additional users
   const additionalUsers = await Promise.all([
     db.insert(users).values({
-      name: "Jordan Lee",
+      firstName: "Jordan",
+      lastName: "Lee",
+      username: "jordanlee",
+      phone: "+15550000002",
+      dateOfBirth: new Date("1993-03-22"),
       email: "jordan@example.com",
       password: hashedPassword,
       avatar: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100",
       balance: "500.00",
     }).returning(),
     db.insert(users).values({
-      name: "Casey Smith",
+      firstName: "Casey",
+      lastName: "Smith",
+      username: "caseysmith",
+      phone: "+15550000003",
+      dateOfBirth: new Date("1990-11-08"),
       email: "casey@example.com",
       password: hashedPassword,
       avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100",
       balance: "800.00",
     }).returning(),
     db.insert(users).values({
-      name: "Mike Chen",
+      firstName: "Mike",
+      lastName: "Chen",
+      username: "mikechen",
+      phone: "+15550000004",
+      dateOfBirth: new Date("1997-01-30"),
       email: "mike@example.com",
       password: hashedPassword,
       avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=100",

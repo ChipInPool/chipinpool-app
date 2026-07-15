@@ -6,3 +6,12 @@ vite.config.ts.*
 *.tar.gz
 # Expo local state
 mobile/.expo/
+# Local env
+.env
+.env.local
+# Large/source artifacts that should not be committed
+*.zip
+*.crash
+# Ad-hoc screenshots / pasted logs dropped into attached_assets
+attached_assets/IMG_*
+attached_assets/Pasted-*
