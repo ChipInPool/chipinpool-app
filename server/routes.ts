@@ -11,6 +11,7 @@ import { fileStorageService, isAzureStorage } from "./fileStorage";
 import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, walletDeposits, bankAccounts, merchantPayouts, payMeTransactions, apiAccessRequests, poolActivities, invites, betaInvites, waitlist } from "@shared/schema";
 import express from "express";
 import { db, pool as pgPool } from "./db";
+import { encryptField } from "./encryption";
 import { eq, desc, sql, inArray, and, lt, isNull, or } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { z } from "zod";
@@ -3729,12 +3730,9 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Insufficient balance" });
       }
 
-      // Get verified bank account
-      const savedMethod = await db.select()
-        .from(bankAccounts)
-        .where(eq(bankAccounts.id, savedMethodId))
-        .then(rows => rows[0]);
-      
+      // Get verified bank account (storage decrypts sensitive fields)
+      const savedMethod = await storage.getBankAccountById(savedMethodId);
+
       if (!savedMethod || savedMethod.userId !== userId) {
         return res.status(404).json({ error: "Bank account not found" });
       }
@@ -3943,8 +3941,8 @@ export async function registerRoutes(
           accountName: accountHolderName,
           accountMask: accountLast4,
           accountType,
-          routingNumber,
-          accountNumber,
+          routingNumber: encryptField(routingNumber) as string,
+          accountNumber: encryptField(accountNumber) as string,
           isDefault: setAsDefault,
         })
         .returning();

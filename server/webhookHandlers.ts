@@ -60,8 +60,71 @@ export class WebhookHandlers {
       await WebhookHandlers.handlePayoutPaid(event.data.object);
     } else if (event.type === 'payout.failed') {
       await WebhookHandlers.handlePayoutFailed(event.data.object);
+    } else if (event.type === 'payment_intent.payment_failed' || event.type === 'charge.failed') {
+      await WebhookHandlers.handlePaymentFailed(event.data.object);
     } else {
       console.log(`[Webhook] Unhandled event type: ${event.type}`);
+    }
+  }
+
+  // An ACH contribution is credited to a pool while the payment is still
+  // 'processing'. If Stripe later reports the PaymentIntent/charge failed or was
+  // returned, reverse the pool credit so creators can't withdraw money that
+  // never settled. Idempotent: a repeated webhook finds nothing to reverse.
+  static async handlePaymentFailed(object: any): Promise<void> {
+    // For charge.failed the PaymentIntent id is on object.payment_intent;
+    // for payment_intent.payment_failed the id is object.id.
+    const paymentIntentId: string | undefined = object?.payment_intent || object?.id;
+    if (!paymentIntentId) {
+      console.log('[Webhook] payment_failed with no PaymentIntent id, skipping');
+      return;
+    }
+
+    try {
+      const reversed = await storage.reverseContributionByStripeSession(paymentIntentId);
+      if (!reversed) {
+        console.log(`[Webhook] payment_failed ${paymentIntentId}: no matching contribution to reverse`);
+        return;
+      }
+
+      console.warn(`[Webhook] Reversed ACH contribution of $${reversed.amount} to pool ${reversed.poolId} (PaymentIntent ${paymentIntentId} failed/returned)`);
+
+      // Record the reversal for auditability
+      try {
+        await storage.createPoolActivity({
+          poolId: reversed.poolId,
+          userId: reversed.userId || undefined,
+          type: 'refund',
+          amount: reversed.amount,
+          description: 'ACH contribution reversed (payment failed or returned)',
+        } as any);
+      } catch (activityErr) {
+        console.error('[Webhook] Could not record reversal activity:', activityErr);
+      }
+
+      // Notify the contributor that their bank payment did not clear
+      if (reversed.userId) {
+        const user = await storage.getUser(reversed.userId);
+        if (user) {
+          await storage.createNotification({
+            userId: reversed.userId,
+            type: 'contribution',
+            title: 'Bank payment failed',
+            message: `Your bank contribution of $${parseFloat(reversed.amount).toFixed(2)} could not be completed and has been reversed.`,
+            link: `/pool/${reversed.poolId}`,
+          });
+          if (user.notifyPush) {
+            sendPushNotification(
+              reversed.userId,
+              'Bank payment failed',
+              `Your $${parseFloat(reversed.amount).toFixed(2)} bank contribution was reversed.`,
+              `/pool/${reversed.poolId}`,
+            ).catch(() => {});
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('[Webhook] Error reversing failed ACH contribution:', err.message);
     }
   }
 

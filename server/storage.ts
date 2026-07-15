@@ -19,6 +19,33 @@ import {
   type UserFollow
 } from "@shared/schema";
 import { eq, desc, and, sql, gt, lte, inArray, or, ilike, count } from "drizzle-orm";
+import { encryptField, decryptField } from "./encryption";
+
+// Decrypt sensitive bank-account fields when reading. No-op on legacy plaintext.
+function decryptBankAccount<T extends { accountNumber?: string | null; routingNumber?: string | null; plaidAccessToken?: string | null } | undefined>(account: T): T {
+  if (!account) return account;
+  return {
+    ...account,
+    accountNumber: decryptField(account.accountNumber) ?? account.accountNumber,
+    routingNumber: decryptField(account.routingNumber) ?? account.routingNumber,
+    plaidAccessToken: decryptField(account.plaidAccessToken) ?? account.plaidAccessToken,
+  } as T;
+}
+
+// Encrypt sensitive bank-account fields before writing. No-op until a key is set.
+function encryptBankFields<T extends Record<string, any>>(values: T): T {
+  const out: Record<string, any> = { ...values };
+  if ('accountNumber' in out) out.accountNumber = encryptField(out.accountNumber);
+  if ('routingNumber' in out) out.routingNumber = encryptField(out.routingNumber);
+  if ('plaidAccessToken' in out) out.plaidAccessToken = encryptField(out.plaidAccessToken);
+  return out as T;
+}
+
+// Decrypt the sensitive plaidAccessToken on user reads. No-op on legacy plaintext.
+function decryptUser<T extends { plaidAccessToken?: string | null } | undefined>(user: T): T {
+  if (!user || user.plaidAccessToken == null) return user;
+  return { ...user, plaidAccessToken: decryptField(user.plaidAccessToken) ?? user.plaidAccessToken } as T;
+}
 
 export interface IStorage {
   // User operations
@@ -54,6 +81,7 @@ export interface IStorage {
   createContribution(contribution: InsertContribution): Promise<Contribution>;
   getContributionByStripeSession(sessionId: string): Promise<Contribution | undefined>;
   createStripeContribution(poolId: string, amount: string, sessionId: string, userId?: string | null, guestEmail?: string | null): Promise<Contribution | null>;
+  reverseContributionByStripeSession(sessionId: string): Promise<{ poolId: string; userId: string | null; amount: string } | null>;
   
   // Comment operations
   getCommentsByPool(poolId: string): Promise<Comment[]>;
@@ -193,7 +221,7 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    return decryptUser(user);
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
@@ -405,6 +433,28 @@ export class DatabaseStorage implements IStorage {
   async getContributionByStripeSession(sessionId: string): Promise<Contribution | undefined> {
     const [contribution] = await db.select().from(contributions).where(eq(contributions.stripeSessionId, sessionId));
     return contribution;
+  }
+
+  // Reverse a contribution that was credited to a pool while its ACH payment was
+  // still 'processing', when that payment later fails or is returned. Atomic and
+  // idempotent (a repeated webhook finds nothing to reverse). Returns details of
+  // what was reversed, or null if there was nothing to reverse.
+  async reverseContributionByStripeSession(sessionId: string): Promise<{ poolId: string; userId: string | null; amount: string } | null> {
+    return await db.transaction(async (tx) => {
+      const [contribution] = await tx.select().from(contributions)
+        .where(eq(contributions.stripeSessionId, sessionId));
+      if (!contribution) return null;
+
+      await tx.delete(contributions).where(eq(contributions.id, contribution.id));
+
+      // Never drive the pool below zero if funds were already spent/distributed
+      await tx.update(pools).set({
+        currentAmount: sql`GREATEST(CAST(${pools.currentAmount} AS DECIMAL) - ${contribution.amount}, 0)`,
+        updatedAt: new Date(),
+      }).where(eq(pools.id, contribution.poolId));
+
+      return { poolId: contribution.poolId, userId: contribution.userId, amount: contribution.amount };
+    });
   }
 
   async createStripeContribution(poolId: string, amount: string, sessionId: string, userId?: string | null, guestEmail?: string | null): Promise<Contribution | null> {
@@ -652,8 +702,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: string, data: Partial<User>): Promise<User | undefined> {
-    const [user] = await db.update(users).set(data).where(eq(users.id, id)).returning();
-    return user;
+    const toWrite = 'plaidAccessToken' in data
+      ? { ...data, plaidAccessToken: encryptField(data.plaidAccessToken) as any }
+      : data;
+    const [user] = await db.update(users).set(toWrite).where(eq(users.id, id)).returning();
+    return decryptUser(user);
   }
 
   async createVerificationCode(data: { userId: string; type: string; code: string; expiresAt: Date }): Promise<void> {
@@ -900,19 +953,20 @@ export class DatabaseStorage implements IStorage {
 
   // Bank account operations
   async getBankAccountsByUser(userId: string): Promise<BankAccount[]> {
-    return db.select().from(bankAccounts)
+    const rows = await db.select().from(bankAccounts)
       .where(eq(bankAccounts.userId, userId))
       .orderBy(desc(bankAccounts.isDefault), desc(bankAccounts.createdAt));
+    return rows.map(decryptBankAccount);
   }
 
   async getBankAccountById(id: string): Promise<BankAccount | undefined> {
     const [account] = await db.select().from(bankAccounts).where(eq(bankAccounts.id, id));
-    return account;
+    return decryptBankAccount(account);
   }
 
   async createBankAccount(account: InsertBankAccount): Promise<BankAccount> {
-    const [result] = await db.insert(bankAccounts).values(account).returning();
-    return result;
+    const [result] = await db.insert(bankAccounts).values(encryptBankFields(account)).returning();
+    return decryptBankAccount(result);
   }
 
   async setDefaultBankAccount(userId: string, accountId: string): Promise<void> {
@@ -932,23 +986,23 @@ export class DatabaseStorage implements IStorage {
   async getBankAccountByStripeAccountId(stripeAccountId: string): Promise<BankAccount | undefined> {
     const [account] = await db.select().from(bankAccounts)
       .where(eq(bankAccounts.stripeFinancialConnectionsAccountId, stripeAccountId));
-    return account;
+    return decryptBankAccount(account);
   }
 
   async updateBankAccountByStripeAccountId(stripeAccountId: string, updates: Partial<BankAccount>): Promise<BankAccount | undefined> {
     const [result] = await db.update(bankAccounts)
-      .set(updates)
+      .set(encryptBankFields(updates))
       .where(eq(bankAccounts.stripeFinancialConnectionsAccountId, stripeAccountId))
       .returning();
-    return result;
+    return decryptBankAccount(result);
   }
 
   async updateBankAccount(id: string, updates: Partial<BankAccount>): Promise<BankAccount | undefined> {
     const [result] = await db.update(bankAccounts)
-      .set(updates)
+      .set(encryptBankFields(updates))
       .where(eq(bankAccounts.id, id))
       .returning();
-    return result;
+    return decryptBankAccount(result);
   }
 
   // Pool transfer request operations
