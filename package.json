@@ -11,7 +11,8 @@
     "check": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "encrypt:migrate": "tsx scripts/encrypt-existing-data.ts"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.30.0",
