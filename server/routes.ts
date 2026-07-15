@@ -12,6 +12,7 @@ import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema,
 import express from "express";
 import { db, pool as pgPool } from "./db";
 import { encryptField } from "./encryption";
+import { assertSafeOutboundUrl } from "./ssrfGuard";
 import { eq, desc, sql, inArray, and, lt, isNull, or } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { z } from "zod";
@@ -123,6 +124,17 @@ export async function registerRoutes(
     console.warn('[Security Warning] SESSION_SECRET not set - using insecure default for development only');
   }
   
+  // Trusted, server-controlled base URL for links we email/text to users.
+  // Never derive these from the request Host header (attacker-controllable),
+  // which would let an attacker poison password-reset links to steal tokens.
+  const getTrustedBaseUrl = (): string => {
+    if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
+    if (process.env.REPLIT_DOMAINS) return `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
+    if (process.env.WEBSITE_HOSTNAME) return `https://${process.env.WEBSITE_HOSTNAME}`;
+    if (process.env.NODE_ENV === 'production') return 'https://www.chipinpool.com';
+    return 'http://localhost:5000';
+  };
+
   const effectiveSecret = sessionSecret || 'dev-only-insecure-secret-do-not-use-in-production';
   function signedSessionToken(sessionID: string): string {
     return `connect.sid=s%3A${cookieSignature.sign(sessionID, effectiveSecret)}`;
@@ -891,7 +903,7 @@ export async function registerRoutes(
       });
 
       // Send reset link via chosen method
-      const resetLink = `${process.env.NODE_ENV === 'production' ? 'https://' + req.get('host') : 'http://localhost:5000'}/reset-password?token=${token}`;
+      const resetLink = `${getTrustedBaseUrl()}/reset-password?token=${token}`;
       
       if (data.method === 'email' && user.email) {
         await sendPasswordResetEmail(user.email, resetLink);
@@ -1761,20 +1773,16 @@ export async function registerRoutes(
         
         // Check if this pool is linked to a merchant checkout session
         const merchantSession = await storage.getMerchantCheckoutSessionByPoolId(pool.id);
-        if (merchantSession && merchantSession.status === 'collecting') {
-          // Complete the checkout session
-          await storage.updateCheckoutSessionStatus(
-            merchantSession.id, 
-            'completed', 
-            newPoolAmount
-          );
-          
+        // Atomically claim the collecting->completed transition so merchant stats
+        // are credited exactly once even if the Stripe webhook races this handler.
+        if (merchantSession && merchantSession.status === 'collecting' &&
+            await storage.completeCheckoutSessionIfCollecting(merchantSession.id, newPoolAmount)) {
           // Update merchant stats - add net amount to pending balance
           const netAmount = parseFloat(merchantSession.netAmount);
           const feeAmount = parseFloat(merchantSession.feeAmount);
           const totalAmount = parseFloat(merchantSession.amount);
           await storage.updateMerchantStats(merchantSession.merchantId, netAmount, feeAmount, totalAmount);
-          
+
           // Send webhook to merchant
           const merchant = await storage.getMerchant(merchantSession.merchantId);
           if (merchant?.webhookUrl) {
@@ -4097,23 +4105,25 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Withdrawal already processed" });
       }
 
-      // Refund the user's balance
-      const withdrawalUser = await storage.getUser(withdrawal.userId);
-      if (withdrawalUser) {
-        const currentBalance = parseFloat(withdrawalUser.balance);
-        const refundAmount = parseFloat(withdrawal.amount);
-        const newBalance = (currentBalance + refundAmount).toFixed(2);
-        await storage.updateUser(withdrawal.userId, { balance: newBalance });
-      }
-
-      await db.update(walletWithdrawals)
-        .set({ 
+      // Atomically claim the pending->rejected transition first. If no row is
+      // affected, another request already processed it — do NOT refund again.
+      const claimed = await db.update(walletWithdrawals)
+        .set({
           status: 'rejected',
           processedAt: new Date(),
           processedBy: req.adminUser.id,
           adminNotes: reason || null,
         })
-        .where(eq(walletWithdrawals.id, id));
+        .where(and(eq(walletWithdrawals.id, id), eq(walletWithdrawals.status, 'pending_review')))
+        .returning({ id: walletWithdrawals.id });
+
+      if (claimed.length === 0) {
+        return res.status(400).json({ error: "Withdrawal already processed" });
+      }
+
+      // Refund the user's balance atomically (only once, now that we own the transition)
+      const withdrawalUser = await storage.getUser(withdrawal.userId);
+      await storage.atomicCreditUserBalance(withdrawal.userId, parseFloat(withdrawal.amount));
 
       // Log admin action
       await db.insert(adminAuditLogs).values({
@@ -7192,7 +7202,7 @@ export async function registerRoutes(
     const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
 
     const keyRecord = await storage.getMerchantApiKeyByPrefix(fullPrefix);
-    if (!keyRecord || keyRecord.keyHash !== keyHash) {
+    if (!keyRecord || !safeEqual(keyRecord.keyHash, keyHash)) {
       return res.status(401).json({ error: "Invalid API key" });
     }
 
@@ -7448,6 +7458,13 @@ export async function registerRoutes(
   // Helper function to send webhooks to merchants
   async function sendMerchantWebhook(merchant: any, sessionId: string, event: string, payload: any) {
     if (!merchant.webhookUrl) return;
+
+    // SSRF guard: never let a merchant-controlled URL reach internal services
+    const safe = await assertSafeOutboundUrl(merchant.webhookUrl);
+    if (!safe.ok) {
+      console.error(`[ChipInPay Webhook] Refusing to deliver to unsafe URL (${safe.reason}): ${merchant.webhookUrl}`);
+      return;
+    }
 
     try {
       const crypto = await import('crypto');

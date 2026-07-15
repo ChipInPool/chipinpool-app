@@ -287,20 +287,16 @@ export class WebhookHandlers {
           
           // Check if this pool is linked to a merchant checkout session
           const merchantSession = await storage.getMerchantCheckoutSessionByPoolId(pool.id);
-          if (merchantSession && merchantSession.status === 'collecting') {
-            // Complete the checkout session
-            await storage.updateCheckoutSessionStatus(
-              merchantSession.id, 
-              'completed', 
-              pool.currentAmount
-            );
-            
+          // Atomically claim the collecting->completed transition so merchant
+          // stats are credited exactly once even if this races the API handler.
+          if (merchantSession && merchantSession.status === 'collecting' &&
+              await storage.completeCheckoutSessionIfCollecting(merchantSession.id, pool.currentAmount)) {
             // Update merchant stats - add net amount to pending balance
             const netAmount = parseFloat(merchantSession.netAmount);
             const feeAmount = parseFloat(merchantSession.feeAmount);
             const totalAmount = parseFloat(merchantSession.amount);
             await storage.updateMerchantStats(merchantSession.merchantId, netAmount, feeAmount, totalAmount);
-            
+
             // Send webhook to merchant
             const merchant = await storage.getMerchant(merchantSession.merchantId);
             if (merchant?.webhookUrl) {
@@ -330,7 +326,15 @@ export class WebhookHandlers {
   // Helper method to send merchant webhooks
   static async sendMerchantWebhook(merchant: any, sessionId: string, eventType: string, payload: any): Promise<void> {
     if (!merchant.webhookUrl) return;
-    
+
+    // SSRF guard: never let a merchant-controlled URL reach internal services
+    const { assertSafeOutboundUrl } = await import('./ssrfGuard');
+    const safe = await assertSafeOutboundUrl(merchant.webhookUrl);
+    if (!safe.ok) {
+      console.error(`[Webhook] Refusing to deliver to unsafe URL (${safe.reason}): ${merchant.webhookUrl}`);
+      return;
+    }
+
     const crypto = await import('crypto');
     const timestamp = Math.floor(Date.now() / 1000);
     const payloadString = JSON.stringify(payload);

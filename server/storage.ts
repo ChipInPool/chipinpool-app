@@ -182,6 +182,7 @@ export interface IStorage {
   getMerchantCheckoutSessionByPoolId(poolId: string): Promise<MerchantCheckoutSession | undefined>;
   getMerchantCheckoutSessions(merchantId: string): Promise<MerchantCheckoutSession[]>;
   updateCheckoutSessionStatus(id: string, status: string, collectedAmount?: string): Promise<void>;
+  completeCheckoutSessionIfCollecting(id: string, collectedAmount?: string): Promise<boolean>;
   updateCheckoutSessionPool(id: string, poolId: string): Promise<void>;
   getExpiredCheckoutSessions(): Promise<MerchantCheckoutSession[]>;
   updateMerchantStats(merchantId: string, netAmount: number, feeAmount: number, totalAmount: number): Promise<void>;
@@ -896,6 +897,19 @@ export class DatabaseStorage implements IStorage {
     if (collectedAmount) updateData.collectedAmount = collectedAmount;
     if (status === 'completed') updateData.completedAt = new Date();
     await db.update(merchantCheckoutSessions).set(updateData).where(eq(merchantCheckoutSessions.id, id));
+  }
+
+  // Atomically transition a session from 'collecting' to 'completed'. Returns
+  // true only for the caller that actually performed the transition, so merchant
+  // stats/payouts are credited exactly once even if two events race.
+  async completeCheckoutSessionIfCollecting(id: string, collectedAmount?: string): Promise<boolean> {
+    const updateData: any = { status: 'completed', completedAt: new Date() };
+    if (collectedAmount) updateData.collectedAmount = collectedAmount;
+    const rows = await db.update(merchantCheckoutSessions)
+      .set(updateData)
+      .where(and(eq(merchantCheckoutSessions.id, id), eq(merchantCheckoutSessions.status, 'collecting')))
+      .returning({ id: merchantCheckoutSessions.id });
+    return rows.length > 0;
   }
 
   async updateCheckoutSessionPool(id: string, poolId: string): Promise<void> {
