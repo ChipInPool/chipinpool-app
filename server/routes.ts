@@ -18,12 +18,14 @@ import { sendPoolInviteEmail } from "./resendClient";
 import { sendPoolInviteSMS } from "./clicksendClient";
 import { awardContributionPoints, awardPoolCreationPoints, awardPoolCompletionPoints } from "./gamification";
 import { 
-  generateOTP, 
-  generate2FASecret, 
-  generate2FAQRCode, 
+  generateOTP,
+  generate2FASecret,
+  generate2FAQRCode,
   verify2FAToken,
   hashTransactionPin,
-  verifyTransactionPin
+  verifyTransactionPin,
+  generateInviteCode,
+  safeEqual
 } from "./verificationService";
 import {
   sendPoolContributionNotification,
@@ -210,14 +212,61 @@ export async function registerRoutes(
     next();
   };
 
+  // Returns true if the user may view a pool's private data: the creator, any
+  // contributor, an invited user (by id/email/phone), or — for public pools —
+  // any authenticated user. Preserves the invite/share flow while blocking IDOR.
+  const canViewPool = async (pool: { id: string; creatorId: string; isPublic?: boolean | null }, userId: string): Promise<boolean> => {
+    if (pool.creatorId === userId) return true;
+    if (pool.isPublic) return true;
+    const poolContributions = await storage.getContributionsByPool(pool.id);
+    if (poolContributions.some((c: any) => c.userId === userId)) return true;
+    const [invitesForPool, viewer] = await Promise.all([
+      storage.getPoolInvites(pool.id),
+      storage.getUser(userId),
+    ]);
+    return invitesForPool.some((inv: any) =>
+      inv.inviteeId === userId ||
+      (viewer?.email && inv.inviteeEmail && inv.inviteeEmail.toLowerCase() === viewer.email.toLowerCase()) ||
+      (viewer?.phone && inv.inviteePhone && inv.inviteePhone === viewer.phone)
+    );
+  };
+
+  // Strip a user record down to fields that are safe to expose to other users.
+  const publicUserFields = (user: any) => user ? ({
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    username: user.username,
+    avatar: user.avatar,
+    isVerified: user.isVerified,
+    kycStatus: user.kycStatus,
+  }) : null;
+
+  // Public-profile projection. Never leak email/phone/balance/Stripe/Plaid
+  // tokens/PIN/2FA secrets to other users; only the owner sees contact fields.
+  const publicProfileFields = (user: any, isOwner: boolean) => ({
+    id: user.id,
+    username: user.username,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    avatar: user.avatar,
+    bio: user.bio,
+    location: user.location,
+    isPublic: user.isPublic,
+    isVerified: user.isVerified,
+    kycStatus: user.kycStatus,
+    createdAt: user.createdAt,
+    ...(isOwner ? { email: user.email, phone: user.phone } : {}),
+  });
+
   // Phone verification routes - rate limited to prevent abuse
   app.post("/api/auth/send-phone-code", authRateLimiter, async (req, res, next) => {
     try {
       const { phone: rawPhone } = sendPhoneCodeSchema.parse(req.body);
       const phone = normalizePhone(rawPhone);
       
-      // Generate 6-digit code
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      // Generate cryptographically secure 6-digit code
+      const code = generateOTP();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
       
       // Delete any existing codes for this phone
@@ -1365,7 +1414,11 @@ export async function registerRoutes(
     try {
       const pool = await storage.getPool(req.params.id);
       if (!pool) return res.status(404).json({ message: "Pool not found" });
-      
+
+      if (!(await canViewPool(pool, req.session.userId!))) {
+        return res.status(403).json({ message: "Not authorized to view this pool" });
+      }
+
       const activities = await storage.getPoolActivities(req.params.id);
       const poolContributions = await storage.getContributionsByPool(req.params.id);
       
@@ -1420,6 +1473,10 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Pool not found" });
       }
 
+      if (!(await canViewPool(pool, req.session.userId!))) {
+        return res.status(403).json({ message: "Not authorized to view this pool" });
+      }
+
       const [creator, contributions, comments] = await Promise.all([
         storage.getUser(pool.creatorId),
         storage.getContributionsByPool(pool.id),
@@ -1440,7 +1497,7 @@ export async function registerRoutes(
           const user = await storage.getUser(c.userId);
           const badges = await storage.getUserBadges(c.userId);
           return {
-            user: user ? { ...user, badges, password: undefined } : null,
+            user: user ? { ...publicUserFields(user), badges } : null,
             amount: c.amount,
             date: c.createdAt.toISOString(),
           };
@@ -1455,7 +1512,7 @@ export async function registerRoutes(
           return {
             id: c.id,
             userId: c.userId,
-            user: user ? { ...user, badges, password: undefined } : null,
+            user: user ? { ...publicUserFields(user), badges } : null,
             text: c.text,
             timestamp: c.createdAt.toISOString(),
             likes: c.likes,
@@ -1468,7 +1525,7 @@ export async function registerRoutes(
       res.json({
         pool: {
           ...pool,
-          creator: creator ? { ...creator, badges, password: undefined } : null,
+          creator: creator ? { ...publicUserFields(creator), badges } : null,
           contributors: contributorsData.filter((c) => c.user !== null),
           comments: commentsData.filter((c) => c.user !== null),
         },
@@ -2316,16 +2373,15 @@ export async function registerRoutes(
 
       const totalRaised = createdPools.reduce((sum: number, pool: any) => sum + parseFloat(pool.currentAmount || '0'), 0);
 
-      const { password, ...userWithoutPassword } = user;
       res.json({
         user: {
-          ...userWithoutPassword,
+          ...publicProfileFields(user, isOwner),
           badges,
           followerCount: followersCount,
           followingCount,
           poolsCreated: createdPools.length,
         },
-        pools: createdPools,
+        pools: isOwner ? createdPools : createdPools.filter((p: any) => p.isPublic),
         poolsJoined: contributedPools.length,
         totalRaised: totalRaised.toFixed(2),
         isFollowing: isViewerFollowing,
@@ -2339,10 +2395,15 @@ export async function registerRoutes(
 
   app.get("/api/users/:id/pools", requireAuth, async (req, res, next) => {
     try {
-      const [createdPools, contributedPools] = await Promise.all([
+      const isOwner = req.session.userId === req.params.id;
+      const [createdPoolsRaw, contributedPoolsRaw] = await Promise.all([
         storage.getPoolsByCreator(req.params.id),
         storage.getPoolsByContributor(req.params.id),
       ]);
+
+      // Other users only see the target's public pools
+      const createdPools = isOwner ? createdPoolsRaw : createdPoolsRaw.filter((p: any) => p.isPublic);
+      const contributedPools = isOwner ? contributedPoolsRaw : contributedPoolsRaw.filter((p: any) => p.isPublic);
 
       res.json({ createdPools, contributedPools });
     } catch (error) {
@@ -2407,16 +2468,15 @@ export async function registerRoutes(
 
       const totalRaised = createdPools.reduce((sum, pool) => sum + parseFloat(pool.currentAmount || '0'), 0);
 
-      const { password, ...userWithoutPassword } = user;
       res.json({
         user: {
-          ...userWithoutPassword,
+          ...publicProfileFields(user, isOwner),
           badges,
           followerCount: followersCount,
           followingCount,
           poolsCreated: createdPools.length,
         },
-        pools: createdPools,
+        pools: isOwner ? createdPools : createdPools.filter((p: any) => p.isPublic),
         poolsJoined: contributedPools.length,
         totalRaised: totalRaised.toFixed(2),
         isFollowing: isViewerFollowing,
@@ -2657,6 +2717,12 @@ export async function registerRoutes(
 
   app.get("/api/pools/:id/invites", requireAuth, async (req, res, next) => {
     try {
+      // Invitee contact details are private to the pool creator
+      const pool = await storage.getPool(req.params.id);
+      if (!pool) return res.status(404).json({ message: "Pool not found" });
+      if (pool.creatorId !== req.session.userId) {
+        return res.status(403).json({ message: "Only the pool creator can view invites" });
+      }
       const invites = await storage.getPoolInvites(req.params.id);
       res.json({ invites });
     } catch (error) {
@@ -3218,6 +3284,10 @@ export async function registerRoutes(
       const pool = await storage.getPool(req.params.id);
       if (!pool) {
         return res.status(404).json({ message: "Pool not found" });
+      }
+
+      if (!(await canViewPool(pool, req.session.userId!))) {
+        return res.status(403).json({ message: "Not authorized to view this pool" });
       }
 
       const contributions = await storage.getRecurringContributionsByPool(pool.id);
@@ -4084,9 +4154,19 @@ export async function registerRoutes(
     try {
       const stripe = await getUncachableStripeClient();
       const { paymentMethodId } = req.params;
-      
+
       const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
-      
+
+      // Ownership check: the payment method must belong to the caller's Stripe
+      // customer, otherwise anyone could read another user's bank details.
+      const user = await storage.getUser(req.session.userId!);
+      const pmCustomer = typeof paymentMethod.customer === 'string'
+        ? paymentMethod.customer
+        : paymentMethod.customer?.id;
+      if (!user?.stripeCustomerId || pmCustomer !== user.stripeCustomerId) {
+        return res.status(403).json({ error: "Not authorized to view this payment method" });
+      }
+
       // Return only the necessary fields
       res.json({
         id: paymentMethod.id,
@@ -8787,7 +8867,7 @@ export async function registerRoutes(
 
   app.get("/api/card-analytics", requireAuth, async (req: any, res, next) => {
     try {
-      const userPools = await db.select().from(pools).where(eq(pools.creatorId, req.user!.id));
+      const userPools = await db.select().from(pools).where(eq(pools.creatorId, req.session.userId!));
       const poolIds = userPools.map(p => p.id);
       
       if (poolIds.length === 0) {
@@ -8870,7 +8950,11 @@ export async function registerRoutes(
       if (!pool) {
         return res.status(404).json({ error: "Pool not found" });
       }
-      
+      // Ownership check: only the pool creator may view its card + transactions
+      if (pool.creatorId !== req.session.userId) {
+        return res.status(403).json({ error: "Not authorized to view this pool's card analytics" });
+      }
+
       const [card] = await db.select().from(virtualCards).where(eq(virtualCards.poolId, poolId));
       if (!card) {
         return res.json({
@@ -9348,12 +9432,12 @@ export async function registerRoutes(
         note: z.string().optional(),
         expiresInDays: z.number().int().min(1).max(365).optional(),
       }).parse(req.body);
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
+      const code = generateInviteCode(10);
       const expiresAt = data.expiresInDays ? new Date(Date.now() + data.expiresInDays * 86400000) : null;
       const [invite] = await db.insert(betaInvites).values({
         code,
         email: data.email,
-        createdBy: req.user!.id,
+        createdBy: req.session.userId!,
         maxUses: data.maxUses,
         note: data.note,
         expiresAt: expiresAt ?? undefined,
@@ -9400,12 +9484,12 @@ export async function registerRoutes(
       const [entry] = await db.select().from(waitlist).where(eq(waitlist.id, req.params.id)).limit(1);
       if (!entry) return res.status(404).json({ message: "Waitlist entry not found." });
 
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
+      const code = generateInviteCode(10);
       const expiresAt = new Date(Date.now() + 30 * 86400000); // 30 days
       const [invite] = await db.insert(betaInvites).values({
         code,
         email: entry.email,
-        createdBy: req.user!.id,
+        createdBy: req.session.userId!,
         maxUses: 1,
         note: `Invited from waitlist: ${entry.firstName} ${entry.lastName}`,
         expiresAt,
@@ -9414,7 +9498,8 @@ export async function registerRoutes(
       await db.update(waitlist).set({ invitedAt: new Date(), inviteCode: code }).where(eq(waitlist.id, entry.id));
 
       // Send invite email
-      const { sendEmail, emailWrapper, emailButton } = await import('./emailTemplates.js');
+      const { sendEmail } = await import('./notificationService');
+      const { emailWrapper, emailButton } = await import('./emailTemplates');
       const body = `
         <h2 style="color:#001F3F;margin:0 0 16px">You're invited to ChipIn! 🎉</h2>
         <p>Hi ${entry.firstName},</p>
@@ -9426,11 +9511,11 @@ export async function registerRoutes(
         <p>This code expires in 30 days and can only be used once. Head to chipinpool.com to create your account.</p>
         ${emailButton('Create My Account', 'https://chipinpool.com/register?invite=' + code)}
       `;
-      await sendEmail({
-        to: entry.email,
-        subject: "You're invited to ChipIn Beta!",
-        html: emailWrapper({ body, preheaderText: `Your ChipIn Beta invite code: ${code}` }),
-      });
+      await sendEmail(
+        entry.email,
+        "You're invited to ChipIn Beta!",
+        emailWrapper({ body, preheaderText: `Your ChipIn Beta invite code: ${code}` }),
+      );
 
       res.json({ message: `Invite sent to ${entry.email}`, invite });
     } catch (error) {

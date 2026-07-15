@@ -4,7 +4,27 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 
 export function generateOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  // Cryptographically secure 6-digit code (Math.random is predictable/seed-recoverable)
+  return crypto.randomInt(100000, 1000000).toString();
+}
+
+// Constant-time string comparison to avoid timing side-channels
+export function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+// Cryptographically secure alphanumeric invite/beta code (unambiguous charset)
+export function generateInviteCode(length = 10): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = crypto.randomBytes(length);
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    out += alphabet[bytes[i] % alphabet.length];
+  }
+  return out;
 }
 
 export function generate2FASecret(email: string): { secret: string; otpauthUrl: string } {
@@ -21,7 +41,7 @@ export function verify2FAToken(secret: string, token: string): boolean {
   const counter = Math.floor(Date.now() / 30000);
   for (let i = -1; i <= 1; i++) {
     const expectedToken = generateTOTP(secret, counter + i);
-    if (expectedToken === token) return true;
+    if (safeEqual(expectedToken, token)) return true;
   }
   return false;
 }
