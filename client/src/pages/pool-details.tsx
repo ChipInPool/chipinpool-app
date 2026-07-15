@@ -945,8 +945,13 @@ export default function PoolDetails() {
                                       if (user && value === user.id) {
                                         setDistributionFromContributor(index, { id: user.id, name: `${user.firstName} ${user.lastName} (My Wallet)` });
                                       } else {
-                                        const contributor = contributors.find((c: any) => c.id === value);
-                                        if (contributor) setDistributionFromContributor(index, contributor);
+                                        const contributor = contributors.find((c: any) => c.user?.id === value);
+                                        if (contributor?.user) {
+                                          setDistributionFromContributor(index, {
+                                            id: contributor.user.id,
+                                            name: `${contributor.user.firstName || ''} ${contributor.user.lastName || ''}`.trim() || contributor.user.username || 'Contributor',
+                                          });
+                                        }
                                       }
                                     }}
                                   >
@@ -959,9 +964,15 @@ export default function PoolDetails() {
                                           {user.firstName} {user.lastName} (My Wallet)
                                         </SelectItem>
                                       )}
-                                      {contributors.filter((c: any) => c.id && c.id !== user?.id).map((c: any) => (
-                                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                      ))}
+                                      {contributors
+                                        .filter((c: any) => c.user?.id && c.user.id !== user?.id)
+                                        // de-dupe repeat contributors by user id
+                                        .filter((c: any, i: number, arr: any[]) => arr.findIndex((x: any) => x.user?.id === c.user?.id) === i)
+                                        .map((c: any) => (
+                                          <SelectItem key={c.user.id} value={c.user.id}>
+                                            {`${c.user.firstName || ''} ${c.user.lastName || ''}`.trim() || c.user.username || 'Contributor'}
+                                          </SelectItem>
+                                        ))}
                                     </SelectContent>
                                   </Select>
                                   <Input

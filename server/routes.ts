@@ -1498,7 +1498,9 @@ export async function registerRoutes(
       
       const raised = parseFloat(pool.currentAmount);
       const spent = parseFloat(pool.spentAmount);
-      const remaining = parseFloat(pool.currentAmount);
+      // Remaining is what's still available to spend: current balance minus what
+      // has already been spent (previously this incorrectly equalled "raised").
+      const remaining = Math.max(raised - spent, 0);
       
       res.json({
         activities: allActivities,
@@ -1937,7 +1939,7 @@ export async function registerRoutes(
       res.json({
         comment: {
           ...comment,
-          user: user ? { ...user, badges, password: undefined } : null,
+          user: user ? { ...publicUserFields(user), badges } : null,
           timestamp: comment.createdAt.toISOString(),
         },
       });
@@ -1995,6 +1997,12 @@ export async function registerRoutes(
       const user = await storage.getUser(req.session.userId!);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
+      }
+
+      // Require identity verification before any payout (consistent with the
+      // other withdrawal endpoints)
+      if (user.kycStatus !== 'verified') {
+        return res.status(400).json({ message: "Please complete identity verification before withdrawing" });
       }
 
       // Require the transaction PIN if the user has set one
