@@ -467,9 +467,9 @@ export default function Home() {
                   </div>
                 ) : (
                   <div className="divide-y divide-white/[0.06]">
-                    {recentNotifications.map((notification: any) => (
-                      <Link key={notification.id} href={notification.link || '#'}>
-                        <div className={`p-3.5 hover:bg-white/[0.04] transition-colors cursor-pointer ${!notification.read ? 'bg-primary/[0.06] border-l-2 border-l-primary' : ''}`}>
+                    {recentNotifications.map((notification: any) => {
+                      const inner = (
+                        <div className={`p-3.5 hover:bg-white/[0.04] transition-colors ${notification.link ? 'cursor-pointer' : ''} ${!notification.read ? 'bg-primary/[0.06] border-l-2 border-l-primary' : ''}`}>
                           <div className="flex items-start gap-3">
                             <div className={`p-2 rounded-lg ${!notification.read ? 'bg-primary/10' : 'bg-white/[0.05]'}`}>
                               <Clock className="w-3.5 h-3.5 text-muted-foreground/60" />
@@ -477,14 +477,19 @@ export default function Home() {
                             <div className="flex-1 min-w-0">
                               <p className="text-[13px] font-semibold leading-snug truncate">{notification.title}</p>
                               <p className="text-xs text-muted-foreground/60 line-clamp-2 mt-0.5 leading-relaxed">{notification.message}</p>
-                              <p className="text-[10px] text-muted-foreground/40 mt-1.5">
+                              <p className="text-[10px] text-muted-foreground/50 mt-1.5">
                                 {format(new Date(notification.createdAt), 'MMM d, h:mm a')}
                               </p>
                             </div>
                           </div>
                         </div>
-                      </Link>
-                    ))}
+                      );
+                      // Only wrap in a link when the notification actually points somewhere;
+                      // a dead "#" link scrolled to top and did nothing.
+                      return notification.link
+                        ? <Link key={notification.id} href={notification.link}>{inner}</Link>
+                        : <div key={notification.id}>{inner}</div>;
+                    })}
                   </div>
                 )}
               </CardContent>

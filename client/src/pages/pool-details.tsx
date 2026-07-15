@@ -386,6 +386,15 @@ export default function PoolDetails() {
   const remainingBalance = parseFloat(pool?.currentAmount || '0');
 
   const handleChipIn = async () => {
+    const chipInValue = parseFloat(chipInAmount);
+    if (isNaN(chipInValue) || chipInValue < 1) {
+      toast({ title: "Invalid amount", description: "Please enter an amount of at least $1.", variant: "destructive" });
+      return;
+    }
+    if (paymentMethod === 'balance' && chipInValue > parseFloat(user?.balance || '0')) {
+      toast({ title: "Insufficient balance", description: "Add funds to your wallet or choose another payment method.", variant: "destructive" });
+      return;
+    }
     setIsChippingIn(true);
     try {
       if (paymentMethod === 'stripe') {
@@ -625,7 +634,7 @@ export default function PoolDetails() {
             <div className={`relative rounded-3xl overflow-hidden border border-white/5 bg-card/50 ${pool.image ? 'aspect-video' : ''}`}>
               {pool.image && (
                 <>
-                  <img src={pool.image} className="w-full h-full object-cover" />
+                  <img src={pool.image} alt={pool.title} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-linear-to-t from-background/90 via-transparent to-transparent" />
                 </>
               )}
@@ -1058,6 +1067,7 @@ export default function PoolDetails() {
                   <DialogContent className="sm:max-w-md bg-card border-white/10">
                     <DialogHeader>
                       <DialogTitle>Chip in to {pool.title}</DialogTitle>
+                      <DialogDescription>Enter an amount and choose how you'd like to pay.</DialogDescription>
                     </DialogHeader>
                     
                     {paymentStep === 'amount' ? (
@@ -1227,7 +1237,7 @@ export default function PoolDetails() {
                             {isChippingIn ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</> : "Continue to Payment"}
                           </Button>
                         ) : (
-                          <Button type="button" className="w-full sm:w-auto font-bold" onClick={() => setPaymentStep('method')} disabled={!chipInAmount}>
+                          <Button type="button" className="w-full sm:w-auto font-bold" onClick={() => setPaymentStep('method')} disabled={!chipInAmount || parseFloat(chipInAmount) < 1}>
                             Continue
                           </Button>
                         )

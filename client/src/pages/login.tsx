@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
-import { Loader2, Shield, CheckCircle2, ArrowRight, Phone, Mail, Calendar, User, AlertCircle, Check, ArrowLeft, Key, Lock } from "lucide-react";
+import { Loader2, Shield, CheckCircle2, ArrowRight, Phone, Mail, Calendar, User, AlertCircle, Check, ArrowLeft, Key, KeyRound, Lock } from "lucide-react";
 
 type LoginMethod = 'email' | 'username' | 'phone';
 type ForgotMethod = 'email' | 'phone';
