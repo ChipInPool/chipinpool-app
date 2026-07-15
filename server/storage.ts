@@ -28,6 +28,12 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserBalance(id: string, amount: string): Promise<void>;
   updateUserStats(id: string, poolsCreated?: number, totalContributed?: string): Promise<void>;
+  // Atomic, concurrency-safe money movement (guarded so balances can never go negative)
+  atomicDebitUserBalance(id: string, amount: number): Promise<boolean>;
+  atomicCreditUserBalance(id: string, amount: number): Promise<void>;
+  atomicDebitPoolAmount(id: string, amount: number): Promise<boolean>;
+  atomicCreditPoolAmount(id: string, amount: number): Promise<void>;
+  contributeFromWallet(userId: string, poolId: string, amount: number, amountStr: string): Promise<Contribution | null>;
   
   // Pool operations
   getPool(id: string): Promise<Pool | undefined>;
@@ -65,6 +71,7 @@ export interface IStorage {
   getVirtualCardById(id: string): Promise<VirtualCard | undefined>;
   createVirtualCard(card: InsertVirtualCard): Promise<VirtualCard>;
   updateCardBalance(id: string, amount: string): Promise<void>;
+  atomicDebitCardBalance(id: string, amount: number): Promise<boolean>;
   
   // Transaction operations
   getTransactionsByCard(virtualCardId: string): Promise<Transaction[]>;
@@ -206,6 +213,70 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserBalance(id: string, amount: string): Promise<void> {
     await db.update(users).set({ balance: amount }).where(eq(users.id, id));
+  }
+
+  // Atomically decrement a user's balance only if sufficient funds exist.
+  // Returns true if the debit succeeded, false if funds were insufficient.
+  // Guarded at the SQL layer so concurrent requests cannot double-spend.
+  async atomicDebitUserBalance(id: string, amount: number): Promise<boolean> {
+    const result = await db.update(users)
+      .set({ balance: sql`${users.balance} - ${amount}` })
+      .where(and(eq(users.id, id), sql`${users.balance} >= ${amount}`))
+      .returning({ id: users.id });
+    return result.length > 0;
+  }
+
+  async atomicCreditUserBalance(id: string, amount: number): Promise<void> {
+    await db.update(users)
+      .set({ balance: sql`${users.balance} + ${amount}` })
+      .where(eq(users.id, id));
+  }
+
+  // Atomically decrement a pool's balance only if sufficient funds exist.
+  async atomicDebitPoolAmount(id: string, amount: number): Promise<boolean> {
+    const result = await db.update(pools)
+      .set({ currentAmount: sql`${pools.currentAmount} - ${amount}`, updatedAt: new Date() })
+      .where(and(eq(pools.id, id), sql`${pools.currentAmount} >= ${amount}`))
+      .returning({ id: pools.id });
+    return result.length > 0;
+  }
+
+  async atomicCreditPoolAmount(id: string, amount: number): Promise<void> {
+    await db.update(pools)
+      .set({ currentAmount: sql`${pools.currentAmount} + ${amount}`, updatedAt: new Date() })
+      .where(eq(pools.id, id));
+  }
+
+  // Full wallet-funded contribution as a single atomic transaction: debit the
+  // user's wallet (guarded), credit the pool, and record the contribution.
+  // Returns the created contribution, or null if the wallet had insufficient funds.
+  async contributeFromWallet(userId: string, poolId: string, amount: number, amountStr: string): Promise<Contribution | null> {
+    return await db.transaction(async (tx) => {
+      const debited = await tx.update(users)
+        .set({
+          balance: sql`${users.balance} - ${amount}`,
+          totalContributed: sql`${users.totalContributed} + ${amount}`,
+        })
+        .where(and(eq(users.id, userId), sql`${users.balance} >= ${amount}`))
+        .returning({ id: users.id });
+
+      if (debited.length === 0) {
+        return null;
+      }
+
+      const [contribution] = await tx.insert(contributions).values({
+        poolId,
+        userId,
+        amount: amountStr,
+      }).returning();
+
+      await tx.update(pools).set({
+        currentAmount: sql`${pools.currentAmount} + ${amount}`,
+        updatedAt: new Date(),
+      }).where(eq(pools.id, poolId));
+
+      return contribution;
+    });
   }
 
   async updateUserStats(id: string, poolsCreated?: number, totalContributed?: string): Promise<void> {
@@ -414,6 +485,15 @@ export class DatabaseStorage implements IStorage {
 
   async updateCardBalance(id: string, amount: string): Promise<void> {
     await db.update(virtualCards).set({ balance: amount }).where(eq(virtualCards.id, id));
+  }
+
+  // Atomically decrement a card's balance only if sufficient funds exist.
+  async atomicDebitCardBalance(id: string, amount: number): Promise<boolean> {
+    const result = await db.update(virtualCards)
+      .set({ balance: sql`${virtualCards.balance} - ${amount}` })
+      .where(and(eq(virtualCards.id, id), sql`${virtualCards.balance} >= ${amount}`))
+      .returning({ id: virtualCards.id });
+    return result.length > 0;
   }
 
   async getTransactionsByCard(virtualCardId: string): Promise<Transaction[]> {

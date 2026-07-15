@@ -1616,9 +1616,14 @@ export async function registerRoutes(
 
   app.post("/api/pools/:id/contribute", requireAuth, async (req, res, next) => {
     try {
-      const { amount } = z.object({ amount: z.string() }).parse(req.body);
+      const { amount } = z.object({
+        amount: z.string().refine((val) => {
+          const num = parseFloat(val);
+          return !isNaN(num) && num > 0 && num <= 1000000;
+        }, "Amount must be a positive number"),
+      }).parse(req.body);
       const pool = await storage.getPool(req.params.id);
-      
+
       if (!pool) {
         return res.status(404).json({ message: "Pool not found" });
       }
@@ -1632,20 +1637,15 @@ export async function registerRoutes(
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Check if user has enough balance
-      const userBalance = parseFloat(user.balance);
       const contributionAmount = parseFloat(amount);
-      
-      if (userBalance < contributionAmount) {
+
+      // Atomically debit the wallet, credit the pool, and record the contribution.
+      // The guarded SQL decrement prevents double-spend under concurrent requests
+      // and rejects the contribution when funds are insufficient.
+      const contribution = await storage.contributeFromWallet(user.id, pool.id, contributionAmount, amount);
+      if (!contribution) {
         return res.status(400).json({ message: "Insufficient balance" });
       }
-
-      // Create contribution
-      const contribution = await storage.createContribution({
-        poolId: pool.id,
-        userId: user.id,
-        amount,
-      });
 
       // Record pool activity for contribution
       await storage.createPoolActivity({
@@ -1657,16 +1657,8 @@ export async function registerRoutes(
         referenceId: contribution.id,
       });
 
-      // Update pool amount
+      // Recompute derived amount for downstream notification/milestone logic
       const newPoolAmount = (parseFloat(pool.currentAmount) + contributionAmount).toFixed(2);
-      await storage.updatePoolAmount(pool.id, newPoolAmount);
-
-      // Update user balance and stats
-      const newUserBalance = (userBalance - contributionAmount).toFixed(2);
-      await storage.updateUserBalance(user.id, newUserBalance);
-      
-      const newTotalContributed = (parseFloat(user.totalContributed) + contributionAmount).toFixed(2);
-      await storage.updateUserStats(user.id, undefined, newTotalContributed);
 
       // Get pool creator for notifications
       const poolCreator = await storage.getUser(pool.creatorId);
@@ -1904,14 +1896,13 @@ export async function registerRoutes(
         return res.status(404).json({ message: "User not found" });
       }
 
-      const currentBalance = parseFloat(user.balance);
-      if (currentBalance < withdrawAmount) {
+      // Atomic guarded debit prevents concurrent double-withdrawal
+      const debited = await storage.atomicDebitUserBalance(user.id, withdrawAmount);
+      if (!debited) {
         return res.status(400).json({ message: "Insufficient balance" });
       }
+      const newBalance = (parseFloat(user.balance) - withdrawAmount).toFixed(2);
 
-      const newBalance = (currentBalance - withdrawAmount).toFixed(2);
-      await storage.updateUserBalance(user.id, newBalance);
-      
       // Log the withdrawal
       await storage.createWalletWithdrawal(user.id, amount, bankAccountId);
 
@@ -2193,15 +2184,18 @@ export async function registerRoutes(
       const cardBalance = parseFloat(card.balance);
       const transactionAmount = parseFloat(data.amount);
 
-      if (cardBalance < transactionAmount) {
-        return res.status(400).json({ message: "Insufficient card balance" });
+      if (isNaN(transactionAmount) || transactionAmount <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
       }
 
-      const transaction = await storage.createTransaction(data);
-      
-      // Update card balance
+      // Atomic guarded debit prevents negative-amount inflation and concurrent overspend
+      const cardDebited = await storage.atomicDebitCardBalance(card.id, transactionAmount);
+      if (!cardDebited) {
+        return res.status(400).json({ message: "Insufficient card balance" });
+      }
       const newBalance = (cardBalance - transactionAmount).toFixed(2);
-      await storage.updateCardBalance(card.id, newBalance);
+
+      const transaction = await storage.createTransaction(data);
 
       // Record pool activity for spending
       await storage.createPoolActivity({
@@ -2702,11 +2696,14 @@ export async function registerRoutes(
   // Contribute to pool using linked bank account (ACH)
   app.post("/api/pools/:id/contribute-bank", requireAuth, async (req, res, next) => {
     try {
-      const { amount, bankAccountId } = z.object({ 
-        amount: z.string(),
+      const { amount, bankAccountId } = z.object({
+        amount: z.string().refine((val) => {
+          const num = parseFloat(val);
+          return !isNaN(num) && num > 0 && num <= 1000000;
+        }, "Amount must be a positive number"),
         bankAccountId: z.string(),
       }).parse(req.body);
-      
+
       const pool = await storage.getPool(req.params.id);
       if (!pool) {
         return res.status(404).json({ error: "Pool not found" });
@@ -3081,7 +3078,6 @@ export async function registerRoutes(
       if (!user) return res.status(404).json({ error: "User not found" });
 
       const contributionAmount = parseFloat(amount);
-      const userBalance = parseFloat(user.balance);
 
       if (paymentMethod === 'bank') {
         if (!bankAccountId) {
@@ -3171,16 +3167,14 @@ export async function registerRoutes(
           }
         }
       } else {
-        if (startImmediately && userBalance < contributionAmount) {
-          return res.status(400).json({ 
-            message: "Insufficient balance for the first contribution. Please add funds to your wallet." 
-          });
-        }
-
         if (startImmediately) {
-          await storage.updateUserBalance(userId, (userBalance - contributionAmount).toFixed(2));
-          await storage.createContribution({ poolId: pool.id, userId, amount });
-          await storage.updatePoolAmount(pool.id, (parseFloat(pool.currentAmount) + contributionAmount).toFixed(2));
+          // Atomic wallet debit + pool credit + contribution record (guarded, no double-spend)
+          const contribution = await storage.contributeFromWallet(userId, pool.id, contributionAmount, amount);
+          if (!contribution) {
+            return res.status(400).json({
+              message: "Insufficient balance for the first contribution. Please add funds to your wallet."
+            });
+          }
         }
       }
 
@@ -3547,16 +3541,19 @@ export async function registerRoutes(
       }
 
       const withdrawAmount = parseFloat(amount);
-      const currentBalance = parseFloat(user.balance);
-      
-      if (withdrawAmount <= 0 || withdrawAmount > currentBalance) {
+
+      if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
         return res.status(400).json({ error: "Invalid withdrawal amount" });
       }
 
+      // Atomic guarded debit prevents concurrent double-withdrawal
+      const debited = await storage.atomicDebitUserBalance(userId, withdrawAmount);
+      if (!debited) {
+        return res.status(400).json({ error: "Insufficient balance" });
+      }
+      const newBalance = (parseFloat(user.balance) - withdrawAmount).toFixed(2);
+
       // In production, this would initiate a real ACH transfer via Plaid Transfer API
-      const newBalance = (currentBalance - withdrawAmount).toFixed(2);
-      await storage.updateUser(userId, { balance: newBalance });
-      
       // Log the withdrawal
       await storage.createWalletWithdrawal(userId, amount, user.plaidAccountId);
 
@@ -3601,7 +3598,7 @@ export async function registerRoutes(
       const withdrawAmount = parseFloat(amount);
       const currentBalance = parseFloat(user.balance);
 
-      if (withdrawAmount <= 0) {
+      if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
         return res.status(400).json({ error: "Amount must be greater than zero" });
       }
 
@@ -3634,9 +3631,12 @@ export async function registerRoutes(
       const finalAccountType = savedMethod.accountType;
       const bankAccountIdRef = savedMethod.id;
 
-      // Deduct from user balance immediately
+      // Atomically deduct from user balance (guarded against concurrent double-withdrawal)
+      const debited = await storage.atomicDebitUserBalance(userId, withdrawAmount);
+      if (!debited) {
+        return res.status(400).json({ error: "Insufficient balance" });
+      }
       const newBalance = (currentBalance - withdrawAmount).toFixed(2);
-      await storage.updateUser(userId, { balance: newBalance });
 
       // Create withdrawal request with full bank details
       const accountLast4 = finalAccountNumber.slice(-4);
@@ -3653,8 +3653,7 @@ export async function registerRoutes(
         })
         .where(eq(walletWithdrawals.id, withdrawal.id));
 
-      console.log(`[Wallet Withdraw] Manual payout request created: ${withdrawal.id} for $${amount}`);
-      console.log(`[Wallet Withdraw] Bank: ${finalAccountHolderName}, Routing: ${finalRoutingNumber}, Account: ****${accountLast4}`);
+      console.log(`[Wallet Withdraw] Manual payout request created: ${withdrawal.id} for $${amount} (account ****${accountLast4})`);
 
       // Send admin notification email
       const { sendEmail } = await import('./notificationService');
@@ -4864,8 +4863,8 @@ export async function registerRoutes(
 
       const transferAmount = parseFloat(data.amount);
       const poolBalance = parseFloat(pool.currentAmount);
-      
-      if (transferAmount <= 0 || transferAmount > poolBalance) {
+
+      if (isNaN(transferAmount) || transferAmount <= 0 || transferAmount > poolBalance) {
         return res.status(400).json({ error: "Invalid transfer amount" });
       }
 
@@ -4897,6 +4896,14 @@ export async function registerRoutes(
         const instantFee = payoutSpeed === 'instant' ? transferAmount * INSTANT_FEE_RATE : 0;
         const netAmount = transferAmount - instantFee;
 
+        // Atomically deduct from pool first (guarded against concurrent double-drain).
+        // Only proceed to create the payout request if the debit succeeded.
+        const poolDebited = await storage.atomicDebitPoolAmount(poolId, transferAmount);
+        if (!poolDebited) {
+          return res.status(400).json({ error: "Insufficient pool balance" });
+        }
+        const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
+
         // Create transfer request
         const transfer = await storage.createPoolTransferRequest({
           poolId,
@@ -4906,10 +4913,6 @@ export async function registerRoutes(
           notes: data.notes,
           bankAccountId,
         });
-
-        // Deduct from pool immediately
-        const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
-        await storage.updatePoolAmount(poolId, newPoolAmount);
 
         // Record pool activity for withdrawal
         await storage.createPoolActivity({
@@ -5074,7 +5077,7 @@ export async function registerRoutes(
             await storage.updateWalletWithdrawalStatus(withdrawal.id, 'failed');
             
             if (plaidError.code === 'RTP_NOT_SUPPORTED') {
-              await storage.updatePoolAmount(poolId, poolBalance.toFixed(2));
+              await storage.atomicCreditPoolAmount(poolId, transferAmount);
               await storage.updatePoolTransferRequest(transfer.id, { status: 'pending' });
               return res.status(400).json({ 
                 error: 'Instant payout not available for this bank. Please use standard payout.',
@@ -5086,7 +5089,7 @@ export async function registerRoutes(
 
         // Handle payout failure
         if (payoutError) {
-          await storage.updatePoolAmount(poolId, poolBalance.toFixed(2));
+          await storage.atomicCreditPoolAmount(poolId, transferAmount);
           await storage.updatePoolTransferRequest(transfer.id, { status: 'failed' });
           return res.status(500).json({ 
             error: `Payout failed: ${payoutError}. Pool balance has been restored.`
@@ -5289,8 +5292,11 @@ export async function registerRoutes(
       const distributeSchema = z.object({
         distributions: z.array(z.object({
           userId: z.string(),
-          amount: z.string(),
-        })),
+          amount: z.string().refine((val) => {
+            const num = parseFloat(val);
+            return !isNaN(num) && num > 0 && num <= 1000000;
+          }, "Distribution amount must be a positive number"),
+        })).min(1),
         closePool: z.boolean().optional(),
       });
 
@@ -8665,7 +8671,7 @@ export async function registerRoutes(
 
   app.get("/api/mfa/status", requireAuth, async (req: any, res, next) => {
     try {
-      const status = await mfaService.getMFAStatus(req.user!.id);
+      const status = await mfaService.getMFAStatus(req.session.userId!);
       res.json(status);
     } catch (error) {
       next(error);
@@ -8674,7 +8680,7 @@ export async function registerRoutes(
 
   app.post("/api/mfa/setup", requireAuth, async (req: any, res, next) => {
     try {
-      const result = await mfaService.setupMFA(req.user!.id);
+      const result = await mfaService.setupMFA(req.session.userId!);
       res.json({ qrCode: result.qrCode, recoveryCodes: result.recoveryCodes });
     } catch (error) {
       next(error);
@@ -8688,7 +8694,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid token" });
       }
       
-      const success = await mfaService.enableMFA(req.user!.id, token);
+      const success = await mfaService.enableMFA(req.session.userId!, token);
       if (!success) {
         return res.status(400).json({ error: "Invalid verification code" });
       }
@@ -8706,7 +8712,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid token" });
       }
       
-      const success = await mfaService.disableMFA(req.user!.id, token);
+      const success = await mfaService.disableMFA(req.session.userId!, token);
       if (!success) {
         return res.status(400).json({ error: "Invalid verification code" });
       }
@@ -8717,13 +8723,13 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/mfa/verify", async (req, res, next) => {
+  app.post("/api/mfa/verify", requireAuth, async (req: any, res, next) => {
     try {
-      const { userId, token, recoveryCode } = req.body;
-      if (!userId) {
-        return res.status(400).json({ error: "User ID required" });
-      }
-      
+      const { token, recoveryCode } = req.body;
+      // Derive the user from the authenticated session — never trust a userId
+      // from the request body (that would be an unauthenticated brute-force oracle).
+      const userId = req.session.userId!;
+
       const ipAddress = req.ip;
       const userAgent = req.headers['user-agent'];
       
@@ -8753,18 +8759,18 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid token" });
       }
       
-      const [user] = await db.select().from(users).where(eq(users.id, req.user!.id));
+      const [user] = await db.select().from(users).where(eq(users.id, req.session.userId!));
       if (!user?.twoFactorSecret) {
         return res.status(400).json({ error: "MFA not enabled" });
       }
-      
+
       const { mfaService } = await import("./mfa-service");
       const isValid = mfaService.verifyToken(token, user.twoFactorSecret);
       if (!isValid) {
         return res.status(400).json({ error: "Invalid verification code" });
       }
-      
-      const recoveryCodes = await mfaService.generateRecoveryCodes(req.user!.id);
+
+      const recoveryCodes = await mfaService.generateRecoveryCodes(req.session.userId!);
       res.json({ recoveryCodes });
     } catch (error) {
       next(error);

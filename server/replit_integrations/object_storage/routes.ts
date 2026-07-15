@@ -4,7 +4,16 @@ import { fileStorageService, isAzureStorage } from "../../fileStorage";
 import express from "express";
 
 export function registerObjectStorageRoutes(app: Express): void {
-  app.post("/api/uploads/request-url", async (req, res) => {
+  // Require an authenticated session for all upload operations. Without this,
+  // anyone could obtain presigned upload URLs or push arbitrary blobs into storage.
+  const requireAuth = (req: any, res: any, next: any) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    next();
+  };
+
+  app.post("/api/uploads/request-url", requireAuth, async (req, res) => {
     try {
       const { name, size, contentType } = req.body;
 
@@ -42,7 +51,7 @@ export function registerObjectStorageRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/uploads/direct", express.raw({ type: ["image/*"], limit: "10mb" }), async (req, res) => {
+  app.post("/api/uploads/direct", requireAuth, express.raw({ type: ["image/*"], limit: "10mb" }), async (req, res) => {
     try {
       const contentType = req.headers["content-type"] || "application/octet-stream";
       const buffer = req.body as Buffer;
