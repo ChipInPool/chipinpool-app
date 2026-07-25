@@ -1,4 +1,5 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { QueryClient, QueryCache, QueryFunction } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -49,6 +50,22 @@ export const getQueryFn: <T>(options: {
   };
 
 export const queryClient = new QueryClient({
+  // Surface query failures as a toast so a network/server error is distinct from
+  // a genuinely empty result (which previously rendered the same empty state).
+  queryCache: new QueryCache({
+    onError: (error: any) => {
+      const message = error?.message || "";
+      // 401s are expected (logged-out) and handled by returnNull/redirects.
+      if (/^401[:\s]/.test(message) || /unauthorized|not authenticated/i.test(message)) {
+        return;
+      }
+      toast({
+        title: "Couldn't load data",
+        description: message || "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    },
+  }),
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),

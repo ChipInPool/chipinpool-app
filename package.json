@@ -9,7 +9,10 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
-    "db:push": "drizzle-kit push"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:push": "drizzle-kit push",
+    "encrypt:migrate": "tsx scripts/encrypt-existing-data.ts"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.30.0",
@@ -64,7 +67,7 @@
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.6",
     "date-fns": "^3.6.0",
-    "drizzle-orm": "^0.39.3",
+    "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.7.0",
     "embla-carousel-react": "^8.6.0",
     "expo-image-picker": "^17.0.10",
@@ -130,7 +133,8 @@
     "tailwindcss": "^4.1.14",
     "tsx": "^4.20.5",
     "typescript": "5.6.3",
-    "vite": "^7.1.9"
+    "vite": "^7.1.9",
+    "vitest": "^4.1.10"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"

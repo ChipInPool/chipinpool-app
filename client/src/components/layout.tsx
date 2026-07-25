@@ -89,7 +89,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <DropdownMenuTrigger asChild>
                     <button className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 hover:border-primary/30 transition-all cursor-pointer" data-testid="button-wallet">
                       <Wallet className="w-4 h-4 text-primary" />
-                      <span className="text-sm font-mono font-medium">${parseFloat(user.balance).toLocaleString()}</span>
+                      <span className="text-sm font-mono font-medium">${parseFloat(user.balance || '0').toLocaleString()}</span>
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-card border-white/10 w-48">
@@ -207,7 +207,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       </Avatar>
                       <div>
                         <p className="font-medium">{user.firstName} {user.lastName}</p>
-                        <p className="text-xs text-muted-foreground">${parseFloat(user.balance).toLocaleString()} Available</p>
+                        <p className="text-xs text-muted-foreground">${parseFloat(user.balance || '0').toLocaleString()} Available</p>
                       </div>
                     </div>
                   ) : (

@@ -60,8 +60,71 @@ export class WebhookHandlers {
       await WebhookHandlers.handlePayoutPaid(event.data.object);
     } else if (event.type === 'payout.failed') {
       await WebhookHandlers.handlePayoutFailed(event.data.object);
+    } else if (event.type === 'payment_intent.payment_failed' || event.type === 'charge.failed') {
+      await WebhookHandlers.handlePaymentFailed(event.data.object);
     } else {
       console.log(`[Webhook] Unhandled event type: ${event.type}`);
+    }
+  }
+
+  // An ACH contribution is credited to a pool while the payment is still
+  // 'processing'. If Stripe later reports the PaymentIntent/charge failed or was
+  // returned, reverse the pool credit so creators can't withdraw money that
+  // never settled. Idempotent: a repeated webhook finds nothing to reverse.
+  static async handlePaymentFailed(object: any): Promise<void> {
+    // For charge.failed the PaymentIntent id is on object.payment_intent;
+    // for payment_intent.payment_failed the id is object.id.
+    const paymentIntentId: string | undefined = object?.payment_intent || object?.id;
+    if (!paymentIntentId) {
+      console.log('[Webhook] payment_failed with no PaymentIntent id, skipping');
+      return;
+    }
+
+    try {
+      const reversed = await storage.reverseContributionByStripeSession(paymentIntentId);
+      if (!reversed) {
+        console.log(`[Webhook] payment_failed ${paymentIntentId}: no matching contribution to reverse`);
+        return;
+      }
+
+      console.warn(`[Webhook] Reversed ACH contribution of $${reversed.amount} to pool ${reversed.poolId} (PaymentIntent ${paymentIntentId} failed/returned)`);
+
+      // Record the reversal for auditability
+      try {
+        await storage.createPoolActivity({
+          poolId: reversed.poolId,
+          userId: reversed.userId || undefined,
+          type: 'refund',
+          amount: reversed.amount,
+          description: 'ACH contribution reversed (payment failed or returned)',
+        } as any);
+      } catch (activityErr) {
+        console.error('[Webhook] Could not record reversal activity:', activityErr);
+      }
+
+      // Notify the contributor that their bank payment did not clear
+      if (reversed.userId) {
+        const user = await storage.getUser(reversed.userId);
+        if (user) {
+          await storage.createNotification({
+            userId: reversed.userId,
+            type: 'contribution',
+            title: 'Bank payment failed',
+            message: `Your bank contribution of $${parseFloat(reversed.amount).toFixed(2)} could not be completed and has been reversed.`,
+            link: `/pool/${reversed.poolId}`,
+          });
+          if (user.notifyPush) {
+            sendPushNotification(
+              reversed.userId,
+              'Bank payment failed',
+              `Your $${parseFloat(reversed.amount).toFixed(2)} bank contribution was reversed.`,
+              `/pool/${reversed.poolId}`,
+            ).catch(() => {});
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('[Webhook] Error reversing failed ACH contribution:', err.message);
     }
   }
 
@@ -224,20 +287,16 @@ export class WebhookHandlers {
           
           // Check if this pool is linked to a merchant checkout session
           const merchantSession = await storage.getMerchantCheckoutSessionByPoolId(pool.id);
-          if (merchantSession && merchantSession.status === 'collecting') {
-            // Complete the checkout session
-            await storage.updateCheckoutSessionStatus(
-              merchantSession.id, 
-              'completed', 
-              pool.currentAmount
-            );
-            
+          // Atomically claim the collecting->completed transition so merchant
+          // stats are credited exactly once even if this races the API handler.
+          if (merchantSession && merchantSession.status === 'collecting' &&
+              await storage.completeCheckoutSessionIfCollecting(merchantSession.id, pool.currentAmount)) {
             // Update merchant stats - add net amount to pending balance
             const netAmount = parseFloat(merchantSession.netAmount);
             const feeAmount = parseFloat(merchantSession.feeAmount);
             const totalAmount = parseFloat(merchantSession.amount);
             await storage.updateMerchantStats(merchantSession.merchantId, netAmount, feeAmount, totalAmount);
-            
+
             // Send webhook to merchant
             const merchant = await storage.getMerchant(merchantSession.merchantId);
             if (merchant?.webhookUrl) {
@@ -267,7 +326,15 @@ export class WebhookHandlers {
   // Helper method to send merchant webhooks
   static async sendMerchantWebhook(merchant: any, sessionId: string, eventType: string, payload: any): Promise<void> {
     if (!merchant.webhookUrl) return;
-    
+
+    // SSRF guard: never let a merchant-controlled URL reach internal services
+    const { assertSafeOutboundUrl } = await import('./ssrfGuard');
+    const safe = await assertSafeOutboundUrl(merchant.webhookUrl);
+    if (!safe.ok) {
+      console.error(`[Webhook] Refusing to deliver to unsafe URL (${safe.reason}): ${merchant.webhookUrl}`);
+      return;
+    }
+
     const crypto = await import('crypto');
     const timestamp = Math.floor(Date.now() / 1000);
     const payloadString = JSON.stringify(payload);

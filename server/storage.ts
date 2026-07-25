@@ -19,6 +19,33 @@ import {
   type UserFollow
 } from "@shared/schema";
 import { eq, desc, and, sql, gt, lte, inArray, or, ilike, count } from "drizzle-orm";
+import { encryptField, decryptField } from "./encryption";
+
+// Decrypt sensitive bank-account fields when reading. No-op on legacy plaintext.
+function decryptBankAccount<T extends { accountNumber?: string | null; routingNumber?: string | null; plaidAccessToken?: string | null } | undefined>(account: T): T {
+  if (!account) return account;
+  return {
+    ...account,
+    accountNumber: decryptField(account.accountNumber) ?? account.accountNumber,
+    routingNumber: decryptField(account.routingNumber) ?? account.routingNumber,
+    plaidAccessToken: decryptField(account.plaidAccessToken) ?? account.plaidAccessToken,
+  } as T;
+}
+
+// Encrypt sensitive bank-account fields before writing. No-op until a key is set.
+function encryptBankFields<T extends Record<string, any>>(values: T): T {
+  const out: Record<string, any> = { ...values };
+  if ('accountNumber' in out) out.accountNumber = encryptField(out.accountNumber);
+  if ('routingNumber' in out) out.routingNumber = encryptField(out.routingNumber);
+  if ('plaidAccessToken' in out) out.plaidAccessToken = encryptField(out.plaidAccessToken);
+  return out as T;
+}
+
+// Decrypt the sensitive plaidAccessToken on user reads. No-op on legacy plaintext.
+function decryptUser<T extends { plaidAccessToken?: string | null } | undefined>(user: T): T {
+  if (!user || user.plaidAccessToken == null) return user;
+  return { ...user, plaidAccessToken: decryptField(user.plaidAccessToken) ?? user.plaidAccessToken } as T;
+}
 
 export interface IStorage {
   // User operations
@@ -28,6 +55,12 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserBalance(id: string, amount: string): Promise<void>;
   updateUserStats(id: string, poolsCreated?: number, totalContributed?: string): Promise<void>;
+  // Atomic, concurrency-safe money movement (guarded so balances can never go negative)
+  atomicDebitUserBalance(id: string, amount: number): Promise<boolean>;
+  atomicCreditUserBalance(id: string, amount: number): Promise<void>;
+  atomicDebitPoolAmount(id: string, amount: number): Promise<boolean>;
+  atomicCreditPoolAmount(id: string, amount: number): Promise<void>;
+  contributeFromWallet(userId: string, poolId: string, amount: number, amountStr: string): Promise<Contribution | null>;
   
   // Pool operations
   getPool(id: string): Promise<Pool | undefined>;
@@ -48,6 +81,7 @@ export interface IStorage {
   createContribution(contribution: InsertContribution): Promise<Contribution>;
   getContributionByStripeSession(sessionId: string): Promise<Contribution | undefined>;
   createStripeContribution(poolId: string, amount: string, sessionId: string, userId?: string | null, guestEmail?: string | null): Promise<Contribution | null>;
+  reverseContributionByStripeSession(sessionId: string): Promise<{ poolId: string; userId: string | null; amount: string } | null>;
   
   // Comment operations
   getCommentsByPool(poolId: string): Promise<Comment[]>;
@@ -65,6 +99,7 @@ export interface IStorage {
   getVirtualCardById(id: string): Promise<VirtualCard | undefined>;
   createVirtualCard(card: InsertVirtualCard): Promise<VirtualCard>;
   updateCardBalance(id: string, amount: string): Promise<void>;
+  atomicDebitCardBalance(id: string, amount: number): Promise<boolean>;
   
   // Transaction operations
   getTransactionsByCard(virtualCardId: string): Promise<Transaction[]>;
@@ -147,6 +182,7 @@ export interface IStorage {
   getMerchantCheckoutSessionByPoolId(poolId: string): Promise<MerchantCheckoutSession | undefined>;
   getMerchantCheckoutSessions(merchantId: string): Promise<MerchantCheckoutSession[]>;
   updateCheckoutSessionStatus(id: string, status: string, collectedAmount?: string): Promise<void>;
+  completeCheckoutSessionIfCollecting(id: string, collectedAmount?: string): Promise<boolean>;
   updateCheckoutSessionPool(id: string, poolId: string): Promise<void>;
   getExpiredCheckoutSessions(): Promise<MerchantCheckoutSession[]>;
   updateMerchantStats(merchantId: string, netAmount: number, feeAmount: number, totalAmount: number): Promise<void>;
@@ -186,7 +222,7 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    return decryptUser(user);
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
@@ -206,6 +242,70 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserBalance(id: string, amount: string): Promise<void> {
     await db.update(users).set({ balance: amount }).where(eq(users.id, id));
+  }
+
+  // Atomically decrement a user's balance only if sufficient funds exist.
+  // Returns true if the debit succeeded, false if funds were insufficient.
+  // Guarded at the SQL layer so concurrent requests cannot double-spend.
+  async atomicDebitUserBalance(id: string, amount: number): Promise<boolean> {
+    const result = await db.update(users)
+      .set({ balance: sql`${users.balance} - ${amount}` })
+      .where(and(eq(users.id, id), sql`${users.balance} >= ${amount}`))
+      .returning({ id: users.id });
+    return result.length > 0;
+  }
+
+  async atomicCreditUserBalance(id: string, amount: number): Promise<void> {
+    await db.update(users)
+      .set({ balance: sql`${users.balance} + ${amount}` })
+      .where(eq(users.id, id));
+  }
+
+  // Atomically decrement a pool's balance only if sufficient funds exist.
+  async atomicDebitPoolAmount(id: string, amount: number): Promise<boolean> {
+    const result = await db.update(pools)
+      .set({ currentAmount: sql`${pools.currentAmount} - ${amount}`, updatedAt: new Date() })
+      .where(and(eq(pools.id, id), sql`${pools.currentAmount} >= ${amount}`))
+      .returning({ id: pools.id });
+    return result.length > 0;
+  }
+
+  async atomicCreditPoolAmount(id: string, amount: number): Promise<void> {
+    await db.update(pools)
+      .set({ currentAmount: sql`${pools.currentAmount} + ${amount}`, updatedAt: new Date() })
+      .where(eq(pools.id, id));
+  }
+
+  // Full wallet-funded contribution as a single atomic transaction: debit the
+  // user's wallet (guarded), credit the pool, and record the contribution.
+  // Returns the created contribution, or null if the wallet had insufficient funds.
+  async contributeFromWallet(userId: string, poolId: string, amount: number, amountStr: string): Promise<Contribution | null> {
+    return await db.transaction(async (tx) => {
+      const debited = await tx.update(users)
+        .set({
+          balance: sql`${users.balance} - ${amount}`,
+          totalContributed: sql`${users.totalContributed} + ${amount}`,
+        })
+        .where(and(eq(users.id, userId), sql`${users.balance} >= ${amount}`))
+        .returning({ id: users.id });
+
+      if (debited.length === 0) {
+        return null;
+      }
+
+      const [contribution] = await tx.insert(contributions).values({
+        poolId,
+        userId,
+        amount: amountStr,
+      }).returning();
+
+      await tx.update(pools).set({
+        currentAmount: sql`${pools.currentAmount} + ${amount}`,
+        updatedAt: new Date(),
+      }).where(eq(pools.id, poolId));
+
+      return contribution;
+    });
   }
 
   async updateUserStats(id: string, poolsCreated?: number, totalContributed?: string): Promise<void> {
@@ -336,6 +436,28 @@ export class DatabaseStorage implements IStorage {
     return contribution;
   }
 
+  // Reverse a contribution that was credited to a pool while its ACH payment was
+  // still 'processing', when that payment later fails or is returned. Atomic and
+  // idempotent (a repeated webhook finds nothing to reverse). Returns details of
+  // what was reversed, or null if there was nothing to reverse.
+  async reverseContributionByStripeSession(sessionId: string): Promise<{ poolId: string; userId: string | null; amount: string } | null> {
+    return await db.transaction(async (tx) => {
+      const [contribution] = await tx.select().from(contributions)
+        .where(eq(contributions.stripeSessionId, sessionId));
+      if (!contribution) return null;
+
+      await tx.delete(contributions).where(eq(contributions.id, contribution.id));
+
+      // Never drive the pool below zero if funds were already spent/distributed
+      await tx.update(pools).set({
+        currentAmount: sql`GREATEST(CAST(${pools.currentAmount} AS DECIMAL) - ${contribution.amount}, 0)`,
+        updatedAt: new Date(),
+      }).where(eq(pools.id, contribution.poolId));
+
+      return { poolId: contribution.poolId, userId: contribution.userId, amount: contribution.amount };
+    });
+  }
+
   async createStripeContribution(poolId: string, amount: string, sessionId: string, userId?: string | null, guestEmail?: string | null): Promise<Contribution | null> {
     // Use transaction for atomic idempotence check + contribution + pool update
     return await db.transaction(async (tx) => {
@@ -414,6 +536,15 @@ export class DatabaseStorage implements IStorage {
 
   async updateCardBalance(id: string, amount: string): Promise<void> {
     await db.update(virtualCards).set({ balance: amount }).where(eq(virtualCards.id, id));
+  }
+
+  // Atomically decrement a card's balance only if sufficient funds exist.
+  async atomicDebitCardBalance(id: string, amount: number): Promise<boolean> {
+    const result = await db.update(virtualCards)
+      .set({ balance: sql`${virtualCards.balance} - ${amount}` })
+      .where(and(eq(virtualCards.id, id), sql`${virtualCards.balance} >= ${amount}`))
+      .returning({ id: virtualCards.id });
+    return result.length > 0;
   }
 
   async getTransactionsByCard(virtualCardId: string): Promise<Transaction[]> {
@@ -572,8 +703,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: string, data: Partial<User>): Promise<User | undefined> {
-    const [user] = await db.update(users).set(data).where(eq(users.id, id)).returning();
-    return user;
+    const toWrite = 'plaidAccessToken' in data
+      ? { ...data, plaidAccessToken: encryptField(data.plaidAccessToken) as any }
+      : data;
+    const [user] = await db.update(users).set(toWrite).where(eq(users.id, id)).returning();
+    return decryptUser(user);
   }
 
   async createVerificationCode(data: { userId: string; type: string; code: string; expiresAt: Date }): Promise<void> {
@@ -765,6 +899,19 @@ export class DatabaseStorage implements IStorage {
     await db.update(merchantCheckoutSessions).set(updateData).where(eq(merchantCheckoutSessions.id, id));
   }
 
+  // Atomically transition a session from 'collecting' to 'completed'. Returns
+  // true only for the caller that actually performed the transition, so merchant
+  // stats/payouts are credited exactly once even if two events race.
+  async completeCheckoutSessionIfCollecting(id: string, collectedAmount?: string): Promise<boolean> {
+    const updateData: any = { status: 'completed', completedAt: new Date() };
+    if (collectedAmount) updateData.collectedAmount = collectedAmount;
+    const rows = await db.update(merchantCheckoutSessions)
+      .set(updateData)
+      .where(and(eq(merchantCheckoutSessions.id, id), eq(merchantCheckoutSessions.status, 'collecting')))
+      .returning({ id: merchantCheckoutSessions.id });
+    return rows.length > 0;
+  }
+
   async updateCheckoutSessionPool(id: string, poolId: string): Promise<void> {
     await db.update(merchantCheckoutSessions).set({ poolId }).where(eq(merchantCheckoutSessions.id, id));
   }
@@ -820,19 +967,20 @@ export class DatabaseStorage implements IStorage {
 
   // Bank account operations
   async getBankAccountsByUser(userId: string): Promise<BankAccount[]> {
-    return db.select().from(bankAccounts)
+    const rows = await db.select().from(bankAccounts)
       .where(eq(bankAccounts.userId, userId))
       .orderBy(desc(bankAccounts.isDefault), desc(bankAccounts.createdAt));
+    return rows.map(decryptBankAccount);
   }
 
   async getBankAccountById(id: string): Promise<BankAccount | undefined> {
     const [account] = await db.select().from(bankAccounts).where(eq(bankAccounts.id, id));
-    return account;
+    return decryptBankAccount(account);
   }
 
   async createBankAccount(account: InsertBankAccount): Promise<BankAccount> {
-    const [result] = await db.insert(bankAccounts).values(account).returning();
-    return result;
+    const [result] = await db.insert(bankAccounts).values(encryptBankFields(account)).returning();
+    return decryptBankAccount(result);
   }
 
   async setDefaultBankAccount(userId: string, accountId: string): Promise<void> {
@@ -852,23 +1000,23 @@ export class DatabaseStorage implements IStorage {
   async getBankAccountByStripeAccountId(stripeAccountId: string): Promise<BankAccount | undefined> {
     const [account] = await db.select().from(bankAccounts)
       .where(eq(bankAccounts.stripeFinancialConnectionsAccountId, stripeAccountId));
-    return account;
+    return decryptBankAccount(account);
   }
 
   async updateBankAccountByStripeAccountId(stripeAccountId: string, updates: Partial<BankAccount>): Promise<BankAccount | undefined> {
     const [result] = await db.update(bankAccounts)
-      .set(updates)
+      .set(encryptBankFields(updates))
       .where(eq(bankAccounts.stripeFinancialConnectionsAccountId, stripeAccountId))
       .returning();
-    return result;
+    return decryptBankAccount(result);
   }
 
   async updateBankAccount(id: string, updates: Partial<BankAccount>): Promise<BankAccount | undefined> {
     const [result] = await db.update(bankAccounts)
-      .set(updates)
+      .set(encryptBankFields(updates))
       .where(eq(bankAccounts.id, id))
       .returning();
-    return result;
+    return decryptBankAccount(result);
   }
 
   // Pool transfer request operations

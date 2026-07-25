@@ -53,6 +53,7 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
   const [payoutSpeed, setPayoutSpeed] = useState<'standard' | 'instant'>('standard');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [notes, setNotes] = useState("");
+  const [pin, setPin] = useState("");
 
   // Fee calculation
   const INSTANT_FEE_RATE = 0.015; // 1.5%
@@ -117,7 +118,7 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
   };
 
   const transferMutation = useMutation({
-    mutationFn: async (data: { toUserId: string; amount: string; notes?: string; bankAccountId?: string; payoutSpeed?: 'standard' | 'instant' }) => {
+    mutationFn: async (data: { toUserId: string; amount: string; notes?: string; bankAccountId?: string; payoutSpeed?: 'standard' | 'instant'; pin?: string }) => {
       const res = await fetch(`/api/pools/${poolId}/transfer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -139,6 +140,7 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
       });
       setTransferAmount("");
       setNotes("");
+      setPin("");
       setSelectedContributor(null);
       setConfirmOpen(false);
       onTransferComplete();
@@ -185,12 +187,18 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
     const toUserId = recipientType === "self" ? user?.id : selectedContributor?.userId;
     if (!toUserId) return;
 
+    if (user?.hasTransactionPin && !/^\d{4}$/.test(pin)) {
+      toast({ title: "PIN required", description: "Enter your 4-digit transaction PIN to authorize this transfer.", variant: "destructive" });
+      return;
+    }
+
     transferMutation.mutate({
       toUserId,
       amount: transferAmount,
       notes: notes || undefined,
       bankAccountId: recipientType === "self" ? selectedBankAccountId : undefined,
       payoutSpeed: recipientType === "self" ? payoutSpeed : undefined,
+      ...(user?.hasTransactionPin ? { pin } : {}),
     });
   };
 
@@ -684,11 +692,27 @@ function TransferSection({ poolId, balance, onTransferComplete }: TransferSectio
                 {recipientType === "self" ? "Estimated Arrival:" : "Status:"}
               </span>
               <span className={recipientType === "self" ? (payoutSpeed === 'instant' || isDebitCard ? 'text-yellow-400' : 'text-cyan-400') : ''}>
-                {recipientType === "self" 
-                  ? (isDebitCard || payoutSpeed === 'instant' ? 'Instant (seconds)' : '1-3 business days') 
+                {recipientType === "self"
+                  ? (isDebitCard || payoutSpeed === 'instant' ? 'Instant (seconds)' : '1-3 business days')
                   : "Pending acceptance"}
               </span>
             </div>
+            {user?.hasTransactionPin && (
+              <div className="space-y-1.5 pt-2">
+                <label className="text-sm font-medium" htmlFor="transfer-pin">Transaction PIN</label>
+                <Input
+                  id="transfer-pin"
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  placeholder="••••"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  autoComplete="off"
+                  className="bg-background border-white/10"
+                />
+              </div>
+            )}
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setConfirmOpen(false)} className="border-white/10">

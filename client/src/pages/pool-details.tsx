@@ -96,6 +96,7 @@ export default function PoolDetails() {
   const poolImageInputRef = useRef<HTMLInputElement>(null);
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
   const [distributeDialogOpen, setDistributeDialogOpen] = useState(false);
+  const [distributePin, setDistributePin] = useState("");
   const [distributions, setDistributions] = useState<{userId: string, name: string, amount: string}[]>([]);
   const [closePoolAfterAction, setClosePoolAfterAction] = useState(false);
   const [isRefunding, setIsRefunding] = useState(false);
@@ -385,6 +386,15 @@ export default function PoolDetails() {
   const remainingBalance = parseFloat(pool?.currentAmount || '0');
 
   const handleChipIn = async () => {
+    const chipInValue = parseFloat(chipInAmount);
+    if (isNaN(chipInValue) || chipInValue < 1) {
+      toast({ title: "Invalid amount", description: "Please enter an amount of at least $1.", variant: "destructive" });
+      return;
+    }
+    if (paymentMethod === 'balance' && chipInValue > parseFloat(user?.balance || '0')) {
+      toast({ title: "Insufficient balance", description: "Add funds to your wallet or choose another payment method.", variant: "destructive" });
+      return;
+    }
     setIsChippingIn(true);
     try {
       if (paymentMethod === 'stripe') {
@@ -519,15 +529,20 @@ export default function PoolDetails() {
       toast({ title: "No Distributions", description: "Please add at least one distribution", variant: "destructive" });
       return;
     }
+    if (user?.hasTransactionPin && !/^\d{4}$/.test(distributePin)) {
+      toast({ title: "PIN required", description: "Enter your 4-digit transaction PIN to authorize this payout.", variant: "destructive" });
+      return;
+    }
     setIsDistributing(true);
     try {
       const res = await fetch(`/api/pools/${params?.id}/distribute`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           distributions: validDistributions.map(d => ({ userId: d.userId, amount: d.amount })),
           closePool: closePoolAfterAction,
+          ...(user?.hasTransactionPin ? { pin: distributePin } : {}),
         }),
       });
       const data = await res.json();
@@ -535,6 +550,7 @@ export default function PoolDetails() {
       toast({ title: "Funds Distributed", description: data.message });
       setDistributeDialogOpen(false);
       setDistributions([]);
+      setDistributePin("");
       setClosePoolAfterAction(false);
       queryClient.invalidateQueries({ queryKey: queryKeys.pool(params?.id || '') });
       queryClient.invalidateQueries({ queryKey: queryKeys.pools });
@@ -618,7 +634,7 @@ export default function PoolDetails() {
             <div className={`relative rounded-3xl overflow-hidden border border-white/5 bg-card/50 ${pool.image ? 'aspect-video' : ''}`}>
               {pool.image && (
                 <>
-                  <img src={pool.image} className="w-full h-full object-cover" />
+                  <img src={pool.image} alt={pool.title} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-linear-to-t from-background/90 via-transparent to-transparent" />
                 </>
               )}
@@ -938,8 +954,13 @@ export default function PoolDetails() {
                                       if (user && value === user.id) {
                                         setDistributionFromContributor(index, { id: user.id, name: `${user.firstName} ${user.lastName} (My Wallet)` });
                                       } else {
-                                        const contributor = contributors.find((c: any) => c.id === value);
-                                        if (contributor) setDistributionFromContributor(index, contributor);
+                                        const contributor = contributors.find((c: any) => c.user?.id === value);
+                                        if (contributor?.user) {
+                                          setDistributionFromContributor(index, {
+                                            id: contributor.user.id,
+                                            name: `${contributor.user.firstName || ''} ${contributor.user.lastName || ''}`.trim() || contributor.user.username || 'Contributor',
+                                          });
+                                        }
                                       }
                                     }}
                                   >
@@ -952,9 +973,15 @@ export default function PoolDetails() {
                                           {user.firstName} {user.lastName} (My Wallet)
                                         </SelectItem>
                                       )}
-                                      {contributors.filter((c: any) => c.id && c.id !== user?.id).map((c: any) => (
-                                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                      ))}
+                                      {contributors
+                                        .filter((c: any) => c.user?.id && c.user.id !== user?.id)
+                                        // de-dupe repeat contributors by user id
+                                        .filter((c: any, i: number, arr: any[]) => arr.findIndex((x: any) => x.user?.id === c.user?.id) === i)
+                                        .map((c: any) => (
+                                          <SelectItem key={c.user.id} value={c.user.id}>
+                                            {`${c.user.firstName || ''} ${c.user.lastName || ''}`.trim() || c.user.username || 'Contributor'}
+                                          </SelectItem>
+                                        ))}
                                     </SelectContent>
                                   </Select>
                                   <Input
@@ -989,19 +1016,35 @@ export default function PoolDetails() {
                             </Button>
 
                             <div className="flex items-center gap-2">
-                              <Checkbox 
-                                id="close-pool-distribute" 
+                              <Checkbox
+                                id="close-pool-distribute"
                                 checked={closePoolAfterAction}
                                 onCheckedChange={(checked) => setClosePoolAfterAction(!!checked)}
                               />
                               <Label htmlFor="close-pool-distribute" className="text-sm">Close pool after payout</Label>
                             </div>
 
+                            {user?.hasTransactionPin && (
+                              <div className="space-y-1.5">
+                                <Label htmlFor="distribute-pin" className="text-sm">Transaction PIN</Label>
+                                <Input
+                                  id="distribute-pin"
+                                  type="password"
+                                  inputMode="numeric"
+                                  maxLength={4}
+                                  placeholder="••••"
+                                  value={distributePin}
+                                  onChange={(e) => setDistributePin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                  autoComplete="off"
+                                />
+                              </div>
+                            )}
+
                             <DialogFooter>
                               <Button variant="outline" onClick={() => setDistributeDialogOpen(false)}>Cancel</Button>
-                              <Button 
-                                onClick={handleDistribute} 
-                                disabled={isDistributing || distributions.length === 0}
+                              <Button
+                                onClick={handleDistribute}
+                                disabled={isDistributing || distributions.length === 0 || (user?.hasTransactionPin && !/^\d{4}$/.test(distributePin))}
                                 className="bg-green-600 hover:bg-green-700"
                                 data-testid="button-confirm-distribute"
                               >
@@ -1024,6 +1067,7 @@ export default function PoolDetails() {
                   <DialogContent className="sm:max-w-md bg-card border-white/10">
                     <DialogHeader>
                       <DialogTitle>Chip in to {pool.title}</DialogTitle>
+                      <DialogDescription>Enter an amount and choose how you'd like to pay.</DialogDescription>
                     </DialogHeader>
                     
                     {paymentStep === 'amount' ? (
@@ -1193,7 +1237,7 @@ export default function PoolDetails() {
                             {isChippingIn ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</> : "Continue to Payment"}
                           </Button>
                         ) : (
-                          <Button type="button" className="w-full sm:w-auto font-bold" onClick={() => setPaymentStep('method')} disabled={!chipInAmount}>
+                          <Button type="button" className="w-full sm:w-auto font-bold" onClick={() => setPaymentStep('method')} disabled={!chipInAmount || parseFloat(chipInAmount) < 1}>
                             Continue
                           </Button>
                         )

@@ -14,7 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, queryKeys } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 
 const POOL_EMOJIS = [
   '🎂', '🎉', '✈️', '🏖️', '🎁', '🛒', '🏠', '🎓',
@@ -532,6 +532,7 @@ export default function CreatePool() {
                     <DialogContent className="sm:max-w-md">
                       <DialogHeader>
                         <DialogTitle>Add Cover Image</DialogTitle>
+                        <DialogDescription>Upload an image or paste a link to use as your pool's cover.</DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
                         <div>

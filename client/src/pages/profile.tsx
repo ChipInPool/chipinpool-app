@@ -37,6 +37,7 @@ export default function Profile() {
   const [followersDialogOpen, setFollowersDialogOpen] = useState(false);
   const [followingDialogOpen, setFollowingDialogOpen] = useState(false);
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
+  const [pin, setPin] = useState("");
   const [payoutMethodsDialogOpen, setPayoutMethodsDialogOpen] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -177,15 +178,21 @@ export default function Profile() {
       return;
     }
 
+    if (user?.hasTransactionPin && !/^\d{4}$/.test(pin)) {
+      toast({ description: "Please enter your 4-digit transaction PIN", variant: "destructive" });
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const res = await fetch('/api/wallet/withdraw', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           amount,
-          savedMethodId: selectedMethodId 
+          savedMethodId: selectedMethodId,
+          ...(user?.hasTransactionPin ? { pin } : {}),
         }),
       });
       const data = await res.json();
@@ -196,6 +203,7 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: queryKeys.user });
       setWithdrawDialogOpen(false);
       setAmount("");
+      setPin("");
       setSelectedMethodId(null);
     } catch (error: any) {
       toast({ description: error.message || "Withdrawal failed", variant: "destructive" });
@@ -988,6 +996,23 @@ export default function Profile() {
                 </div>
               )}
 
+              {user?.hasTransactionPin && (
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium" htmlFor="withdraw-pin">Transaction PIN</label>
+                  <Input
+                    id="withdraw-pin"
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={4}
+                    placeholder="••••"
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    autoComplete="off"
+                  />
+                  <p className="text-xs text-muted-foreground">Enter your 4-digit PIN to authorize this withdrawal.</p>
+                </div>
+              )}
+
               <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm text-muted-foreground">
                 <Clock className="w-4 h-4 mt-0.5 shrink-0 text-blue-400" />
                 <span>Withdrawals are processed within 1-2 business days.</span>
@@ -996,22 +1021,24 @@ export default function Profile() {
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="ghost" onClick={() => { 
-              setWithdrawDialogOpen(false); 
-              setAmount(""); 
+            <Button variant="ghost" onClick={() => {
+              setWithdrawDialogOpen(false);
+              setAmount("");
+              setPin("");
               setSelectedMethodId(null);
             }}>
               Cancel
             </Button>
-            <Button 
-              onClick={handleWithdraw} 
+            <Button
+              onClick={handleWithdraw}
               disabled={
-                isProcessing || 
-                !amount || 
-                parseFloat(amount) < 10 || 
+                isProcessing ||
+                !amount ||
+                parseFloat(amount) < 10 ||
                 parseFloat(amount) > parseFloat(user?.balance || '0') ||
                 user?.kycStatus !== 'verified' ||
-                !selectedMethodId
+                !selectedMethodId ||
+                (user?.hasTransactionPin && !/^\d{4}$/.test(pin))
               }
               className="bg-blue-600 hover:bg-blue-700"
               data-testid="button-confirm-withdraw"

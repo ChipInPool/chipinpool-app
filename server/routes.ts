@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
 import cookieSignature from "cookie-signature";
@@ -9,7 +10,9 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { fileStorageService, isAzureStorage } from "./fileStorage";
 import { registerSchema, loginSchema, loginWithUsernameSchema, phoneLoginSchema, verifyPhoneLoginSchema, forgotPasswordSchema, resetPasswordSchema, insertPoolSchema, insertContributionSchema, insertCommentSchema, insertTransactionSchema, users, follows, contributions, phoneVerificationCodes, passwordResetTokens, sendPhoneCodeSchema, verifyPhoneCodeSchema, adminAuditLogs, pools, transactions, merchants, virtualCards, fraudAlerts, walletWithdrawals, walletDeposits, bankAccounts, merchantPayouts, payMeTransactions, apiAccessRequests, poolActivities, invites, betaInvites, waitlist } from "@shared/schema";
 import express from "express";
-import { db } from "./db";
+import { db, pool as pgPool } from "./db";
+import { encryptField } from "./encryption";
+import { assertSafeOutboundUrl } from "./ssrfGuard";
 import { eq, desc, sql, inArray, and, lt, isNull, or } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { z } from "zod";
@@ -18,12 +21,14 @@ import { sendPoolInviteEmail } from "./resendClient";
 import { sendPoolInviteSMS } from "./clicksendClient";
 import { awardContributionPoints, awardPoolCreationPoints, awardPoolCompletionPoints } from "./gamification";
 import { 
-  generateOTP, 
-  generate2FASecret, 
-  generate2FAQRCode, 
+  generateOTP,
+  generate2FASecret,
+  generate2FAQRCode,
   verify2FAToken,
   hashTransactionPin,
-  verifyTransactionPin
+  verifyTransactionPin,
+  generateInviteCode,
+  safeEqual
 } from "./verificationService";
 import {
   sendPoolContributionNotification,
@@ -119,6 +124,17 @@ export async function registerRoutes(
     console.warn('[Security Warning] SESSION_SECRET not set - using insecure default for development only');
   }
   
+  // Trusted, server-controlled base URL for links we email/text to users.
+  // Never derive these from the request Host header (attacker-controllable),
+  // which would let an attacker poison password-reset links to steal tokens.
+  const getTrustedBaseUrl = (): string => {
+    if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
+    if (process.env.REPLIT_DOMAINS) return `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
+    if (process.env.WEBSITE_HOSTNAME) return `https://${process.env.WEBSITE_HOSTNAME}`;
+    if (process.env.NODE_ENV === 'production') return 'https://www.chipinpool.com';
+    return 'http://localhost:5000';
+  };
+
   const effectiveSecret = sessionSecret || 'dev-only-insecure-secret-do-not-use-in-production';
   function signedSessionToken(sessionID: string): string {
     return `connect.sid=s%3A${cookieSignature.sign(sessionID, effectiveSecret)}`;
@@ -170,9 +186,18 @@ export async function registerRoutes(
   // Trust proxy for secure cookies behind Replit's/Azure's reverse proxy
   app.set('trust proxy', 1);
 
-  // Session middleware
+  // Session middleware — persist sessions in Postgres so they survive restarts,
+  // don't leak memory, and work across multiple instances (the default
+  // MemoryStore does none of these and is unsafe for production).
+  const PgSession = connectPgSimple(session);
+  const sessionStore = new PgSession({
+    pool: pgPool as any,
+    tableName: 'user_sessions',
+    createTableIfMissing: true,
+  });
   app.use(
     session({
+      store: sessionStore,
       secret: sessionSecret || 'dev-only-insecure-secret-do-not-use-in-production',
       resave: false,
       saveUninitialized: false,
@@ -210,14 +235,77 @@ export async function registerRoutes(
     next();
   };
 
+  // Returns true if the user may view a pool's private data: the creator, any
+  // contributor, an invited user (by id/email/phone), or — for public pools —
+  // any authenticated user. Preserves the invite/share flow while blocking IDOR.
+  const canViewPool = async (pool: { id: string; creatorId: string; isPublic?: boolean | null }, userId: string): Promise<boolean> => {
+    if (pool.creatorId === userId) return true;
+    if (pool.isPublic) return true;
+    const poolContributions = await storage.getContributionsByPool(pool.id);
+    if (poolContributions.some((c: any) => c.userId === userId)) return true;
+    const [invitesForPool, viewer] = await Promise.all([
+      storage.getPoolInvites(pool.id),
+      storage.getUser(userId),
+    ]);
+    return invitesForPool.some((inv: any) =>
+      inv.inviteeId === userId ||
+      (viewer?.email && inv.inviteeEmail && inv.inviteeEmail.toLowerCase() === viewer.email.toLowerCase()) ||
+      (viewer?.phone && inv.inviteePhone && inv.inviteePhone === viewer.phone)
+    );
+  };
+
+  // Strip a user record down to fields that are safe to expose to other users.
+  const publicUserFields = (user: any) => user ? ({
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    username: user.username,
+    avatar: user.avatar,
+    isVerified: user.isVerified,
+    kycStatus: user.kycStatus,
+  }) : null;
+
+  // Public-profile projection. Never leak email/phone/balance/Stripe/Plaid
+  // tokens/PIN/2FA secrets to other users; only the owner sees contact fields.
+  const publicProfileFields = (user: any, isOwner: boolean) => ({
+    id: user.id,
+    username: user.username,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    avatar: user.avatar,
+    bio: user.bio,
+    location: user.location,
+    isPublic: user.isPublic,
+    isVerified: user.isVerified,
+    kycStatus: user.kycStatus,
+    createdAt: user.createdAt,
+    ...(isOwner ? { email: user.email, phone: user.phone } : {}),
+  });
+
+  // Enforce the transaction PIN on money-movement routes. If the user has set a
+  // PIN, a valid one must accompany the request; users who never set a PIN are
+  // unaffected (backward compatible). Returns ok=false with a status to send.
+  const enforceTransactionPin = async (
+    user: { transactionPin?: string | null } | undefined,
+    providedPin: unknown,
+  ): Promise<{ ok: true } | { ok: false; status: number; error: string }> => {
+    if (!user?.transactionPin) return { ok: true };
+    if (typeof providedPin !== 'string' || !/^\d{4}$/.test(providedPin)) {
+      return { ok: false, status: 400, error: 'Transaction PIN required' };
+    }
+    const valid = await verifyTransactionPin(providedPin, user.transactionPin);
+    if (!valid) return { ok: false, status: 401, error: 'Incorrect transaction PIN' };
+    return { ok: true };
+  };
+
   // Phone verification routes - rate limited to prevent abuse
   app.post("/api/auth/send-phone-code", authRateLimiter, async (req, res, next) => {
     try {
       const { phone: rawPhone } = sendPhoneCodeSchema.parse(req.body);
       const phone = normalizePhone(rawPhone);
       
-      // Generate 6-digit code
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      // Generate cryptographically secure 6-digit code
+      const code = generateOTP();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
       
       // Delete any existing codes for this phone
@@ -815,7 +903,7 @@ export async function registerRoutes(
       });
 
       // Send reset link via chosen method
-      const resetLink = `${process.env.NODE_ENV === 'production' ? 'https://' + req.get('host') : 'http://localhost:5000'}/reset-password?token=${token}`;
+      const resetLink = `${getTrustedBaseUrl()}/reset-password?token=${token}`;
       
       if (data.method === 'email' && user.email) {
         await sendPasswordResetEmail(user.email, resetLink);
@@ -907,8 +995,16 @@ export async function registerRoutes(
       }
 
       const badges = await storage.getUserBadges(user.id);
-      const { password, ...userWithoutPassword } = user;
-      res.json({ user: { ...userWithoutPassword, badges } });
+      // Never send secrets to the client; expose booleans instead of the values
+      const { password, transactionPin, twoFactorSecret, plaidAccessToken, ...safeUser } = user as any;
+      res.json({
+        user: {
+          ...safeUser,
+          badges,
+          hasTransactionPin: !!transactionPin,
+          has2FA: !!twoFactorSecret,
+        },
+      });
     } catch (error) {
       next(error);
     }
@@ -1365,7 +1461,11 @@ export async function registerRoutes(
     try {
       const pool = await storage.getPool(req.params.id);
       if (!pool) return res.status(404).json({ message: "Pool not found" });
-      
+
+      if (!(await canViewPool(pool, req.session.userId!))) {
+        return res.status(403).json({ message: "Not authorized to view this pool" });
+      }
+
       const activities = await storage.getPoolActivities(req.params.id);
       const poolContributions = await storage.getContributionsByPool(req.params.id);
       
@@ -1398,7 +1498,9 @@ export async function registerRoutes(
       
       const raised = parseFloat(pool.currentAmount);
       const spent = parseFloat(pool.spentAmount);
-      const remaining = parseFloat(pool.currentAmount);
+      // Remaining is what's still available to spend: current balance minus what
+      // has already been spent (previously this incorrectly equalled "raised").
+      const remaining = Math.max(raised - spent, 0);
       
       res.json({
         activities: allActivities,
@@ -1418,6 +1520,10 @@ export async function registerRoutes(
       const pool = await storage.getPool(req.params.id);
       if (!pool) {
         return res.status(404).json({ message: "Pool not found" });
+      }
+
+      if (!(await canViewPool(pool, req.session.userId!))) {
+        return res.status(403).json({ message: "Not authorized to view this pool" });
       }
 
       const [creator, contributions, comments] = await Promise.all([
@@ -1440,7 +1546,7 @@ export async function registerRoutes(
           const user = await storage.getUser(c.userId);
           const badges = await storage.getUserBadges(c.userId);
           return {
-            user: user ? { ...user, badges, password: undefined } : null,
+            user: user ? { ...publicUserFields(user), badges } : null,
             amount: c.amount,
             date: c.createdAt.toISOString(),
           };
@@ -1455,7 +1561,7 @@ export async function registerRoutes(
           return {
             id: c.id,
             userId: c.userId,
-            user: user ? { ...user, badges, password: undefined } : null,
+            user: user ? { ...publicUserFields(user), badges } : null,
             text: c.text,
             timestamp: c.createdAt.toISOString(),
             likes: c.likes,
@@ -1468,7 +1574,7 @@ export async function registerRoutes(
       res.json({
         pool: {
           ...pool,
-          creator: creator ? { ...creator, badges, password: undefined } : null,
+          creator: creator ? { ...publicUserFields(creator), badges } : null,
           contributors: contributorsData.filter((c) => c.user !== null),
           comments: commentsData.filter((c) => c.user !== null),
         },
@@ -1616,9 +1722,14 @@ export async function registerRoutes(
 
   app.post("/api/pools/:id/contribute", requireAuth, async (req, res, next) => {
     try {
-      const { amount } = z.object({ amount: z.string() }).parse(req.body);
+      const { amount } = z.object({
+        amount: z.string().refine((val) => {
+          const num = parseFloat(val);
+          return !isNaN(num) && num > 0 && num <= 1000000;
+        }, "Amount must be a positive number"),
+      }).parse(req.body);
       const pool = await storage.getPool(req.params.id);
-      
+
       if (!pool) {
         return res.status(404).json({ message: "Pool not found" });
       }
@@ -1632,20 +1743,15 @@ export async function registerRoutes(
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Check if user has enough balance
-      const userBalance = parseFloat(user.balance);
       const contributionAmount = parseFloat(amount);
-      
-      if (userBalance < contributionAmount) {
+
+      // Atomically debit the wallet, credit the pool, and record the contribution.
+      // The guarded SQL decrement prevents double-spend under concurrent requests
+      // and rejects the contribution when funds are insufficient.
+      const contribution = await storage.contributeFromWallet(user.id, pool.id, contributionAmount, amount);
+      if (!contribution) {
         return res.status(400).json({ message: "Insufficient balance" });
       }
-
-      // Create contribution
-      const contribution = await storage.createContribution({
-        poolId: pool.id,
-        userId: user.id,
-        amount,
-      });
 
       // Record pool activity for contribution
       await storage.createPoolActivity({
@@ -1657,16 +1763,8 @@ export async function registerRoutes(
         referenceId: contribution.id,
       });
 
-      // Update pool amount
+      // Recompute derived amount for downstream notification/milestone logic
       const newPoolAmount = (parseFloat(pool.currentAmount) + contributionAmount).toFixed(2);
-      await storage.updatePoolAmount(pool.id, newPoolAmount);
-
-      // Update user balance and stats
-      const newUserBalance = (userBalance - contributionAmount).toFixed(2);
-      await storage.updateUserBalance(user.id, newUserBalance);
-      
-      const newTotalContributed = (parseFloat(user.totalContributed) + contributionAmount).toFixed(2);
-      await storage.updateUserStats(user.id, undefined, newTotalContributed);
 
       // Get pool creator for notifications
       const poolCreator = await storage.getUser(pool.creatorId);
@@ -1677,20 +1775,16 @@ export async function registerRoutes(
         
         // Check if this pool is linked to a merchant checkout session
         const merchantSession = await storage.getMerchantCheckoutSessionByPoolId(pool.id);
-        if (merchantSession && merchantSession.status === 'collecting') {
-          // Complete the checkout session
-          await storage.updateCheckoutSessionStatus(
-            merchantSession.id, 
-            'completed', 
-            newPoolAmount
-          );
-          
+        // Atomically claim the collecting->completed transition so merchant stats
+        // are credited exactly once even if the Stripe webhook races this handler.
+        if (merchantSession && merchantSession.status === 'collecting' &&
+            await storage.completeCheckoutSessionIfCollecting(merchantSession.id, newPoolAmount)) {
           // Update merchant stats - add net amount to pending balance
           const netAmount = parseFloat(merchantSession.netAmount);
           const feeAmount = parseFloat(merchantSession.feeAmount);
           const totalAmount = parseFloat(merchantSession.amount);
           await storage.updateMerchantStats(merchantSession.merchantId, netAmount, feeAmount, totalAmount);
-          
+
           // Send webhook to merchant
           const merchant = await storage.getMerchant(merchantSession.merchantId);
           if (merchant?.webhookUrl) {
@@ -1845,7 +1939,7 @@ export async function registerRoutes(
       res.json({
         comment: {
           ...comment,
-          user: user ? { ...user, badges, password: undefined } : null,
+          user: user ? { ...publicUserFields(user), badges } : null,
           timestamp: comment.createdAt.toISOString(),
         },
       });
@@ -1889,12 +1983,13 @@ export async function registerRoutes(
 
   app.post("/api/user/withdraw", requireAuth, async (req, res, next) => {
     try {
-      const { amount, bankAccountId } = z.object({ 
+      const { amount, bankAccountId, pin } = z.object({
         amount: z.string(),
-        bankAccountId: z.string().optional()
+        bankAccountId: z.string().optional(),
+        pin: z.string().optional(),
       }).parse(req.body);
       const withdrawAmount = parseFloat(amount);
-      
+
       if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
         return res.status(400).json({ message: "Invalid amount" });
       }
@@ -1904,14 +1999,23 @@ export async function registerRoutes(
         return res.status(404).json({ message: "User not found" });
       }
 
-      const currentBalance = parseFloat(user.balance);
-      if (currentBalance < withdrawAmount) {
-        return res.status(400).json({ message: "Insufficient balance" });
+      // Require identity verification before any payout (consistent with the
+      // other withdrawal endpoints)
+      if (user.kycStatus !== 'verified') {
+        return res.status(400).json({ message: "Please complete identity verification before withdrawing" });
       }
 
-      const newBalance = (currentBalance - withdrawAmount).toFixed(2);
-      await storage.updateUserBalance(user.id, newBalance);
-      
+      // Require the transaction PIN if the user has set one
+      const pinCheck = await enforceTransactionPin(user, pin);
+      if (!pinCheck.ok) return res.status(pinCheck.status).json({ message: pinCheck.error });
+
+      // Atomic guarded debit prevents concurrent double-withdrawal
+      const debited = await storage.atomicDebitUserBalance(user.id, withdrawAmount);
+      if (!debited) {
+        return res.status(400).json({ message: "Insufficient balance" });
+      }
+      const newBalance = (parseFloat(user.balance) - withdrawAmount).toFixed(2);
+
       // Log the withdrawal
       await storage.createWalletWithdrawal(user.id, amount, bankAccountId);
 
@@ -2193,15 +2297,18 @@ export async function registerRoutes(
       const cardBalance = parseFloat(card.balance);
       const transactionAmount = parseFloat(data.amount);
 
-      if (cardBalance < transactionAmount) {
-        return res.status(400).json({ message: "Insufficient card balance" });
+      if (isNaN(transactionAmount) || transactionAmount <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
       }
 
-      const transaction = await storage.createTransaction(data);
-      
-      // Update card balance
+      // Atomic guarded debit prevents negative-amount inflation and concurrent overspend
+      const cardDebited = await storage.atomicDebitCardBalance(card.id, transactionAmount);
+      if (!cardDebited) {
+        return res.status(400).json({ message: "Insufficient card balance" });
+      }
       const newBalance = (cardBalance - transactionAmount).toFixed(2);
-      await storage.updateCardBalance(card.id, newBalance);
+
+      const transaction = await storage.createTransaction(data);
 
       // Record pool activity for spending
       await storage.createPoolActivity({
@@ -2322,16 +2429,15 @@ export async function registerRoutes(
 
       const totalRaised = createdPools.reduce((sum: number, pool: any) => sum + parseFloat(pool.currentAmount || '0'), 0);
 
-      const { password, ...userWithoutPassword } = user;
       res.json({
         user: {
-          ...userWithoutPassword,
+          ...publicProfileFields(user, isOwner),
           badges,
           followerCount: followersCount,
           followingCount,
           poolsCreated: createdPools.length,
         },
-        pools: createdPools,
+        pools: isOwner ? createdPools : createdPools.filter((p: any) => p.isPublic),
         poolsJoined: contributedPools.length,
         totalRaised: totalRaised.toFixed(2),
         isFollowing: isViewerFollowing,
@@ -2345,10 +2451,15 @@ export async function registerRoutes(
 
   app.get("/api/users/:id/pools", requireAuth, async (req, res, next) => {
     try {
-      const [createdPools, contributedPools] = await Promise.all([
+      const isOwner = req.session.userId === req.params.id;
+      const [createdPoolsRaw, contributedPoolsRaw] = await Promise.all([
         storage.getPoolsByCreator(req.params.id),
         storage.getPoolsByContributor(req.params.id),
       ]);
+
+      // Other users only see the target's public pools
+      const createdPools = isOwner ? createdPoolsRaw : createdPoolsRaw.filter((p: any) => p.isPublic);
+      const contributedPools = isOwner ? contributedPoolsRaw : contributedPoolsRaw.filter((p: any) => p.isPublic);
 
       res.json({ createdPools, contributedPools });
     } catch (error) {
@@ -2413,16 +2524,15 @@ export async function registerRoutes(
 
       const totalRaised = createdPools.reduce((sum, pool) => sum + parseFloat(pool.currentAmount || '0'), 0);
 
-      const { password, ...userWithoutPassword } = user;
       res.json({
         user: {
-          ...userWithoutPassword,
+          ...publicProfileFields(user, isOwner),
           badges,
           followerCount: followersCount,
           followingCount,
           poolsCreated: createdPools.length,
         },
-        pools: createdPools,
+        pools: isOwner ? createdPools : createdPools.filter((p: any) => p.isPublic),
         poolsJoined: contributedPools.length,
         totalRaised: totalRaised.toFixed(2),
         isFollowing: isViewerFollowing,
@@ -2663,6 +2773,12 @@ export async function registerRoutes(
 
   app.get("/api/pools/:id/invites", requireAuth, async (req, res, next) => {
     try {
+      // Invitee contact details are private to the pool creator
+      const pool = await storage.getPool(req.params.id);
+      if (!pool) return res.status(404).json({ message: "Pool not found" });
+      if (pool.creatorId !== req.session.userId) {
+        return res.status(403).json({ message: "Only the pool creator can view invites" });
+      }
       const invites = await storage.getPoolInvites(req.params.id);
       res.json({ invites });
     } catch (error) {
@@ -2702,11 +2818,14 @@ export async function registerRoutes(
   // Contribute to pool using linked bank account (ACH)
   app.post("/api/pools/:id/contribute-bank", requireAuth, async (req, res, next) => {
     try {
-      const { amount, bankAccountId } = z.object({ 
-        amount: z.string(),
+      const { amount, bankAccountId } = z.object({
+        amount: z.string().refine((val) => {
+          const num = parseFloat(val);
+          return !isNaN(num) && num > 0 && num <= 1000000;
+        }, "Amount must be a positive number"),
         bankAccountId: z.string(),
       }).parse(req.body);
-      
+
       const pool = await storage.getPool(req.params.id);
       if (!pool) {
         return res.status(404).json({ error: "Pool not found" });
@@ -3081,7 +3200,6 @@ export async function registerRoutes(
       if (!user) return res.status(404).json({ error: "User not found" });
 
       const contributionAmount = parseFloat(amount);
-      const userBalance = parseFloat(user.balance);
 
       if (paymentMethod === 'bank') {
         if (!bankAccountId) {
@@ -3171,16 +3289,14 @@ export async function registerRoutes(
           }
         }
       } else {
-        if (startImmediately && userBalance < contributionAmount) {
-          return res.status(400).json({ 
-            message: "Insufficient balance for the first contribution. Please add funds to your wallet." 
-          });
-        }
-
         if (startImmediately) {
-          await storage.updateUserBalance(userId, (userBalance - contributionAmount).toFixed(2));
-          await storage.createContribution({ poolId: pool.id, userId, amount });
-          await storage.updatePoolAmount(pool.id, (parseFloat(pool.currentAmount) + contributionAmount).toFixed(2));
+          // Atomic wallet debit + pool credit + contribution record (guarded, no double-spend)
+          const contribution = await storage.contributeFromWallet(userId, pool.id, contributionAmount, amount);
+          if (!contribution) {
+            return res.status(400).json({
+              message: "Insufficient balance for the first contribution. Please add funds to your wallet."
+            });
+          }
         }
       }
 
@@ -3224,6 +3340,10 @@ export async function registerRoutes(
       const pool = await storage.getPool(req.params.id);
       if (!pool) {
         return res.status(404).json({ message: "Pool not found" });
+      }
+
+      if (!(await canViewPool(pool, req.session.userId!))) {
+        return res.status(403).json({ message: "Not authorized to view this pool" });
       }
 
       const contributions = await storage.getRecurringContributionsByPool(pool.id);
@@ -3534,11 +3654,16 @@ export async function registerRoutes(
   // Initiate withdrawal to bank
   app.post("/api/plaid/withdraw", requireAuth, async (req, res, next) => {
     try {
-      const { amount } = z.object({ amount: z.string() }).parse(req.body);
+      const { amount, pin } = z.object({ amount: z.string(), pin: z.string().optional() }).parse(req.body);
       const userId = req.session.userId!;
       const user = await storage.getUser(userId);
-      
+
       if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Require the transaction PIN if the user has set one
+      const pinCheck = await enforceTransactionPin(user, pin);
+      if (!pinCheck.ok) return res.status(pinCheck.status).json({ error: pinCheck.error });
+
       if (!user.plaidAccessToken || !user.plaidAccountId) {
         return res.status(400).json({ error: "No bank account linked" });
       }
@@ -3547,16 +3672,19 @@ export async function registerRoutes(
       }
 
       const withdrawAmount = parseFloat(amount);
-      const currentBalance = parseFloat(user.balance);
-      
-      if (withdrawAmount <= 0 || withdrawAmount > currentBalance) {
+
+      if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
         return res.status(400).json({ error: "Invalid withdrawal amount" });
       }
 
+      // Atomic guarded debit prevents concurrent double-withdrawal
+      const debited = await storage.atomicDebitUserBalance(userId, withdrawAmount);
+      if (!debited) {
+        return res.status(400).json({ error: "Insufficient balance" });
+      }
+      const newBalance = (parseFloat(user.balance) - withdrawAmount).toFixed(2);
+
       // In production, this would initiate a real ACH transfer via Plaid Transfer API
-      const newBalance = (currentBalance - withdrawAmount).toFixed(2);
-      await storage.updateUser(userId, { balance: newBalance });
-      
       // Log the withdrawal
       await storage.createWalletWithdrawal(userId, amount, user.plaidAccountId);
 
@@ -3584,14 +3712,19 @@ export async function registerRoutes(
   // Wallet withdrawal endpoint - creates pending request for manual admin processing
   app.post("/api/wallet/withdraw", requireAuth, async (req, res, next) => {
     try {
-      const { amount, savedMethodId } = z.object({
+      const { amount, savedMethodId, pin } = z.object({
         amount: z.string(),
         savedMethodId: z.string({ required_error: "Please select a verified bank account" }),
+        pin: z.string().optional(),
       }).parse(req.body);
 
       const userId = req.session.userId!;
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Require the transaction PIN if the user has set one
+      const pinCheck = await enforceTransactionPin(user, pin);
+      if (!pinCheck.ok) return res.status(pinCheck.status).json({ error: pinCheck.error });
 
       // Require KYC verification for withdrawals
       if (user.kycStatus !== 'verified') {
@@ -3601,7 +3734,7 @@ export async function registerRoutes(
       const withdrawAmount = parseFloat(amount);
       const currentBalance = parseFloat(user.balance);
 
-      if (withdrawAmount <= 0) {
+      if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
         return res.status(400).json({ error: "Amount must be greater than zero" });
       }
 
@@ -3613,12 +3746,9 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Insufficient balance" });
       }
 
-      // Get verified bank account
-      const savedMethod = await db.select()
-        .from(bankAccounts)
-        .where(eq(bankAccounts.id, savedMethodId))
-        .then(rows => rows[0]);
-      
+      // Get verified bank account (storage decrypts sensitive fields)
+      const savedMethod = await storage.getBankAccountById(savedMethodId);
+
       if (!savedMethod || savedMethod.userId !== userId) {
         return res.status(404).json({ error: "Bank account not found" });
       }
@@ -3634,9 +3764,12 @@ export async function registerRoutes(
       const finalAccountType = savedMethod.accountType;
       const bankAccountIdRef = savedMethod.id;
 
-      // Deduct from user balance immediately
+      // Atomically deduct from user balance (guarded against concurrent double-withdrawal)
+      const debited = await storage.atomicDebitUserBalance(userId, withdrawAmount);
+      if (!debited) {
+        return res.status(400).json({ error: "Insufficient balance" });
+      }
       const newBalance = (currentBalance - withdrawAmount).toFixed(2);
-      await storage.updateUser(userId, { balance: newBalance });
 
       // Create withdrawal request with full bank details
       const accountLast4 = finalAccountNumber.slice(-4);
@@ -3653,8 +3786,7 @@ export async function registerRoutes(
         })
         .where(eq(walletWithdrawals.id, withdrawal.id));
 
-      console.log(`[Wallet Withdraw] Manual payout request created: ${withdrawal.id} for $${amount}`);
-      console.log(`[Wallet Withdraw] Bank: ${finalAccountHolderName}, Routing: ${finalRoutingNumber}, Account: ****${accountLast4}`);
+      console.log(`[Wallet Withdraw] Manual payout request created: ${withdrawal.id} for $${amount} (account ****${accountLast4})`);
 
       // Send admin notification email
       const { sendEmail } = await import('./notificationService');
@@ -3825,8 +3957,8 @@ export async function registerRoutes(
           accountName: accountHolderName,
           accountMask: accountLast4,
           accountType,
-          routingNumber,
-          accountNumber,
+          routingNumber: encryptField(routingNumber) as string,
+          accountNumber: encryptField(accountNumber) as string,
           isDefault: setAsDefault,
         })
         .returning();
@@ -3981,23 +4113,25 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Withdrawal already processed" });
       }
 
-      // Refund the user's balance
-      const withdrawalUser = await storage.getUser(withdrawal.userId);
-      if (withdrawalUser) {
-        const currentBalance = parseFloat(withdrawalUser.balance);
-        const refundAmount = parseFloat(withdrawal.amount);
-        const newBalance = (currentBalance + refundAmount).toFixed(2);
-        await storage.updateUser(withdrawal.userId, { balance: newBalance });
-      }
-
-      await db.update(walletWithdrawals)
-        .set({ 
+      // Atomically claim the pending->rejected transition first. If no row is
+      // affected, another request already processed it — do NOT refund again.
+      const claimed = await db.update(walletWithdrawals)
+        .set({
           status: 'rejected',
           processedAt: new Date(),
           processedBy: req.adminUser.id,
           adminNotes: reason || null,
         })
-        .where(eq(walletWithdrawals.id, id));
+        .where(and(eq(walletWithdrawals.id, id), eq(walletWithdrawals.status, 'pending_review')))
+        .returning({ id: walletWithdrawals.id });
+
+      if (claimed.length === 0) {
+        return res.status(400).json({ error: "Withdrawal already processed" });
+      }
+
+      // Refund the user's balance atomically (only once, now that we own the transition)
+      const withdrawalUser = await storage.getUser(withdrawal.userId);
+      await storage.atomicCreditUserBalance(withdrawal.userId, parseFloat(withdrawal.amount));
 
       // Log admin action
       await db.insert(adminAuditLogs).values({
@@ -4085,9 +4219,19 @@ export async function registerRoutes(
     try {
       const stripe = await getUncachableStripeClient();
       const { paymentMethodId } = req.params;
-      
+
       const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
-      
+
+      // Ownership check: the payment method must belong to the caller's Stripe
+      // customer, otherwise anyone could read another user's bank details.
+      const user = await storage.getUser(req.session.userId!);
+      const pmCustomer = typeof paymentMethod.customer === 'string'
+        ? paymentMethod.customer
+        : paymentMethod.customer?.id;
+      if (!user?.stripeCustomerId || pmCustomer !== user.stripeCustomerId) {
+        return res.status(403).json({ error: "Not authorized to view this payment method" });
+      }
+
       // Return only the necessary fields
       res.json({
         id: paymentMethod.id,
@@ -4852,20 +4996,26 @@ export async function registerRoutes(
         notes: z.string().optional(),
         bankAccountId: z.string().optional(),
         payoutSpeed: z.enum(['standard', 'instant']).optional().default('standard'),
+        pin: z.string().optional(),
       });
 
       const data = transferSchema.parse(req.body);
       const pool = await storage.getPool(poolId);
-      
+
       if (!pool) return res.status(404).json({ error: "Pool not found" });
       if (pool.creatorId !== userId) {
         return res.status(403).json({ error: "Only pool creator can initiate transfers" });
       }
 
+      // Require the transaction PIN if the user has set one
+      const transferUser = await storage.getUser(userId);
+      const transferPinCheck = await enforceTransactionPin(transferUser, data.pin);
+      if (!transferPinCheck.ok) return res.status(transferPinCheck.status).json({ error: transferPinCheck.error });
+
       const transferAmount = parseFloat(data.amount);
       const poolBalance = parseFloat(pool.currentAmount);
-      
-      if (transferAmount <= 0 || transferAmount > poolBalance) {
+
+      if (isNaN(transferAmount) || transferAmount <= 0 || transferAmount > poolBalance) {
         return res.status(400).json({ error: "Invalid transfer amount" });
       }
 
@@ -4897,6 +5047,14 @@ export async function registerRoutes(
         const instantFee = payoutSpeed === 'instant' ? transferAmount * INSTANT_FEE_RATE : 0;
         const netAmount = transferAmount - instantFee;
 
+        // Atomically deduct from pool first (guarded against concurrent double-drain).
+        // Only proceed to create the payout request if the debit succeeded.
+        const poolDebited = await storage.atomicDebitPoolAmount(poolId, transferAmount);
+        if (!poolDebited) {
+          return res.status(400).json({ error: "Insufficient pool balance" });
+        }
+        const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
+
         // Create transfer request
         const transfer = await storage.createPoolTransferRequest({
           poolId,
@@ -4906,10 +5064,6 @@ export async function registerRoutes(
           notes: data.notes,
           bankAccountId,
         });
-
-        // Deduct from pool immediately
-        const newPoolAmount = (poolBalance - transferAmount).toFixed(2);
-        await storage.updatePoolAmount(poolId, newPoolAmount);
 
         // Record pool activity for withdrawal
         await storage.createPoolActivity({
@@ -5074,7 +5228,7 @@ export async function registerRoutes(
             await storage.updateWalletWithdrawalStatus(withdrawal.id, 'failed');
             
             if (plaidError.code === 'RTP_NOT_SUPPORTED') {
-              await storage.updatePoolAmount(poolId, poolBalance.toFixed(2));
+              await storage.atomicCreditPoolAmount(poolId, transferAmount);
               await storage.updatePoolTransferRequest(transfer.id, { status: 'pending' });
               return res.status(400).json({ 
                 error: 'Instant payout not available for this bank. Please use standard payout.',
@@ -5086,7 +5240,7 @@ export async function registerRoutes(
 
         // Handle payout failure
         if (payoutError) {
-          await storage.updatePoolAmount(poolId, poolBalance.toFixed(2));
+          await storage.atomicCreditPoolAmount(poolId, transferAmount);
           await storage.updatePoolTransferRequest(transfer.id, { status: 'failed' });
           return res.status(500).json({ 
             error: `Payout failed: ${payoutError}. Pool balance has been restored.`
@@ -5289,9 +5443,13 @@ export async function registerRoutes(
       const distributeSchema = z.object({
         distributions: z.array(z.object({
           userId: z.string(),
-          amount: z.string(),
-        })),
+          amount: z.string().refine((val) => {
+            const num = parseFloat(val);
+            return !isNaN(num) && num > 0 && num <= 1000000;
+          }, "Distribution amount must be a positive number"),
+        })).min(1),
         closePool: z.boolean().optional(),
+        pin: z.string().optional(),
       });
 
       const data = distributeSchema.parse(req.body);
@@ -5304,6 +5462,11 @@ export async function registerRoutes(
       if (pool.creatorId !== userId) {
         return res.status(403).json({ message: "Only the pool creator can distribute funds" });
       }
+
+      // Require the transaction PIN if the user has set one
+      const distributeUser = await storage.getUser(userId);
+      const distributePinCheck = await enforceTransactionPin(distributeUser, data.pin);
+      if (!distributePinCheck.ok) return res.status(distributePinCheck.status).json({ error: distributePinCheck.error });
 
       const distributions: { userId: string; name: string; amount: string }[] = [];
 
@@ -7047,7 +7210,7 @@ export async function registerRoutes(
     const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
 
     const keyRecord = await storage.getMerchantApiKeyByPrefix(fullPrefix);
-    if (!keyRecord || keyRecord.keyHash !== keyHash) {
+    if (!keyRecord || !safeEqual(keyRecord.keyHash, keyHash)) {
       return res.status(401).json({ error: "Invalid API key" });
     }
 
@@ -7303,6 +7466,13 @@ export async function registerRoutes(
   // Helper function to send webhooks to merchants
   async function sendMerchantWebhook(merchant: any, sessionId: string, event: string, payload: any) {
     if (!merchant.webhookUrl) return;
+
+    // SSRF guard: never let a merchant-controlled URL reach internal services
+    const safe = await assertSafeOutboundUrl(merchant.webhookUrl);
+    if (!safe.ok) {
+      console.error(`[ChipInPay Webhook] Refusing to deliver to unsafe URL (${safe.reason}): ${merchant.webhookUrl}`);
+      return;
+    }
 
     try {
       const crypto = await import('crypto');
@@ -8665,7 +8835,7 @@ export async function registerRoutes(
 
   app.get("/api/mfa/status", requireAuth, async (req: any, res, next) => {
     try {
-      const status = await mfaService.getMFAStatus(req.user!.id);
+      const status = await mfaService.getMFAStatus(req.session.userId!);
       res.json(status);
     } catch (error) {
       next(error);
@@ -8674,7 +8844,7 @@ export async function registerRoutes(
 
   app.post("/api/mfa/setup", requireAuth, async (req: any, res, next) => {
     try {
-      const result = await mfaService.setupMFA(req.user!.id);
+      const result = await mfaService.setupMFA(req.session.userId!);
       res.json({ qrCode: result.qrCode, recoveryCodes: result.recoveryCodes });
     } catch (error) {
       next(error);
@@ -8688,7 +8858,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid token" });
       }
       
-      const success = await mfaService.enableMFA(req.user!.id, token);
+      const success = await mfaService.enableMFA(req.session.userId!, token);
       if (!success) {
         return res.status(400).json({ error: "Invalid verification code" });
       }
@@ -8706,7 +8876,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid token" });
       }
       
-      const success = await mfaService.disableMFA(req.user!.id, token);
+      const success = await mfaService.disableMFA(req.session.userId!, token);
       if (!success) {
         return res.status(400).json({ error: "Invalid verification code" });
       }
@@ -8717,13 +8887,13 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/mfa/verify", async (req, res, next) => {
+  app.post("/api/mfa/verify", requireAuth, async (req: any, res, next) => {
     try {
-      const { userId, token, recoveryCode } = req.body;
-      if (!userId) {
-        return res.status(400).json({ error: "User ID required" });
-      }
-      
+      const { token, recoveryCode } = req.body;
+      // Derive the user from the authenticated session — never trust a userId
+      // from the request body (that would be an unauthenticated brute-force oracle).
+      const userId = req.session.userId!;
+
       const ipAddress = req.ip;
       const userAgent = req.headers['user-agent'];
       
@@ -8753,18 +8923,18 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid token" });
       }
       
-      const [user] = await db.select().from(users).where(eq(users.id, req.user!.id));
+      const [user] = await db.select().from(users).where(eq(users.id, req.session.userId!));
       if (!user?.twoFactorSecret) {
         return res.status(400).json({ error: "MFA not enabled" });
       }
-      
+
       const { mfaService } = await import("./mfa-service");
       const isValid = mfaService.verifyToken(token, user.twoFactorSecret);
       if (!isValid) {
         return res.status(400).json({ error: "Invalid verification code" });
       }
-      
-      const recoveryCodes = await mfaService.generateRecoveryCodes(req.user!.id);
+
+      const recoveryCodes = await mfaService.generateRecoveryCodes(req.session.userId!);
       res.json({ recoveryCodes });
     } catch (error) {
       next(error);
@@ -8781,7 +8951,7 @@ export async function registerRoutes(
 
   app.get("/api/card-analytics", requireAuth, async (req: any, res, next) => {
     try {
-      const userPools = await db.select().from(pools).where(eq(pools.creatorId, req.user!.id));
+      const userPools = await db.select().from(pools).where(eq(pools.creatorId, req.session.userId!));
       const poolIds = userPools.map(p => p.id);
       
       if (poolIds.length === 0) {
@@ -8864,7 +9034,11 @@ export async function registerRoutes(
       if (!pool) {
         return res.status(404).json({ error: "Pool not found" });
       }
-      
+      // Ownership check: only the pool creator may view its card + transactions
+      if (pool.creatorId !== req.session.userId) {
+        return res.status(403).json({ error: "Not authorized to view this pool's card analytics" });
+      }
+
       const [card] = await db.select().from(virtualCards).where(eq(virtualCards.poolId, poolId));
       if (!card) {
         return res.json({
@@ -9342,12 +9516,12 @@ export async function registerRoutes(
         note: z.string().optional(),
         expiresInDays: z.number().int().min(1).max(365).optional(),
       }).parse(req.body);
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
+      const code = generateInviteCode(10);
       const expiresAt = data.expiresInDays ? new Date(Date.now() + data.expiresInDays * 86400000) : null;
       const [invite] = await db.insert(betaInvites).values({
         code,
         email: data.email,
-        createdBy: req.user!.id,
+        createdBy: req.session.userId!,
         maxUses: data.maxUses,
         note: data.note,
         expiresAt: expiresAt ?? undefined,
@@ -9394,12 +9568,12 @@ export async function registerRoutes(
       const [entry] = await db.select().from(waitlist).where(eq(waitlist.id, req.params.id)).limit(1);
       if (!entry) return res.status(404).json({ message: "Waitlist entry not found." });
 
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
+      const code = generateInviteCode(10);
       const expiresAt = new Date(Date.now() + 30 * 86400000); // 30 days
       const [invite] = await db.insert(betaInvites).values({
         code,
         email: entry.email,
-        createdBy: req.user!.id,
+        createdBy: req.session.userId!,
         maxUses: 1,
         note: `Invited from waitlist: ${entry.firstName} ${entry.lastName}`,
         expiresAt,
@@ -9408,7 +9582,8 @@ export async function registerRoutes(
       await db.update(waitlist).set({ invitedAt: new Date(), inviteCode: code }).where(eq(waitlist.id, entry.id));
 
       // Send invite email
-      const { sendEmail, emailWrapper, emailButton } = await import('./emailTemplates.js');
+      const { sendEmail } = await import('./notificationService');
+      const { emailWrapper, emailButton } = await import('./emailTemplates');
       const body = `
         <h2 style="color:#001F3F;margin:0 0 16px">You're invited to ChipIn! 🎉</h2>
         <p>Hi ${entry.firstName},</p>
@@ -9420,11 +9595,11 @@ export async function registerRoutes(
         <p>This code expires in 30 days and can only be used once. Head to chipinpool.com to create your account.</p>
         ${emailButton('Create My Account', 'https://chipinpool.com/register?invite=' + code)}
       `;
-      await sendEmail({
-        to: entry.email,
-        subject: "You're invited to ChipIn Beta!",
-        html: emailWrapper({ body, preheaderText: `Your ChipIn Beta invite code: ${code}` }),
-      });
+      await sendEmail(
+        entry.email,
+        "You're invited to ChipIn Beta!",
+        emailWrapper({ body, preheaderText: `Your ChipIn Beta invite code: ${code}` }),
+      );
 
       res.json({ message: `Invite sent to ${entry.email}`, invite });
     } catch (error) {
