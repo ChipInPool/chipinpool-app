@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Layout } from "@/components/layout";
+import { PublicLayout as Layout } from "@/components/public-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ const contactOptions = [
   {
     icon: HelpCircle,
     title: "General Inquiries",
-    description: "Questions about ChipIn, features, or how to get started",
+    description: "Questions about ChipInPool, features, or how to get started",
     email: "mail@chipinpool.com",
   },
   {

@@ -17,6 +17,9 @@ import Explore from "@/pages/explore";
 import HowItWorks from "@/pages/how-it-works";
 import Profile from "@/pages/profile";
 import UserProfile from "@/pages/user-profile";
+import Trust from "@/pages/trust";
+import Pricing from "@/pages/pricing";
+import { RequireAuth } from "@/components/require-auth";
 import Security from "@/pages/security";
 import Transactions from "@/pages/transactions";
 import Recurring from "@/pages/recurring";
@@ -69,7 +72,9 @@ function Router() {
       <Route path="/how-it-works" component={HowItWorks} />
       <Route path="/api-docs" component={ApiDocs} />
       <Route path="/profile" component={Profile} />
-      <Route path="/security" component={Security} />
+      <Route path="/trust" component={Trust} />
+      <Route path="/pricing" component={Pricing} />
+      <Route path="/security"><RequireAuth><Security /></RequireAuth></Route>
       <Route path="/payment-methods" component={PaymentMethods} />
       <Route path="/user/:id" component={UserProfile} />
       <Route path="/profile/:username" component={UserProfile} />

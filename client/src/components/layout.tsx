@@ -1,3 +1,4 @@
+import { PublicLayout } from "@/components/public-layout";
 import { Link, useLocation } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
     setLocation("/login");
     toast({ description: "Logged out successfully" });
   };
+
+  if (!isAuthenticated) return <PublicLayout>{children}</PublicLayout>;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-primary/20">

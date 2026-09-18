@@ -1,4 +1,4 @@
-import { Layout } from "@/components/layout";
+import { PublicLayout as Layout } from "@/components/public-layout";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { ArrowRight, UserPlus, CreditCard, Share2, Gift } from "lucide-react";
@@ -18,12 +18,12 @@ export default function HowItWorks() {
     {
       icon: <CreditCard className="w-8 h-8 text-purple-400" />,
       title: "3. Collect Funds",
-      description: "Watch contributions roll in. We hold the funds securely until you reach your target."
+      description: "Watch contributions roll in. Track confirmed contributions and progress toward your goal."
     },
     {
       icon: <Gift className="w-8 h-8 text-yellow-400" />,
       title: "4. Spend & Enjoy",
-      description: "Use your Virtual Visa Card instantly online or transfer funds to your bank account."
+      description: "Review the available card and bank payout options for your pool. Verification and provider requirements apply."
     }
   ];
 
@@ -31,7 +31,7 @@ export default function HowItWorks() {
     <Layout>
       <div className="max-w-4xl mx-auto py-6 md:py-12 px-1 sm:px-0">
          <div className="text-center mb-8 md:mb-16">
-            <h1 className="text-2xl sm:text-4xl md:text-5xl font-display font-bold mb-4 md:mb-6">How ChipIn Works</h1>
+            <h1 className="text-2xl sm:text-4xl md:text-5xl font-display font-bold mb-4 md:mb-6">How ChipInPool Works</h1>
             <p className="text-base md:text-xl text-muted-foreground max-w-2xl mx-auto">
                Pooling money shouldn't be a hassle. We've streamlined the process so you can focus on the experience, not the math.
             </p>
@@ -55,11 +55,11 @@ export default function HowItWorks() {
          </div>
 
          <div className="rounded-2xl md:rounded-3xl bg-linear-to-br from-primary/20 to-accent/20 p-1">
-            <div className="bg-[#0B0E14] rounded-[20px] md:rounded-[22px] p-6 md:p-12 text-center">
+            <div className="bg-background rounded-[20px] md:rounded-[22px] p-6 md:p-12 text-center">
                <h2 className="text-2xl md:text-3xl font-display font-bold mb-3 md:mb-4">Ready to start?</h2>
-               <p className="text-sm md:text-base text-muted-foreground mb-6 md:mb-8">Join thousands of users pooling for trips, gifts, and more.</p>
+               <p className="text-sm md:text-base text-muted-foreground mb-6 md:mb-8">Create a shared plan for trips, gifts, and more.</p>
                <Button size="lg" className="h-14 px-8 text-lg font-bold shadow-xl shadow-primary/20 hover:scale-105 transition-transform" asChild>
-                 <Link href="/create">Start Your First Pool <ArrowRight className="w-5 h-5 ml-2" /></Link>
+                 <Link href="/register">Start Your First Pool <ArrowRight className="w-5 h-5 ml-2" /></Link>
                </Button>
             </div>
          </div>

@@ -1,6 +1,6 @@
 {
   "name": "ChipInPool",
-  "short_name": "ChipIn",
+  "short_name": "ChipInPool",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0B0E14",

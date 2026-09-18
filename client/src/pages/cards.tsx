@@ -41,7 +41,7 @@ export default function CardsPage() {
               <div className="absolute bottom-0 left-0 w-24 h-24 bg-[#7FFFD4]/5 rounded-full translate-y-6 -translate-x-6" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-8">
-                  <span className="text-xs font-bold text-white/60 tracking-widest uppercase">ChipIn</span>
+                  <span className="text-xs font-bold text-white/60 tracking-widest uppercase">ChipInPool</span>
                   <span className="text-xs font-bold text-[#7FFFD4] tracking-widest uppercase">VISA</span>
                 </div>
                 <div className="font-mono text-lg text-white/80 tracking-[0.2em] mb-4">

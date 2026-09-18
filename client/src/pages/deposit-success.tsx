@@ -39,7 +39,7 @@ export default function DepositSuccess() {
           <div>
             <h1 className="text-2xl font-bold">Payment Successful!</h1>
             <p className="text-white/60 mt-1 text-sm">
-              Your deposit is being added to your ChipIn wallet.
+              Your deposit is being added to your ChipInPool wallet.
             </p>
           </div>
         </div>
@@ -52,7 +52,7 @@ export default function DepositSuccess() {
             data-testid="button-open-app"
           >
             <Smartphone className="w-5 h-5 mr-2" />
-            Open ChipIn App
+            Open ChipInPool App
           </Button>
           <p className="text-xs text-white/40">
             Your balance will update automatically when you return to the app.
@@ -61,7 +61,7 @@ export default function DepositSuccess() {
 
         {/* Web fallback */}
         <div className="border-t border-white/10 pt-6 space-y-3">
-          <p className="text-xs text-white/40">Using ChipIn on the web?</p>
+          <p className="text-xs text-white/40">Using ChipInPool on the web?</p>
           <Link href="/profile">
             <Button
               variant="ghost"

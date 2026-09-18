@@ -1,4 +1,4 @@
-import { Layout } from "@/components/layout";
+import { PublicLayout as Layout } from "@/components/public-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Users, Shield, Zap, Heart, Target, Globe } from "lucide-react";
 
@@ -7,7 +7,7 @@ export default function About() {
     <Layout>
       <div className="max-w-4xl mx-auto py-6 md:py-12 px-1 sm:px-0">
         <div className="text-center mb-8 md:mb-12">
-          <h1 className="text-2xl md:text-4xl font-display font-bold mb-3 md:mb-4">About ChipIn</h1>
+          <h1 className="text-2xl md:text-4xl font-display font-bold mb-3 md:mb-4">About ChipInPool</h1>
           <p className="text-base md:text-xl text-muted-foreground max-w-2xl mx-auto">
             We're on a mission to make group payments simple, transparent, and social.
           </p>
@@ -17,10 +17,10 @@ export default function About() {
           <div className="bg-card/50 border border-white/10 rounded-2xl p-4 md:p-8 mb-8">
             <h2 className="text-xl md:text-2xl font-semibold mb-4">Our Story</h2>
             <p className="text-muted-foreground leading-relaxed mb-4">
-              ChipIn was born from a simple frustration: splitting bills and pooling money with friends shouldn't be complicated. Whether it's a group trip, a birthday gift, or shared household expenses, we believe managing money together should bring people closer, not create awkward moments.
+              ChipInPool was born from a simple frustration: splitting bills and pooling money with friends shouldn't be complicated. Whether it's a group trip, a birthday gift, or shared household expenses, we believe managing money together should bring people closer, not create awkward moments.
             </p>
             <p className="text-muted-foreground leading-relaxed">
-              Founded in 2024, we set out to build the most intuitive, secure, and social way to handle group finances. Today, thousands of people use ChipIn to pool funds, split costs, and spend together with virtual cards.
+              Founded in 2024, we set out to build the most intuitive, secure, and social way to handle group finances. ChipInPool brings shared goals and contributions into one place.
             </p>
           </div>
         </div>
@@ -46,7 +46,7 @@ export default function About() {
               </div>
               <h3 className="font-semibold mb-2">Security & Trust</h3>
               <p className="text-sm text-muted-foreground">
-                Your money and data are sacred. We use bank-level encryption and partner with industry leaders like Stripe to keep everything secure.
+                Manage account verification and spending controls, with Stripe integrations for payment processing and identity verification.
               </p>
             </CardContent>
           </Card>
@@ -103,9 +103,9 @@ export default function About() {
         <div className="bg-gradient-to-r from-primary/10 to-blue-500/10 rounded-2xl p-5 md:p-8 text-center">
           <h2 className="text-xl md:text-2xl font-semibold mb-3 md:mb-4">Join Our Journey</h2>
           <p className="text-sm md:text-base text-muted-foreground mb-4 md:mb-6 max-w-xl mx-auto">
-            We're just getting started. Join thousands of users who are already making group payments easier with ChipIn.
+            We're building a clearer way to collect contributions and manage shared expenses.
           </p>
-          <a href="/login" className="inline-flex items-center justify-center px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary/90 transition-colors" data-testid="link-about-get-started">
+          <a href="/register" className="inline-flex items-center justify-center px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary/90 transition-colors" data-testid="link-about-get-started">
             Get Started Free
           </a>
         </div>

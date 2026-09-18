@@ -128,7 +128,7 @@ export default function Home() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5 mb-8 md:mb-10">
         <Card className="relative overflow-hidden border-white/[0.08] bg-gradient-to-br from-white/[0.04] to-white/[0.01] hover:border-white/[0.12] transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between pb-2 p-4 md:p-6 md:pb-2">
-            <FeatureTooltip id="stat-wallet" title="Wallet Balance" description="Your ChipIn wallet holds your funds. Deposit money via Stripe to start contributing to pools.">
+            <FeatureTooltip id="stat-wallet" title="Wallet Balance" description="Your ChipInPool wallet holds your funds. Deposit money via Stripe to start contributing to pools.">
               <CardTitle className="text-[11px] md:text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">Wallet Balance</CardTitle>
             </FeatureTooltip>
             <div className="p-2 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5">
