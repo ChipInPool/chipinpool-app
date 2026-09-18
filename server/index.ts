@@ -171,7 +171,15 @@ app.use((req, res, next) => {
 
     console.error("Internal Server Error:", err);
 
-    return res.status(status).json({ message });
+    // Never surface internal error details (stack traces, filesystem paths,
+    // driver errors) to clients for unexpected 5xx failures — log them instead
+    // and return a generic message. Deliberate 4xx errors keep their message.
+    const isClientError = status >= 400 && status < 500;
+    const safeMessage = isClientError || process.env.NODE_ENV !== "production"
+      ? message
+      : "Something went wrong. Please try again.";
+
+    return res.status(status).json({ message: safeMessage });
   });
 
   // importantly only setup vite in development and after

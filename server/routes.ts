@@ -190,10 +190,35 @@ export async function registerRoutes(
   // don't leak memory, and work across multiple instances (the default
   // MemoryStore does none of these and is unsafe for production).
   const PgSession = connectPgSimple(session);
+  const SESSION_TABLE = 'user_sessions';
+
+  // Create the session table ourselves with idempotent DDL rather than using
+  // connect-pg-simple's createTableIfMissing. That option reads a table.sql
+  // file from its own package directory at runtime, which does not survive
+  // esbuild bundling into dist/ (it resolved to dist/table.sql and threw
+  // ENOENT in production). Doing the DDL here needs no file I/O at all.
+  try {
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS "${SESSION_TABLE}" (
+        "sid" varchar NOT NULL PRIMARY KEY,
+        "sess" json NOT NULL,
+        "expire" timestamp(6) NOT NULL
+      );
+    `);
+    await pgPool.query(`
+      CREATE INDEX IF NOT EXISTS "IDX_${SESSION_TABLE}_expire"
+        ON "${SESSION_TABLE}" ("expire");
+    `);
+  } catch (err: any) {
+    // Don't take the app down for a transient error here: once the table
+    // exists (the normal case after first boot) sessions work regardless.
+    console.error('[Session] Could not ensure session table exists:', err.message);
+  }
+
   const sessionStore = new PgSession({
     pool: pgPool as any,
-    tableName: 'user_sessions',
-    createTableIfMissing: true,
+    tableName: SESSION_TABLE,
+    createTableIfMissing: false,
   });
   app.use(
     session({
