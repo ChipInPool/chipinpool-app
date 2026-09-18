@@ -1,4 +1,4 @@
-import { Layout } from "@/components/layout";
+import { PublicLayout as Layout } from "@/components/public-layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -321,7 +321,7 @@ export default function ApiDocs() {
            {/* Integration Example */}
            <section id="checkout" className="space-y-4 md:space-y-6">
               <h2 className="text-2xl md:text-3xl font-display font-bold">Create a Checkout Session</h2>
-              <p className="text-muted-foreground">Initialize the ChipIn button in your checkout component.</p>
+              <p className="text-muted-foreground">Initialize the ChipInPool button in your checkout component.</p>
               
               <div className="bg-[#0D1117] rounded-xl border border-white/10 overflow-hidden font-mono text-xs md:text-sm">
                  <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-white/5 border-b border-white/5">
@@ -341,7 +341,7 @@ export default function ApiDocs() {
         <span className="text-gray-500">{/* Standard checkout button */}</span>
         <span className="text-gray-500">&lt;</span><span className="text-yellow-400">button</span><span className="text-gray-500">&gt;</span>Pay Now<span className="text-gray-500">&lt;/</span><span className="text-yellow-400">button</span><span className="text-gray-500">&gt;</span>
 
-        <span className="text-gray-500">{/* ChipIn Split button */}</span>
+        <span className="text-gray-500">{/* ChipInPool Split button */}</span>
         <span className="text-gray-500">&lt;</span><span className="text-yellow-400">PayButton</span> 
           <span className="text-blue-300">amount</span>={"{49900}"}
           <span className="text-blue-300">currency</span>=<span className="text-green-400">"USD"</span>

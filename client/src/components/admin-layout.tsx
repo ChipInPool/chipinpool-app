@@ -54,7 +54,7 @@ function SidebarContent({
           </div>
           <div>
             <h1 className="font-display font-bold text-lg">Admin</h1>
-            <p className="text-xs text-muted-foreground">ChipIn Portal</p>
+            <p className="text-xs text-muted-foreground">ChipInPool Portal</p>
           </div>
         </div>
       </div>

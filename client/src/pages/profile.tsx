@@ -777,7 +777,7 @@ export default function Profile() {
               Add Funds
             </DialogTitle>
             <DialogDescription>
-              Securely deposit money to your ChipIn wallet
+              Securely deposit money to your ChipInPool wallet
             </DialogDescription>
           </DialogHeader>
           

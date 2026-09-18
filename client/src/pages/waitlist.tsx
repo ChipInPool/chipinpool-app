@@ -54,7 +54,7 @@ export default function Waitlist() {
               </div>
               <CardTitle className="text-2xl font-display">You're on the list!</CardTitle>
               <CardDescription className="text-base">
-                Thanks for joining the ChipIn Beta waitlist. We'll email you as soon as a spot opens up — it won't be long!
+                Thanks for joining the ChipInPool Beta waitlist. We'll email you as soon as a spot opens up — it won't be long!
               </CardDescription>
             </CardHeader>
             <CardContent className="pb-6">
@@ -79,15 +79,15 @@ export default function Waitlist() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-6">
-            <img src="/logo.png" alt="ChipIn" className="w-10 h-10 rounded-lg object-cover" />
-            <span className="font-display font-bold text-2xl tracking-tight">ChipIn</span>
+            <img src="/logo.png" alt="ChipInPool" className="w-10 h-10 rounded-lg object-cover" />
+            <span className="font-display font-bold text-2xl tracking-tight">ChipInPool</span>
           </div>
           <div className="inline-flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-sm font-medium mb-4">
             <Sparkles className="w-3.5 h-3.5" /> Private Beta
           </div>
           <h1 className="text-3xl font-display font-bold mb-2">Join the Waitlist</h1>
           <p className="text-muted-foreground">
-            ChipIn is currently invite-only. Sign up and we'll send you an invite when a spot opens up.
+            ChipInPool is currently invite-only. Sign up and we'll send you an invite when a spot opens up.
           </p>
         </div>
 

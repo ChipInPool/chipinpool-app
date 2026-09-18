@@ -14,7 +14,7 @@ type LoginMethod = 'email' | 'username' | 'phone';
 type ForgotMethod = 'email' | 'phone';
 
 export default function Login() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const searchString = useSearch();
   const { login, register, isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -55,7 +55,7 @@ export default function Login() {
   const [showKycPrompt, setShowKycPrompt] = useState(false);
   const [kycLoading, setKycLoading] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
-  const [activeTab, setActiveTab] = useState("login");
+  const [activeTab, setActiveTab] = useState(location === "/register" ? "register" : "login");
   
   const [fieldErrors, setFieldErrors] = useState<{
     username?: { message: string; exists?: boolean };
@@ -164,9 +164,13 @@ export default function Login() {
 
   useEffect(() => {
     if (!authLoading && isAuthenticated && !showKycPrompt) {
-      setLocation("/");
+      setLocation(new URLSearchParams(searchString).get("redirect") === "security" ? "/security" : "/");
     }
-  }, [authLoading, isAuthenticated, showKycPrompt, setLocation]);
+  }, [authLoading, isAuthenticated, showKycPrompt, setLocation, searchString]);
+
+  useEffect(() => {
+    setActiveTab(location === "/register" || urlInviteCode ? "register" : "login");
+  }, [location, urlInviteCode]);
 
   // Auto-switch to register tab and validate invite code if URL has ?invite=
   useEffect(() => {
@@ -493,7 +497,7 @@ export default function Login() {
               <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-4">
                 <Lock className="w-8 h-8 text-yellow-500" />
               </div>
-              <CardTitle className="text-xl font-display">ChipIn is in Private Beta</CardTitle>
+              <CardTitle className="text-xl font-display">ChipInPool is in Private Beta</CardTitle>
               <CardDescription>
                 Your account is pending beta access. Join the waitlist and we'll send you an invite when a spot opens up.
               </CardDescription>
@@ -518,8 +522,8 @@ export default function Login() {
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 mb-4">
-              <img src="/logo.png" alt="ChipIn" className="w-10 h-10 rounded-lg object-cover" />
-              <span className="font-display font-bold text-2xl tracking-tight">ChipIn</span>
+              <img src="/logo.png" alt="ChipInPool" className="w-10 h-10 rounded-lg object-cover" />
+              <span className="font-display font-bold text-2xl tracking-tight">ChipInPool</span>
             </div>
           </div>
 
@@ -627,8 +631,8 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-4">
-            <img src="/logo.png" alt="ChipIn" className="w-10 h-10 rounded-lg object-cover" />
-            <span className="font-display font-bold text-2xl tracking-tight">ChipIn</span>
+            <img src="/logo.png" alt="ChipInPool" className="w-10 h-10 rounded-lg object-cover" />
+            <span className="font-display font-bold text-2xl tracking-tight">ChipInPool</span>
           </div>
           <p className="text-sm md:text-base text-muted-foreground">Pool funds together. Pay smarter.</p>
         </div>
@@ -853,7 +857,7 @@ export default function Login() {
                         <p className="text-xs text-green-600">Invite code accepted!</p>
                       )}
                       <p className="text-[11px] text-muted-foreground">
-                        ChipIn is invite-only. Don't have a code?{" "}
+                        ChipInPool is invite-only. Don't have a code?{" "}
                         <button type="button" className="underline text-primary" onClick={() => setLocation("/waitlist")}>
                           Join the waitlist
                         </button>
@@ -1006,7 +1010,7 @@ export default function Login() {
                         required
                         data-testid="input-register-dob"
                       />
-                      <p className="text-xs text-muted-foreground">You must be 18+ to use ChipIn</p>
+                      <p className="text-xs text-muted-foreground">You must be 18+ to use ChipInPool</p>
                     </div>
                     
                     <Button 

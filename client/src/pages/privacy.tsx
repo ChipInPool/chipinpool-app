@@ -1,4 +1,4 @@
-import { Layout } from "@/components/layout";
+import { PublicLayout as Layout } from "@/components/public-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function Privacy() {
@@ -21,14 +21,14 @@ export default function Privacy() {
             <section>
               <h2 className="text-xl font-semibold mb-3">2. How We Use Your Information</h2>
               <p className="text-muted-foreground leading-relaxed">
-                We use your information to provide ChipIn services, process transactions, verify your identity, prevent fraud, communicate with you, and comply with legal obligations. We may also use aggregated, anonymized data for analytics and service improvement.
+                We use your information to provide ChipInPool services, process transactions, verify your identity, prevent fraud, communicate with you, and comply with legal obligations. We may also use aggregated, anonymized data for analytics and service improvement.
               </p>
             </section>
 
             <section>
               <h2 className="text-xl font-semibold mb-3">3. Information Sharing</h2>
               <p className="text-muted-foreground leading-relaxed">
-                We share your information with service providers who help us operate ChipIn, including payment processors (Stripe), banking partners, identity verification services, and communication providers. We may also share information when required by law or to protect our rights.
+                We share your information with service providers who help us operate ChipInPool, including payment processors (Stripe), banking partners, identity verification services, and communication providers. We may also share information when required by law or to protect our rights.
               </p>
             </section>
 
@@ -70,21 +70,21 @@ export default function Privacy() {
             <section>
               <h2 className="text-xl font-semibold mb-3">9. Children's Privacy</h2>
               <p className="text-muted-foreground leading-relaxed">
-                ChipIn is not intended for users under 18 years of age. We do not knowingly collect personal information from children. If we learn that we have collected information from a child, we will delete it promptly.
+                ChipInPool is not intended for users under 18 years of age. We do not knowingly collect personal information from children. If we learn that we have collected information from a child, we will delete it promptly.
               </p>
             </section>
 
             <section>
               <h2 className="text-xl font-semibold mb-3">10. International Users</h2>
               <p className="text-muted-foreground leading-relaxed">
-                Your information may be transferred to and processed in countries other than your own. By using ChipIn, you consent to such transfers. We take steps to ensure your data is protected in accordance with this policy regardless of where it is processed.
+                Your information may be transferred to and processed in countries other than your own. By using ChipInPool, you consent to such transfers. We take steps to ensure your data is protected in accordance with this policy regardless of where it is processed.
               </p>
             </section>
 
             <section>
               <h2 className="text-xl font-semibold mb-3">11. Changes to This Policy</h2>
               <p className="text-muted-foreground leading-relaxed">
-                We may update this Privacy Policy periodically. We will notify you of material changes via email or through the Service. Your continued use of ChipIn after changes take effect constitutes acceptance of the updated policy.
+                We may update this Privacy Policy periodically. We will notify you of material changes via email or through the Service. Your continued use of ChipInPool after changes take effect constitutes acceptance of the updated policy.
               </p>
             </section>
 

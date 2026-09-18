@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Layout } from "@/components/layout";
+import { PublicLayout as Layout } from "@/components/public-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronDown, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -9,16 +9,16 @@ const faqs = [
     category: "Getting Started",
     questions: [
       {
-        q: "What is ChipIn?",
-        a: "ChipIn is a social payments platform that makes it easy to pool funds with friends, family, or groups. You can create pools for trips, gifts, shared expenses, or any group goal, invite others to contribute, and spend the collected funds using virtual cards.",
+        q: "What is ChipInPool?",
+        a: "ChipInPool is a social payments platform that makes it easy to pool funds with friends, family, or groups. You can create pools for trips, gifts, shared expenses, or any group goal, invite others to contribute, and spend the collected funds using virtual cards.",
       },
       {
         q: "How do I create an account?",
         a: "Sign up with your email, phone number, and basic information. You'll verify your phone via SMS code, and then you can optionally complete identity verification to unlock all features like creating pools and getting virtual cards.",
       },
       {
-        q: "Is ChipIn free to use?",
-        a: "Creating an account and joining pools is free. We charge a small fee on certain transactions like card spending. All fees are clearly shown before you confirm any action.",
+        q: "Is ChipInPool free to use?",
+        a: "Creating an account and joining pools costs $0. Standard pool payouts have a $0 ChipInPool fee; instant pool payouts, when available, cost 1.5%. See the Fees page for examples and details.",
       },
     ],
   },
@@ -48,15 +48,15 @@ const faqs = [
     questions: [
       {
         q: "What are virtual cards?",
-        a: "Virtual cards are digital Visa cards linked to your pool's funds. You can use them to shop online or add them to Apple Pay/Google Pay for in-store purchases.",
+        a: "Virtual cards are digital payment cards for eligible pools. Card issuance, supported purchases, and wallet support depend on your account and the card provider. Check your available card options before planning a purchase.",
       },
       {
         q: "How do I get a virtual card?",
-        a: "Once your pool has funds and you've completed identity verification, you can request a virtual card from the pool details page. Cards are issued instantly.",
+        a: "Once your pool has funds and you've completed identity verification, you can request a virtual card from the pool details page. Issuance depends on provider approval and availability.",
       },
       {
         q: "Are virtual cards secure?",
-        a: "Yes! Each card has unique numbers and can be frozen or deleted instantly. Cards are issued by our banking partner through Stripe, meeting the highest security standards.",
+        a: "Use the card controls available in your account and keep card details private. Contact support promptly if you notice a transaction you do not recognize.",
       },
     ],
   },
@@ -65,11 +65,11 @@ const faqs = [
     questions: [
       {
         q: "How is my money protected?",
-        a: "Your funds are held by our licensed banking partners. We use bank-level encryption, and all payment processing goes through Stripe, a trusted payment infrastructure provider.",
+        a: "ChipInPool integrates with Stripe for payment processing. Verification and a transaction PIN help protect account activity. See the Security page and Terms of Service for more information, or contact support about a specific payment.",
       },
       {
         q: "What is identity verification (KYC)?",
-        a: "To comply with financial regulations and prevent fraud, we verify your identity using Stripe Identity. This involves uploading a government ID and taking a selfie. The process takes just a few minutes.",
+        a: "To comply with financial regulations and prevent fraud, we verify your identity using Stripe Identity. This involves uploading a government ID and taking a selfie. Review times vary.",
       },
       {
         q: "Who can see my contributions?",
@@ -90,7 +90,7 @@ const faqs = [
       },
       {
         q: "What are the fees?",
-        a: "Contributing to pools is free. We charge a small percentage on card transactions. All applicable fees are shown before you confirm any transaction.",
+        a: "Standard pool payouts have a $0 ChipInPool fee. Instant pool payouts, when available, cost 1.5%: a $100 payout has a $1.50 fee and a $98.50 net amount. Merchant integration pricing is separate. Review the Fees page and the payment details before confirming.",
       },
     ],
   },
@@ -124,7 +124,7 @@ export default function FAQ() {
         <div className="text-center mb-8 md:mb-12">
           <h1 className="text-2xl md:text-4xl font-display font-bold mb-3 md:mb-4">Frequently Asked Questions</h1>
           <p className="text-base md:text-xl text-muted-foreground max-w-2xl mx-auto mb-6 md:mb-8">
-            Find answers to common questions about ChipIn.
+            Find answers to common questions about ChipInPool.
           </p>
           <div className="relative max-w-md mx-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -151,6 +151,7 @@ export default function FAQ() {
                       <button
                         onClick={() => toggleItem(key)}
                         className="w-full px-4 md:px-6 py-3 md:py-4 flex items-center justify-between text-left"
+                        aria-expanded={isOpen}
                         data-testid={`button-faq-${catIndex}-${qIndex}`}
                       >
                         <span className="font-medium pr-4 text-sm md:text-base">{item.q}</span>
