@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,17 @@ export default function Waitlist() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  // Signups are public unless the server reports invite-only mode.
+  const [inviteOnly, setInviteOnly] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/auth/signup-mode')
+      .then((res) => res.json())
+      .then((data) => { if (!cancelled) setInviteOnly(data?.inviteOnly === true); })
+      .catch(() => { /* leave signups open on failure */ });
+    return () => { cancelled = true; };
+  }, []);
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -83,11 +94,23 @@ export default function Waitlist() {
             <span className="font-display font-bold text-2xl tracking-tight">ChipInPool</span>
           </div>
           <div className="inline-flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-sm font-medium mb-4">
-            <Sparkles className="w-3.5 h-3.5" /> Private Beta
+            <Sparkles className="w-3.5 h-3.5" /> {inviteOnly ? 'Private Beta' : 'Now Open'}
           </div>
-          <h1 className="text-3xl font-display font-bold mb-2">Join the Waitlist</h1>
+          <h1 className="text-3xl font-display font-bold mb-2">
+            {inviteOnly ? 'Join the Waitlist' : 'Create your account'}
+          </h1>
           <p className="text-muted-foreground">
-            ChipInPool is currently invite-only. Sign up and we'll send you an invite when a spot opens up.
+            {inviteOnly ? (
+              "ChipInPool is currently invite-only. Sign up and we'll send you an invite when a spot opens up."
+            ) : (
+              <>
+                ChipInPool is open to everyone — no invite needed.{" "}
+                <button type="button" className="underline text-primary" onClick={() => setLocation('/login')}>
+                  Sign up now
+                </button>
+                , or leave your details below and we'll keep you posted.
+              </>
+            )}
           </p>
         </div>
 

@@ -37,6 +37,8 @@ export default function Login() {
   const [inviteCode, setInviteCode] = useState(urlInviteCode);
   const [inviteCodeValid, setInviteCodeValid] = useState<boolean | null>(urlInviteCode ? null : null);
   const [inviteCodeChecking, setInviteCodeChecking] = useState(false);
+  // Signups are public unless the server reports invite-only mode.
+  const [inviteOnly, setInviteOnly] = useState(false);
 
   const [registerForm, setRegisterForm] = useState({
     firstName: "",
@@ -171,6 +173,17 @@ export default function Login() {
   useEffect(() => {
     setActiveTab(location === "/register" || urlInviteCode ? "register" : "login");
   }, [location, urlInviteCode]);
+
+  // Ask the server whether registration currently requires an invite code.
+  // Defaults to public if the request fails, matching the server default.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/auth/signup-mode')
+      .then((res) => res.json())
+      .then((data) => { if (!cancelled) setInviteOnly(data?.inviteOnly === true); })
+      .catch(() => { /* leave signups open on failure */ });
+    return () => { cancelled = true; };
+  }, []);
 
   // Auto-switch to register tab and validate invite code if URL has ?invite=
   useEffect(() => {
@@ -397,7 +410,7 @@ export default function Login() {
       return;
     }
 
-    if (!inviteCode.trim()) {
+    if (inviteOnly && !inviteCode.trim()) {
       toast({ description: "Please enter your invite code to register.", variant: "destructive" });
       return;
     }
@@ -410,7 +423,7 @@ export default function Login() {
         email: registerForm.email.toLowerCase(),
         phoneVerificationCode: verificationCode,
         acceptTerms: true,
-        inviteCode: inviteCode.trim().toUpperCase(),
+        inviteCode: inviteCode.trim() ? inviteCode.trim().toUpperCase() : undefined,
       });
       toast({ description: "Account created successfully!" });
       setShowKycPrompt(true);
@@ -826,7 +839,10 @@ export default function Login() {
                     {/* Invite Code */}
                     <div className="space-y-2">
                       <Label htmlFor="register-inviteCode" className="flex items-center gap-1">
-                        <Key className="w-3.5 h-3.5" /> Invite Code <span className="text-red-500">*</span>
+                        <Key className="w-3.5 h-3.5" /> Invite Code{" "}
+                        {inviteOnly
+                          ? <span className="text-red-500">*</span>
+                          : <span className="text-muted-foreground font-normal">(optional)</span>}
                       </Label>
                       <div className="relative">
                         <Input
@@ -841,7 +857,7 @@ export default function Login() {
                             else setInviteCodeValid(null);
                           }}
                           className={`font-mono tracking-widest uppercase pr-10 ${inviteCodeValid === true ? 'border-green-500' : inviteCodeValid === false ? 'border-red-500' : ''}`}
-                          required
+                          required={inviteOnly}
                           data-testid="input-invite-code"
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -851,16 +867,26 @@ export default function Login() {
                         </div>
                       </div>
                       {inviteCodeValid === false && (
-                        <p className="text-xs text-red-500">Invalid or expired invite code.</p>
+                        <p className={`text-xs ${inviteOnly ? 'text-red-500' : 'text-muted-foreground'}`}>
+                          {inviteOnly
+                            ? 'Invalid or expired invite code.'
+                            : "That code isn't valid, but you can still sign up without one."}
+                        </p>
                       )}
                       {inviteCodeValid === true && (
                         <p className="text-xs text-green-600">Invite code accepted!</p>
                       )}
                       <p className="text-[11px] text-muted-foreground">
-                        ChipInPool is invite-only. Don't have a code?{" "}
-                        <button type="button" className="underline text-primary" onClick={() => setLocation("/waitlist")}>
-                          Join the waitlist
-                        </button>
+                        {inviteOnly ? (
+                          <>
+                            ChipInPool is invite-only. Don't have a code?{" "}
+                            <button type="button" className="underline text-primary" onClick={() => setLocation("/waitlist")}>
+                              Join the waitlist
+                            </button>
+                          </>
+                        ) : (
+                          <>Have an invite code? Enter it here — otherwise just continue, anyone can sign up.</>
+                        )}
                       </p>
                     </div>
 
