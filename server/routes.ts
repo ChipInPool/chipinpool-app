@@ -135,6 +135,11 @@ export async function registerRoutes(
     return 'http://localhost:5000';
   };
 
+  // Signups are open to the public by default. Set INVITE_ONLY=true to require
+  // a beta invite code to register (the original closed-beta behavior).
+  const inviteOnlySignups = process.env.INVITE_ONLY === 'true';
+  console.log(`[Signup] Registration mode: ${inviteOnlySignups ? 'invite-only' : 'open to the public'}`);
+
   const effectiveSecret = sessionSecret || 'dev-only-insecure-secret-do-not-use-in-production';
   function signedSessionToken(sessionID: string): string {
     return `connect.sid=s%3A${cookieSignature.sign(sessionID, effectiveSecret)}`;
@@ -323,6 +328,11 @@ export async function registerRoutes(
     return { ok: true };
   };
 
+  // Public: lets the signup UI know whether an invite code is required.
+  app.get("/api/auth/signup-mode", (_req, res) => {
+    res.json({ inviteOnly: inviteOnlySignups });
+  });
+
   // Phone verification routes - rate limited to prevent abuse
   app.post("/api/auth/send-phone-code", authRateLimiter, async (req, res, next) => {
     try {
@@ -452,22 +462,34 @@ export async function registerRoutes(
     try {
       const data = registerSchema.parse(req.body);
       
-      // Validate beta invite code
+      // Beta invite handling. Signups are open to the public unless
+      // INVITE_ONLY=true, in which case a valid invite code is required.
+      // In public mode a supplied code is still redeemed when valid and simply
+      // ignored when not, so a stale code never blocks an otherwise good signup.
       const inviteCode = (req.body.inviteCode as string | undefined)?.trim().toUpperCase();
-      if (!inviteCode) {
+      let invite: typeof betaInvites.$inferSelect | undefined;
+
+      if (inviteCode) {
+        [invite] = await db.select().from(betaInvites)
+          .where(eq(betaInvites.code, inviteCode))
+          .limit(1);
+
+        const inviteProblem = !invite
+          ? "Invalid invite code."
+          : invite.useCount >= invite.maxUses
+            ? "This invite code has already been used."
+            : invite.expiresAt && new Date() > invite.expiresAt
+              ? "This invite code has expired."
+              : null;
+
+        if (inviteProblem) {
+          if (inviteOnlySignups) {
+            return res.status(403).json({ message: inviteProblem, inviteRequired: true });
+          }
+          invite = undefined;
+        }
+      } else if (inviteOnlySignups) {
         return res.status(403).json({ message: "An invite code is required to join ChipIn.", inviteRequired: true });
-      }
-      const [invite] = await db.select().from(betaInvites)
-        .where(eq(betaInvites.code, inviteCode))
-        .limit(1);
-      if (!invite) {
-        return res.status(403).json({ message: "Invalid invite code.", inviteRequired: true });
-      }
-      if (invite.useCount >= invite.maxUses) {
-        return res.status(403).json({ message: "This invite code has already been used.", inviteRequired: true });
-      }
-      if (invite.expiresAt && new Date() > invite.expiresAt) {
-        return res.status(403).json({ message: "This invite code has expired.", inviteRequired: true });
       }
 
       // Check if email already exists
@@ -507,16 +529,18 @@ export async function registerRoutes(
         termsAcceptedAt: now,
         privacyAcceptedAt: now,
         betaApproved: true,
-        betaInviteCode: inviteCode,
+        betaInviteCode: invite ? inviteCode : null,
       });
       
       // Mark phone as verified
       await db.update(users).set({ phoneVerified: true }).where(eq(users.id, user.id));
       
-      // Record invite use
-      await db.update(betaInvites)
-        .set({ useCount: invite.useCount + 1, usedBy: user.id })
-        .where(eq(betaInvites.id, invite.id));
+      // Record invite use (only when a valid code was supplied)
+      if (invite) {
+        await db.update(betaInvites)
+          .set({ useCount: invite.useCount + 1, usedBy: user.id })
+          .where(eq(betaInvites.id, invite.id));
+      }
       
       // Clean up verification code
       await db.delete(phoneVerificationCodes).where(eq(phoneVerificationCodes.phone, normalizedPhone));
@@ -9496,30 +9520,6 @@ export async function registerRoutes(
   });
 
   // Join the waitlist (public)
-  app.post("/api/beta/waitlist", async (req, res, next) => {
-    try {
-      const data = z.object({
-        email: z.string().email(),
-        firstName: z.string().min(1),
-        lastName: z.string().min(1),
-        phone: z.string().optional(),
-      }).parse(req.body);
-      const existing = await db.select().from(waitlist).where(eq(waitlist.email, data.email.toLowerCase())).limit(1);
-      if (existing.length > 0) {
-        return res.status(409).json({ message: "You are already on the waitlist." });
-      }
-      await db.insert(waitlist).values({
-        email: data.email.toLowerCase(),
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone,
-      });
-      res.json({ message: "You've been added to the waitlist! We'll reach out when a spot opens up." });
-    } catch (error) {
-      next(error);
-    }
-  });
-
   // ── ADMIN BETA MANAGEMENT ROUTES ─────────────────────────────────────────────
 
   // List all beta invites
