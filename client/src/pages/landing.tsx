@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useEffect } from "react";
 import { Link } from "wouter";
 import { Sparkles, Zap, ShieldCheck, Users, CreditCard, Code, ArrowRight, CheckCircle, RefreshCw, Bell } from "lucide-react";
 import { PublicHeader, PublicFooter } from "@/components/public-layout";
@@ -6,6 +7,12 @@ import { PoolPreview } from "@/components/pool-preview";
 import { FeeSummary } from "@/components/fee-summary";
 
 export default function Landing() {
+  useEffect(() => {
+    // The anchor may not exist until React mounts after cross-page navigation.
+    if (window.location.hash === "#features") {
+      document.getElementById("features")?.scrollIntoView();
+    }
+  }, []);
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
       <style>{`

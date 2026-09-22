@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
+import { PublicNavigationLink } from "@/components/public-navigation-link";
 import { Menu, Moon, Sun, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/theme-provider";
@@ -36,13 +37,13 @@ export function PublicHeader() {
           className="hidden lg:flex items-center gap-6"
         >
           {navigation.map(([href, label]) => (
-            <Link
+            <PublicNavigationLink
               key={href}
               href={href}
               className="text-sm text-muted-foreground hover:text-foreground"
             >
               {label}
-            </Link>
+            </PublicNavigationLink>
           ))}
         </nav>
         <div className="flex items-center gap-1 sm:gap-3">
@@ -93,14 +94,14 @@ export function PublicHeader() {
             ["/login", "Sign In"],
             ["/register", "Get Started"],
           ].map(([href, label]) => (
-            <Link
+            <PublicNavigationLink
               key={href}
               href={href}
               onClick={() => setOpen(false)}
               className="rounded-lg px-3 py-3 hover:bg-muted"
             >
               {label}
-            </Link>
+            </PublicNavigationLink>
           ))}
         </nav>
       )}
