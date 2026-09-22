@@ -9520,30 +9520,6 @@ export async function registerRoutes(
   });
 
   // Join the waitlist (public)
-  app.post("/api/beta/waitlist", async (req, res, next) => {
-    try {
-      const data = z.object({
-        email: z.string().email(),
-        firstName: z.string().min(1),
-        lastName: z.string().min(1),
-        phone: z.string().optional(),
-      }).parse(req.body);
-      const existing = await db.select().from(waitlist).where(eq(waitlist.email, data.email.toLowerCase())).limit(1);
-      if (existing.length > 0) {
-        return res.status(409).json({ message: "You are already on the waitlist." });
-      }
-      await db.insert(waitlist).values({
-        email: data.email.toLowerCase(),
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone,
-      });
-      res.json({ message: "You've been added to the waitlist! We'll reach out when a spot opens up." });
-    } catch (error) {
-      next(error);
-    }
-  });
-
   // ── ADMIN BETA MANAGEMENT ROUTES ─────────────────────────────────────────────
 
   // List all beta invites

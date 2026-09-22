@@ -510,14 +510,14 @@ export default function Login() {
               <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-4">
                 <Lock className="w-8 h-8 text-yellow-500" />
               </div>
-              <CardTitle className="text-xl font-display">ChipInPool is in Private Beta</CardTitle>
+              <CardTitle className="text-xl font-display">Account access restricted</CardTitle>
               <CardDescription>
-                Your account is pending beta access. Join the waitlist and we'll send you an invite when a spot opens up.
+                This account doesn't currently have access to ChipInPool. If you think that's a mistake, get in touch and we'll sort it out.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 pb-6">
-              <Button className="w-full" onClick={() => setLocation("/waitlist")} data-testid="button-join-waitlist">
-                Join the Waitlist
+              <Button className="w-full" onClick={() => setLocation("/contact")} data-testid="button-contact-support">
+                Contact Support
               </Button>
               <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => setBetaRestricted(false)} data-testid="button-back-to-login">
                 Back to Login
@@ -879,9 +879,9 @@ export default function Login() {
                       <p className="text-[11px] text-muted-foreground">
                         {inviteOnly ? (
                           <>
-                            ChipInPool is invite-only. Don't have a code?{" "}
-                            <button type="button" className="underline text-primary" onClick={() => setLocation("/waitlist")}>
-                              Join the waitlist
+                            ChipInPool is invite-only right now. Don't have a code?{" "}
+                            <button type="button" className="underline text-primary" onClick={() => setLocation("/contact")}>
+                              Get in touch
                             </button>
                           </>
                         ) : (
